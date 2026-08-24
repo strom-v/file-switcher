@@ -4,6 +4,8 @@ __pycache__/
 node_modules/
 dist/
 out/
-build/
+build/*
+!build/icon.png
+!build/icon.icns
 resources/bin/
 *.tsbuildinfo
