@@ -1,7 +1,37 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { tmpdir, userInfo } from 'os'
 import { app } from 'electron'
 import { execAsync } from './execAsync'
+import { vpnAllowlistStore } from './vpnAllowlistStore'
+import type { VpnService } from '../shared/types'
+
+const SUDOERS_FILE = '/etc/sudoers.d/filesswitcher-networksetup'
+
+// Разрешает networksetup без пароля/Touch ID при каждом старте/остановке прокси — NOPASSWD только на этот бинарник, не на произвольные команды.
+export function isSudoersRuleInstalled(): boolean {
+  return existsSync(SUDOERS_FILE)
+}
+
+/** Устанавливает NOPASSWD-правило для networksetup через один системный диалог авторизации (Touch ID/пароль). */
+export async function installSudoersRule(): Promise<void> {
+  const rule = `${userInfo().username} ALL=(root) NOPASSWD: /usr/sbin/networksetup`
+  const tmpFile = join(tmpdir(), `filesswitcher-sudoers-${Date.now()}`)
+  writeFileSync(tmpFile, `${rule}\n`, { mode: 0o440 })
+
+  try {
+    const script = [
+      `visudo -c -f "${tmpFile}"`,
+      `cp "${tmpFile}" "${SUDOERS_FILE}"`,
+      `chmod 440 "${SUDOERS_FILE}"`,
+      `chown root:wheel "${SUDOERS_FILE}"`
+    ].join(' && ')
+    const escaped = script.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    await execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
+  } finally {
+    unlinkSync(tmpFile)
+  }
+}
 
 interface SavedProxyState {
   webEnabled: boolean
@@ -14,8 +44,7 @@ interface SavedProxyState {
 
 type SavedStatesFile = Record<string, SavedProxyState>
 
-// сохраняем на диск, а не только в памяти процесса — иначе перезапуск/падение Electron
-// с включённым прокси делает откат невозможным (некому вспомнить исходные значения)
+// сохраняем на диск, а не только в памяти — иначе падение Electron с включённым прокси делает откат невозможным
 function getStateFilePath(): string {
   return join(app.getPath('userData'), 'proxy-system-state.json')
 }
@@ -39,48 +68,64 @@ function clearSavedStates(): void {
   if (existsSync(filePath)) unlinkSync(filePath)
 }
 
-/**
- * Выполняет networksetup-команды с привилегиями администратора. Сначала пробует `sudo -n`
- * (неинтерактивно, без запроса пароля) — сработает мгновенно, если в /etc/sudoers настроено
- * NOPASSWD для networksetup (см. README/онбординг). Если нет — падает обратно на системный
- * диалог авторизации macOS, который спрашивает пароль/Touch ID каждый раз.
- */
-async function execAsAdmin(cmd: string): Promise<string> {
+// Выполняет networksetup-команды с правами администратора: сперва sudo -n по одной (см. scripts/setup_sudoers.sh), при неудаче — общий диалог авторизации macOS.
+async function execAsAdmin(networksetupArgs: string[]): Promise<void> {
   try {
-    return await execAsync(`sudo -n sh -c "${cmd.replace(/"/g, '\\"')}"`)
+    for (const args of networksetupArgs) {
+      await execAsync(`sudo -n networksetup ${args}`)
+    }
   } catch {
-    const escaped = cmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    return execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
+    const combined = networksetupArgs.map((args) => `networksetup ${args}`).join(' && ')
+    const escaped = combined.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    await execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
   }
 }
 
-/**
- * Активные (не отключённые пользователем) сетевые сервисы macOS, включая VPN — на них тоже
- * настраивается прокси, иначе трафик через активный VPN-туннель проходит мимо и не логируется.
- * Если VPN-клиент не готов работать вместе с системным прокси, его стоит выключать перед
- * запуском отслеживания вручную.
- */
-async function getActiveNetworkServices(): Promise<string[]> {
-  const output = await execAsync('networksetup -listallnetworkservices')
-  return output
+// Активные network services macOS, кроме VPN — на VPN прокси ставится отдельно, только если разрешён (см. enableSystemProxy).
+async function getActiveNonVpnServices(vpnNames: string[]): Promise<string[]> {
+  const allOutput = await execAsync('networksetup -listallnetworkservices')
+  const vpnNameSet = new Set(vpnNames)
+  return allOutput
     .split('\n')
     .slice(1)
     .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('*'))
+    .filter((line) => line && !line.startsWith('*') && !vpnNameSet.has(line))
 }
 
-/**
- * Проверяет, активен ли сейчас хотя бы один VPN-туннель — определяется по наличию `utun`-интерфейса
- * с назначенным IP-адресом (`inet ...`). Это ловит любой VPN независимо от того, зарегистрирован ли
- * он как сервис в System Settings → Network (как VPN MIR) или запускается напрямую через своё
- * приложение без системной конфигурации (WireGuard-клиенты и т.п.) — оба варианта используют
- * utun под капотом. Пустые utun-интерфейсы без IP (их создаёт сама macOS для AWDL/Private Relay
- * и т.п. даже без VPN) не считаются. Только чтение, не требует прав администратора.
- */
-export async function isVpnActive(): Promise<boolean> {
+// Имена подключённых (Connected) VPN network services по данным `scutil --nc list`.
+async function getConnectedVpnServiceNames(): Promise<string[]> {
+  const output = await execAsync('scutil --nc list')
+  const names: string[] = []
+  for (const line of output.split('\n')) {
+    const match = line.match(/^\*?\s*\(Connected\).*"([^"]+)"/)
+    if (match) names.push(match[1])
+  }
+  return names
+}
+
+// Есть ли активный utun-туннель с IP — ловит любой VPN, включая безымянные (WireGuard и т.п.); пустые utun (AWDL и т.п.) не считаются.
+async function hasActiveUtunTunnel(): Promise<boolean> {
   const output = await execAsync('ifconfig')
   const interfaceBlocks = output.split(/\n(?=\S)/)
   return interfaceBlocks.some((block) => /^utun\d+:/.test(block) && /\n\tinet\s/.test(block))
+}
+
+/** Активен ли сейчас хоть один VPN — именованный сервис или безымянный utun-туннель. */
+export async function isVpnActive(): Promise<boolean> {
+  const [vpnNames, hasUtun] = await Promise.all([getConnectedVpnServiceNames(), hasActiveUtunTunnel()])
+  return vpnNames.length > 0 || hasUtun
+}
+
+/** Список активных VPN для UI: именованные сервисы (можно разрешить/запретить прокси) плюс `{ name: null }`, если есть ещё и безымянный utun (только индикация). */
+export async function getVpnServices(): Promise<VpnService[]> {
+  const [vpnNames, hasUtun] = await Promise.all([getConnectedVpnServiceNames(), hasActiveUtunTunnel()])
+  const services: VpnService[] = vpnNames.map((name) => ({ name, allowed: vpnAllowlistStore.isAllowed(name) }))
+  if (hasUtun) services.push({ name: null, allowed: false })
+  return services
+}
+
+export function setVpnServiceAllowed(name: string, allowed: boolean): void {
+  vpnAllowlistStore.setAllowed(name, allowed)
 }
 
 interface ProxyGetResult {
@@ -108,29 +153,26 @@ async function getServiceProxyState(service: string): Promise<{ web: ProxyGetRes
 function buildRestoreCommand(service: string, saved: SavedProxyState): string[] {
   return [
     saved.webEnabled && saved.webServer
-      ? `networksetup -setwebproxy "${service}" ${saved.webServer} ${saved.webPort}`
-      : `networksetup -setwebproxystate "${service}" off`,
+      ? `-setwebproxy "${service}" ${saved.webServer} ${saved.webPort}`
+      : `-setwebproxystate "${service}" off`,
     saved.secureWebEnabled && saved.secureWebServer
-      ? `networksetup -setsecurewebproxy "${service}" ${saved.secureWebServer} ${saved.secureWebPort}`
-      : `networksetup -setsecurewebproxystate "${service}" off`
+      ? `-setsecurewebproxy "${service}" ${saved.secureWebServer} ${saved.secureWebPort}`
+      : `-setsecurewebproxystate "${service}" off`
   ]
 }
 
 /** Выполняет networksetup-команды, возвращающие прокси всех сервисов в сохранённое состояние */
 async function restoreSavedStates(states: SavedStatesFile): Promise<void> {
   const commands = Object.entries(states).flatMap(([service, saved]) => buildRestoreCommand(service, saved))
-  await execAsAdmin(commands.join(' && '))
+  await execAsAdmin(commands)
 }
 
-/**
- * Включает системный HTTP/HTTPS-прокси macOS на всех активных физических интерфейсах (как это
- * делает Fiddler на Windows автоматически), предварительно сохраняя исходное состояние на диск
- * для восстановления при остановке — переживает перезапуск/падение приложения. Требует
- * привилегий администратора — macOS покажет системный диалог авторизации (либо пройдёт молча,
- * если настроен sudoers NOPASSWD).
- */
+/** Включает системный HTTP/HTTPS-прокси на активных сервисах (плюс разрешённые VPN), сохранив исходное состояние на диск для восстановления при остановке/падении. */
 export async function enableSystemProxy(host: string, port: number): Promise<void> {
-  const services = await getActiveNetworkServices()
+  const vpnNames = await getConnectedVpnServiceNames()
+  const nonVpnServices = await getActiveNonVpnServices(vpnNames)
+  const allowedVpnServices = vpnNames.filter((name) => vpnAllowlistStore.isAllowed(name))
+  const services = [...nonVpnServices, ...allowedVpnServices]
   if (services.length === 0) return
 
   const states: SavedStatesFile = {}
@@ -148,12 +190,12 @@ export async function enableSystemProxy(host: string, port: number): Promise<voi
       secureWebPort: secureWeb.port
     }
 
-    commands.push(`networksetup -setwebproxy "${service}" ${host} ${port}`)
-    commands.push(`networksetup -setsecurewebproxy "${service}" ${host} ${port}`)
+    commands.push(`-setwebproxy "${service}" ${host} ${port}`)
+    commands.push(`-setsecurewebproxy "${service}" ${host} ${port}`)
   }
 
   writeSavedStates(states)
-  await execAsAdmin(commands.join(' && '))
+  await execAsAdmin(commands)
 }
 
 /** Восстанавливает системный прокси в состояние, которое было до enableSystemProxy() */
@@ -168,12 +210,7 @@ export async function disableSystemProxy(): Promise<void> {
   await restoreSavedStates(states)
 }
 
-/**
- * Страховка на старте/выходе из приложения: если на диске остался файл сохранённого состояния
- * (прошлый запуск завершился аварийно, не успев откатить прокси) — восстанавливает его. Если
- * файла нет, но системный прокси всё ещё указывает на локальный адрес (например файл состояния
- * был утерян) — на всякий случай выключает прокси, чтобы не оставить пользователя без интернета.
- */
+/** Страховка на старте/выходе: восстанавливает сохранённое состояние прокси после аварийного завершения, либо выключает прокси, если файл состояния утерян. */
 export async function recoverStaleSystemProxy(host: string): Promise<void> {
   const states = readSavedStates()
   if (states && Object.keys(states).length > 0) {
@@ -186,20 +223,22 @@ export async function recoverStaleSystemProxy(host: string): Promise<void> {
     return
   }
 
-  const services = await getActiveNetworkServices()
+  const vpnNames = await getConnectedVpnServiceNames()
+  const nonVpnServices = await getActiveNonVpnServices(vpnNames)
+  const services = [...nonVpnServices, ...vpnNames]
   const staleCommands: string[] = []
   for (const service of services) {
     const { web, secureWeb } = await getServiceProxyState(service)
 
     if (web.enabled && web.server === host) {
-      staleCommands.push(`networksetup -setwebproxystate "${service}" off`)
+      staleCommands.push(`-setwebproxystate "${service}" off`)
     }
     if (secureWeb.enabled && secureWeb.server === host) {
-      staleCommands.push(`networksetup -setsecurewebproxystate "${service}" off`)
+      staleCommands.push(`-setsecurewebproxystate "${service}" off`)
     }
   }
 
   if (staleCommands.length > 0) {
-    await execAsAdmin(staleCommands.join(' && '))
+    await execAsAdmin(staleCommands)
   }
 }
