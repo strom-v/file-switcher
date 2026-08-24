@@ -50,29 +50,32 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
             const isMatched = item.event === 'matched'
             return (
               <List.Item
-                className={isMatched ? 'log-item--matched' : undefined}
+                className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}
                 style={{ cursor: 'pointer' }}
                 onClick={() => setSelected(item)}
               >
-                <Flex vertical>
-                  <Space size="small">
+                <Flex vertical gap={0}>
+                  <Flex gap={6} align="baseline">
                     <Typography.Text strong style={{ minWidth: 42 }}>
                       {item.method}
                     </Typography.Text>
                     <Typography.Text strong style={{ color: httpStatusColor(item.statusCode), minWidth: 28 }}>
                       {item.statusCode ?? '—'}
                     </Typography.Text>
-                    <Typography.Text type="secondary">{tsToDate(item.ts).toLocaleTimeString()}</Typography.Text>
-                  </Space>
-                  <Typography.Text className="ellipsis-text" ellipsis={{ tooltip: item.url }} copyable>
-                    {item.url}
-                  </Typography.Text>
+                    <Typography.Text type="secondary" style={{ minWidth: 68 }}>
+                      {tsToDate(item.ts).toLocaleTimeString()}
+                    </Typography.Text>
+                    <Typography.Text className="ellipsis-text" ellipsis={{ tooltip: item.url }} copyable={!!item.url}>
+                      {item.url}
+                    </Typography.Text>
+                  </Flex>
                   {isMatched && (
                     <Typography.Text
                       className="ellipsis-text"
                       type="secondary"
                       ellipsis={{ tooltip: item.file }}
-                      copyable
+                      copyable={!!item.file}
+                      style={{ fontSize: 12 }}
                     >
                       {item.file}
                     </Typography.Text>

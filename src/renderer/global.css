@@ -71,6 +71,12 @@ html.dark-scrollbars .rule-row--complete > td.ant-table-cell {
   background-color: rgba(82, 196, 26, 0.15);
 }
 
+/* компактная запись лога прокси: меньше вертикальных отступов, чтобы помещалось больше строк */
+.log-item--compact.ant-list-item {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
 html.dark-scrollbars,
 html.dark-scrollbars body {
   background: #141414;
