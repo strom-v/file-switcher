@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
-import { Button, Form, Input, Modal, Switch } from 'antd'
+import { Button, Collapse, Flex, Form, Input, InputNumber, Modal, Space, Switch } from 'antd'
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import type { Rule } from '../../shared/types'
+import type { HeaderOverride, Rule } from '../../shared/types'
 
 interface RuleFormModalProps {
   open: boolean
@@ -30,7 +31,11 @@ export default function RuleFormModal({
           urlPattern: '',
           isRegex: true,
           localFilePath: '',
-          contentType: ''
+          contentType: '',
+          requestHeaderOverrides: [],
+          responseHeaderOverrides: [],
+          delayMs: undefined,
+          statusCodeOverride: undefined
         }
       )
     }
@@ -72,12 +77,7 @@ export default function RuleFormModal({
         <Form.Item name="isRegex" label={t('rules.form.isRegex')} valuePropName="checked">
           <Switch />
         </Form.Item>
-        <Form.Item
-          name="localFilePath"
-          label={t('rules.form.localFile')}
-          extra={t('rules.form.localFileHint')}
-          rules={[{ required: true, message: t('rules.form.localFileRequired') }]}
-        >
+        <Form.Item name="localFilePath" label={t('rules.form.localFile')} extra={t('rules.form.localFileHint')}>
           <Input
             placeholder={t('rules.form.localFilePlaceholder')}
             addonAfter={
@@ -90,7 +90,74 @@ export default function RuleFormModal({
         <Form.Item name="contentType" label={t('rules.form.contentType')}>
           <Input placeholder={t('rules.form.contentTypePlaceholder')} />
         </Form.Item>
+
+        <Collapse
+          size="small"
+          items={[
+            {
+              key: 'advanced',
+              label: t('rules.form.advancedSection'),
+              children: (
+                <>
+                  <Form.Item name="statusCodeOverride" label={t('rules.form.statusCodeOverride')}>
+                    <InputNumber
+                      min={100}
+                      max={599}
+                      placeholder={t('rules.form.statusCodeOverridePlaceholder')}
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                  <Form.Item name="delayMs" label={t('rules.form.delayMs')}>
+                    <InputNumber min={0} step={100} style={{ width: '100%' }} />
+                  </Form.Item>
+                  <HeaderOverridesField name="requestHeaderOverrides" label={t('rules.form.requestHeaders')} />
+                  <HeaderOverridesField name="responseHeaderOverrides" label={t('rules.form.responseHeaders')} />
+                </>
+              )
+            }
+          ]}
+        />
       </Form>
     </Modal>
+  )
+}
+
+interface HeaderOverridesFieldProps {
+  name: 'requestHeaderOverrides' | 'responseHeaderOverrides'
+  label: string
+}
+
+/** Динамический список пар имя/значение заголовков; пустое значение при сохранении означает "удалить заголовок" */
+function HeaderOverridesField({ name, label }: HeaderOverridesFieldProps): React.ReactElement {
+  const { t } = useTranslation()
+
+  return (
+    <Form.Item label={label}>
+      <Form.List name={name}>
+        {(fields, { add, remove }) => (
+          <Space direction="vertical" style={{ width: '100%' }}>
+            {fields.map((field) => (
+              <Flex key={field.key} gap={8}>
+                <Form.Item name={[field.name, 'name']} noStyle>
+                  <Input placeholder={t('rules.form.headerName')} style={{ flex: 1 }} />
+                </Form.Item>
+                <Form.Item name={[field.name, 'value']} noStyle>
+                  <Input placeholder={t('rules.form.headerValueHint')} style={{ flex: 1 }} />
+                </Form.Item>
+                <Button icon={<DeleteOutlined />} onClick={() => remove(field.name)} />
+              </Flex>
+            ))}
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() => add({ name: '', value: '' } satisfies HeaderOverride)}
+              block
+            >
+              {t('rules.form.addHeader')}
+            </Button>
+          </Space>
+        )}
+      </Form.List>
+    </Form.Item>
   )
 }

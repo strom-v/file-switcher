@@ -1,10 +1,20 @@
 import React from 'react'
-import { Checkbox, ConfigProvider, Popconfirm, Space, Table, Typography } from 'antd'
+import { Checkbox, ConfigProvider, Popconfirm, Space, Table, Tag, Tooltip, Typography } from 'antd'
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 import IconButton from './IconButton'
 import type { Rule } from '../../shared/types'
+
+/** Есть ли у правила модификации, кроме подмены тела (заголовки/задержка/статус) */
+function hasAdvancedModifications(rule: Rule): boolean {
+  return (
+    !!rule.requestHeaderOverrides?.length ||
+    !!rule.responseHeaderOverrides?.length ||
+    !!rule.delayMs ||
+    !!rule.statusCodeOverride
+  )
+}
 
 interface RulesTableProps {
   rules: Rule[]
@@ -54,10 +64,21 @@ export default function RulesTable({
       title: t('rules.table.localFile'),
       dataIndex: 'localFilePath',
       ellipsis: true,
-      render: (localFilePath: string) => (
-        <Typography.Text className="ellipsis-text" ellipsis={{ tooltip: localFilePath }} copyable={!!localFilePath}>
-          {localFilePath}
-        </Typography.Text>
+      render: (localFilePath: string | undefined, rule) => (
+        <Space size={4}>
+          {localFilePath ? (
+            <Typography.Text className="ellipsis-text" ellipsis={{ tooltip: localFilePath }} copyable>
+              {localFilePath}
+            </Typography.Text>
+          ) : (
+            <Typography.Text type="secondary">{t('rules.table.noFile')}</Typography.Text>
+          )}
+          {hasAdvancedModifications(rule) && (
+            <Tooltip title={t('rules.table.hasAdvancedHint')}>
+              <Tag color="blue">{t('rules.table.hasAdvanced')}</Tag>
+            </Tooltip>
+          )}
+        </Space>
       )
     },
     {
@@ -81,7 +102,8 @@ export default function RulesTable({
         columns={columns}
         dataSource={rules}
         pagination={false}
-        size="middle"
+        size="small"
+        className="rules-table--compact"
         rowClassName={(rule) => (rule.urlPattern && rule.localFilePath ? 'rule-row--complete' : '')}
       />
     </ConfigProvider>

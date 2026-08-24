@@ -1,8 +1,15 @@
+import { readFileSync, writeFileSync } from 'fs'
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
-import { isVpnActive } from './proxySystemConfig'
+import {
+  getVpnServices,
+  installSudoersRule,
+  isSudoersRuleInstalled,
+  isVpnActive,
+  setVpnServiceAllowed
+} from './proxySystemConfig'
 
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
 export function registerIpcHandlers(): void {
@@ -31,6 +38,23 @@ export function registerIpcHandlers(): void {
     }
   })
 
+  ipcMain.handle('system:vpnServices', async () => {
+    if (process.platform !== 'darwin') return []
+    try {
+      return await getVpnServices()
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('system:setVpnServiceAllowed', (_event, name: string, allowed: boolean) => {
+    setVpnServiceAllowed(name, allowed)
+  })
+
+  ipcMain.handle('system:sudoersInstalled', () => isSudoersRuleInstalled())
+
+  ipcMain.handle('system:installSudoersRule', () => installSudoersRule())
+
   ipcMain.handle('cert:status', () => getCertStatus())
 
   ipcMain.handle('cert:list', () => listCerts())
@@ -51,6 +75,26 @@ export function registerIpcHandlers(): void {
       return null
     }
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('dialog:openTextFile', async (_event, extensions?: string[]) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: extensions ? [{ name: 'Files', extensions }] : undefined
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return readFileSync(result.filePaths[0], 'utf-8')
+  })
+
+  ipcMain.handle('dialog:saveTextFile', async (_event, defaultFileName: string, content: string) => {
+    const result = await dialog.showSaveDialog({ defaultPath: defaultFileName })
+    if (result.canceled || !result.filePath) {
+      return null
+    }
+    writeFileSync(result.filePath, content, 'utf-8')
+    return result.filePath
   })
 
   proxyController.on('status', (state) => {

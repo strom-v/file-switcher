@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, VpnService } from '../shared/types'
 
 const api = {
   rules: {
@@ -33,10 +33,19 @@ const api = {
     list: (): Promise<CertInfo[]> => ipcRenderer.invoke('cert:list')
   },
   dialog: {
-    selectFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFile')
+    selectFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFile'),
+    saveTextFile: (defaultFileName: string, content: string): Promise<string | null> =>
+      ipcRenderer.invoke('dialog:saveTextFile', defaultFileName, content),
+    openTextFile: (extensions?: string[]): Promise<string | null> =>
+      ipcRenderer.invoke('dialog:openTextFile', extensions)
   },
   system: {
-    vpnActive: (): Promise<boolean> => ipcRenderer.invoke('system:vpnActive')
+    vpnActive: (): Promise<boolean> => ipcRenderer.invoke('system:vpnActive'),
+    vpnServices: (): Promise<VpnService[]> => ipcRenderer.invoke('system:vpnServices'),
+    setVpnServiceAllowed: (name: string, allowed: boolean): Promise<void> =>
+      ipcRenderer.invoke('system:setVpnServiceAllowed', name, allowed),
+    sudoersInstalled: (): Promise<boolean> => ipcRenderer.invoke('system:sudoersInstalled'),
+    installSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:installSudoersRule')
   }
 }
 
