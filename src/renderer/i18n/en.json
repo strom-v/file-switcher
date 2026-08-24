@@ -1,0 +1,96 @@
+{
+  "app": {
+    "settingsButton": "settings",
+    "settingsDrawerTitle": "settings",
+    "vpnActive": "VPN",
+    "vpnActiveHint": "VPN is active — its traffic bypasses the proxy and won't be tracked. turn off the VPN before starting tracking."
+  },
+  "rules": {
+    "addButton": "add rule",
+    "table": {
+      "urlPattern": "rule",
+      "localFile": "path",
+      "edit": "edit",
+      "delete": "delete",
+      "deleteConfirm": "delete this rule?"
+    },
+    "form": {
+      "titleNew": "new rule",
+      "titleEdit": "edit rule",
+      "save": "save",
+      "cancel": "cancel",
+      "enabled": "enabled",
+      "urlPattern": "URL pattern",
+      "urlPatternPlaceholder": "https://example.com/app.js",
+      "urlPatternRequired": "enter a URL or regex",
+      "isRegex": "regex",
+      "localFile": "local file",
+      "localFileHint": "for regex rules you can use $1, $2… — match groups are substituted",
+      "localFilePlaceholder": "/path/to/file or /path/to/$2.$3",
+      "localFileRequired": "choose a file",
+      "selectFile": "browse…",
+      "contentType": "Content-Type (optional)",
+      "contentTypePlaceholder": "application/javascript"
+    }
+  },
+  "log": {
+    "clear": "clear",
+    "empty": "no requests yet",
+    "matched": "matched",
+    "passed": "passed through",
+    "detailTitle": "request details",
+    "detailUrl": "URL",
+    "detailMethod": "method",
+    "detailStatus": "status",
+    "detailTime": "time",
+    "detailSize": "response size",
+    "detailEvent": "event",
+    "detailFile": "substituted file",
+    "detailRequestHeaders": "request headers",
+    "detailResponseHeaders": "response headers"
+  },
+  "settings": {
+    "error": "error",
+    "portLabel": "proxy port:",
+    "certTitle": "HTTPS certificate",
+    "certStatus": "status",
+    "certListHint": "mitmproxy CA certificates (CN=mitmproxy) in the current user's keychain. several can accumulate if mitmproxy was reinstalled.",
+    "certExpiresAt": "valid until {{date}}",
+    "certTrusted": "trusted",
+    "certNotTrusted": "generated, not installed",
+    "certNotGenerated": "not generated",
+    "certNotGeneratedAlertTitle": "certificate not yet created",
+    "certNotGeneratedAlertDescription": "start the proxy and open http://mitm.it in your browser so mitmproxy can generate a CA certificate, then trust it.",
+    "installCertButton": "install automatically",
+    "installCertSuccess": "certificate added to trusted",
+    "installCertError": "failed to install certificate: {{message}}",
+    "removeCertButton": "remove certificate trust",
+    "removeCertSuccess": "certificate trust removed",
+    "removeCertError": "failed to remove trust: {{message}}",
+    "firefoxWarningTitle": "Firefox is not supported in the MVP",
+    "firefoxWarningDescription": "Firefox uses its own certificate store (NSS), not the system Keychain. import the certificate manually via about:preferences#privacy → Certificates.",
+    "statusLabels": {
+      "stopped": "stopped",
+      "starting": "starting",
+      "running": "running",
+      "crashed": "crashed"
+    },
+    "themeLight": "light",
+    "themeDark": "dark"
+  },
+  "onboarding": {
+    "title": "welcome to FileSwitcher",
+    "intro": "to make file substitution work in your browser, complete a few steps:",
+    "ok": "got it",
+    "steps": {
+      "addRule": { "title": "add a rule", "description": "in the Rules panel on the right, specify a URL and a local file" },
+      "startProxy": { "title": "start the proxy", "description": "open Settings and click «Start proxy»" },
+      "openMitm": { "title": "open mitm.it", "description": "with the proxy active, open http://mitm.it in your browser" },
+      "downloadCert": { "title": "download the certificate", "description": "download the certificate for your OS (macOS)" },
+      "trustCert": { "title": "trust the certificate", "description": "in Settings, click «Install automatically», or trust it manually via Keychain Access" }
+    }
+  },
+  "proxyErrors": {
+    "startFailed": "failed to start the proxy"
+  }
+}

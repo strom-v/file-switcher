@@ -1,0 +1,86 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* единый квадратный размер для icon-only кнопок по всему приложению */
+.icon-btn.ant-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+/* весь текст (Typography.Text/Title/Paragraph) и теги — курсор default вместо текстового I-beam */
+.ant-typography,
+.ant-tag {
+  cursor: default;
+}
+
+/* иконка-подсказка (обычно под Tooltip) — курсор default, а не унаследованный pointer/text */
+.hint-icon {
+  cursor: default;
+}
+
+/* текст с ellipsis-подсказкой: не растягивает контейнер (курсор задаёт правило выше) */
+.ellipsis-text {
+  max-width: 100%;
+}
+
+/* панель с прокручиваемым содержимым, занимающая всё доступное пространство колонки */
+.scroll-panel {
+  flex: 1;
+  overflow: auto;
+}
+
+/* вертикальная колонка на всю высоту родителя (панель лога/правил внутри Splitter) */
+.panel-column {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* отступ снизу для строки-тулбара над контентом панели */
+.panel-toolbar {
+  margin-bottom: 12px;
+}
+
+/* длинные значения (URL, пути) переносятся по любому символу, не выходя за границы блока */
+.break-all {
+  word-break: break-all;
+}
+
+/* многострочный копируемый текст (заголовки запроса/ответа): сохраняет переносы, без отступов */
+.pre-wrap {
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+/* правило с заполненными URL и путём выделяется на фоне строк с незаполненными полями;
+   background вместо filter — иначе на светлой теме filter выбеливает чекбокс до невидимости */
+.rule-row--complete > td.ant-table-cell {
+  background-color: rgba(0, 0, 0, 0.035);
+}
+
+html.dark-scrollbars .rule-row--complete > td.ant-table-cell {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* запись в логе о сработавшей подмене выделяется зелёным фоном среди остального трафика */
+.log-item--matched.ant-list-item {
+  background-color: rgba(82, 196, 26, 0.15);
+}
+
+html.dark-scrollbars,
+html.dark-scrollbars body {
+  background: #141414;
+}
+
+/* скроллбар скрыт визуально везде — сама прокрутка (колесо/трекпад) остаётся рабочей */
+* {
+  scrollbar-width: none; /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chromium/Electron */
+}

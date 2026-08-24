@@ -1,0 +1,39 @@
+{
+  "name": "file-switcher",
+  "productName": "FileSwitcher",
+  "version": "0.1.0",
+  "description": "Локальный прокси для подмены файлов (macOS, MVP)",
+  "main": "./out/main/main.js",
+  "author": "",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "start": "electron-vite preview",
+    "build:mac": "electron-vite build && electron-builder --mac",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
+  },
+  "dependencies": {
+    "antd": "^6.6.1",
+    "i18next": "^26.4.0",
+    "react-i18next": "^17.0.12"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@electron-toolkit/utils": "^4.0.0",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "prettier": "3.9.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6"
+  }
+}

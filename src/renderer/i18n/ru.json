@@ -1,0 +1,96 @@
+{
+  "app": {
+    "settingsButton": "настройки",
+    "settingsDrawerTitle": "настройки",
+    "vpnActive": "VPN",
+    "vpnActiveHint": "активен VPN — трафик через него идёт мимо прокси и не будет отслеживаться. выключите VPN перед запуском отслеживания."
+  },
+  "rules": {
+    "addButton": "добавить правило",
+    "table": {
+      "urlPattern": "правило",
+      "localFile": "путь",
+      "edit": "изменить",
+      "delete": "удалить",
+      "deleteConfirm": "удалить правило?"
+    },
+    "form": {
+      "titleNew": "новое правило",
+      "titleEdit": "редактирование правила",
+      "save": "сохранить",
+      "cancel": "отмена",
+      "enabled": "включено",
+      "urlPattern": "URL-паттерн",
+      "urlPatternPlaceholder": "https://example.com/app.js",
+      "urlPatternRequired": "укажите URL или regex",
+      "isRegex": "regex",
+      "localFile": "локальный файл",
+      "localFileHint": "для regex-правил можно использовать $1, $2… — подставятся группы совпадения",
+      "localFilePlaceholder": "/path/to/file или /path/to/$2.$3",
+      "localFileRequired": "выберите файл",
+      "selectFile": "выбрать…",
+      "contentType": "Content-Type (опционально)",
+      "contentTypePlaceholder": "application/javascript"
+    }
+  },
+  "log": {
+    "clear": "очистить",
+    "empty": "пока нет запросов",
+    "matched": "подмена",
+    "passed": "без изменений",
+    "detailTitle": "детали запроса",
+    "detailUrl": "URL",
+    "detailMethod": "метод",
+    "detailStatus": "статус",
+    "detailTime": "время",
+    "detailSize": "размер ответа",
+    "detailEvent": "событие",
+    "detailFile": "файл подмены",
+    "detailRequestHeaders": "заголовки запроса",
+    "detailResponseHeaders": "заголовки ответа"
+  },
+  "settings": {
+    "error": "ошибка",
+    "portLabel": "порт прокси:",
+    "certTitle": "HTTPS-сертификат",
+    "certStatus": "статус",
+    "certListHint": "список CA-сертификатов mitmproxy (CN=mitmproxy) в связке ключей текущего пользователя. может накопиться несколько, если mitmproxy переустанавливался.",
+    "certExpiresAt": "действителен до {{date}}",
+    "certTrusted": "доверенный",
+    "certNotTrusted": "сгенерирован, не установлен",
+    "certNotGenerated": "не сгенерирован",
+    "certNotGeneratedAlertTitle": "сертификат ещё не создан",
+    "certNotGeneratedAlertDescription": "запустите прокси и откройте http://mitm.it в браузере, чтобы mitmproxy сгенерировал CA-сертификат, затем установите доверие.",
+    "installCertButton": "установить автоматически",
+    "installCertSuccess": "сертификат добавлен в доверенные",
+    "installCertError": "не удалось установить сертификат: {{message}}",
+    "removeCertButton": "удалить доверие к сертификату",
+    "removeCertSuccess": "доверие к сертификату удалено",
+    "removeCertError": "не удалось удалить доверие: {{message}}",
+    "firefoxWarningTitle": "Firefox не поддерживается в MVP",
+    "firefoxWarningDescription": "Firefox использует собственное хранилище сертификатов (NSS), а не системный Keychain. импортируйте сертификат вручную через about:preferences#privacy → Certificates.",
+    "statusLabels": {
+      "stopped": "остановлен",
+      "starting": "запускается",
+      "running": "работает",
+      "crashed": "упал"
+    },
+    "themeLight": "светлая",
+    "themeDark": "тёмная"
+  },
+  "onboarding": {
+    "title": "добро пожаловать в FileSwitcher",
+    "intro": "чтобы подмена файлов заработала в браузере, выполните несколько шагов:",
+    "ok": "понятно",
+    "steps": {
+      "addRule": { "title": "добавьте правило", "description": "в блоке «правила» справа укажите URL и локальный файл" },
+      "startProxy": { "title": "включите прокси", "description": "откройте «настройки» и нажмите «запустить прокси»" },
+      "openMitm": { "title": "откройте mitm.it", "description": "в браузере с активным прокси перейдите на http://mitm.it" },
+      "downloadCert": { "title": "скачайте сертификат", "description": "скачайте сертификат для вашей ОС (macOS)" },
+      "trustCert": { "title": "доверьтесь сертификату", "description": "в «настройках» нажмите «установить автоматически», либо доверьтесь вручную через Keychain Access" }
+    }
+  },
+  "proxyErrors": {
+    "startFailed": "не удалось запустить прокси"
+  }
+}

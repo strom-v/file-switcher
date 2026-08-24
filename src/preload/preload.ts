@@ -1,0 +1,45 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo } from '../shared/types'
+
+const api = {
+  rules: {
+    get: (): Promise<Rule[]> => ipcRenderer.invoke('rules:get'),
+    save: (rules: Rule[]): Promise<Rule[]> => ipcRenderer.invoke('rules:save', rules)
+  },
+  proxy: {
+    start: (port: number): Promise<ProxyState> => ipcRenderer.invoke('proxy:start', port),
+    stop: (): Promise<ProxyState> => ipcRenderer.invoke('proxy:stop'),
+    status: (): Promise<ProxyState> => ipcRenderer.invoke('proxy:status'),
+    onStatus: (callback: (state: ProxyState) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, state: ProxyState): void => callback(state)
+      ipcRenderer.on('proxy:status', listener)
+      return () => ipcRenderer.removeListener('proxy:status', listener)
+    },
+    onLog: (callback: (event: ProxyLogEvent) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, log: ProxyLogEvent): void => callback(log)
+      ipcRenderer.on('proxy:log', listener)
+      return () => ipcRenderer.removeListener('proxy:log', listener)
+    },
+    onStderr: (callback: (text: string) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, text: string): void => callback(text)
+      ipcRenderer.on('proxy:stderr', listener)
+      return () => ipcRenderer.removeListener('proxy:stderr', listener)
+    }
+  },
+  cert: {
+    status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),
+    install: (): Promise<CertStatus> => ipcRenderer.invoke('cert:install'),
+    remove: (): Promise<CertStatus> => ipcRenderer.invoke('cert:remove'),
+    list: (): Promise<CertInfo[]> => ipcRenderer.invoke('cert:list')
+  },
+  dialog: {
+    selectFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFile')
+  },
+  system: {
+    vpnActive: (): Promise<boolean> => ipcRenderer.invoke('system:vpnActive')
+  }
+}
+
+contextBridge.exposeInMainWorld('api', api)
+
+export type Api = typeof api

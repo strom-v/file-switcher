@@ -1,0 +1,73 @@
+import { dialog, ipcMain, BrowserWindow } from 'electron'
+import { proxyController } from './proxyController'
+import { rulesStore, Rule } from './rulesStore'
+import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
+import { isVpnActive } from './proxySystemConfig'
+
+/** Регистрирует все ipcMain-обработчики и подписки на события прокси */
+export function registerIpcHandlers(): void {
+  ipcMain.handle('rules:get', () => rulesStore.getAll())
+
+  ipcMain.handle('rules:save', (_event, rules: Rule[]) => rulesStore.saveAll(rules))
+
+  ipcMain.handle('proxy:start', (_event, port: number) => {
+    proxyController.start(rulesStore.getFilePath(), port)
+    return proxyController.getState()
+  })
+
+  ipcMain.handle('proxy:stop', async () => {
+    await proxyController.stop()
+    return proxyController.getState()
+  })
+
+  ipcMain.handle('proxy:status', () => proxyController.getState())
+
+  ipcMain.handle('system:vpnActive', async () => {
+    if (process.platform !== 'darwin') return false
+    try {
+      return await isVpnActive()
+    } catch {
+      return false
+    }
+  })
+
+  ipcMain.handle('cert:status', () => getCertStatus())
+
+  ipcMain.handle('cert:list', () => listCerts())
+
+  ipcMain.handle('cert:install', async () => {
+    await installCert()
+    return getCertStatus()
+  })
+
+  ipcMain.handle('cert:remove', async () => {
+    await removeCertTrust()
+    return getCertStatus()
+  })
+
+  ipcMain.handle('dialog:selectFile', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openFile'] })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
+
+  proxyController.on('status', (state) => {
+    broadcast('proxy:status', state)
+  })
+
+  proxyController.on('log', (event) => {
+    broadcast('proxy:log', event)
+  })
+
+  proxyController.on('stderr', (text: string) => {
+    broadcast('proxy:stderr', text)
+  })
+}
+
+function broadcast(channel: string, payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(channel, payload)
+  }
+}

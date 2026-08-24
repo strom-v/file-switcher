@@ -1,0 +1,12 @@
+{
+  "rules": [
+    {
+      "id": "test-1",
+      "enabled": true,
+      "urlPattern": "https://example\\.com/app\\.js",
+      "isRegex": true,
+      "localFilePath": "/Users/vitaly/Desktop/projects/my projects/file-switcher/test/fixture.js",
+      "contentType": "application/javascript"
+    }
+  ]
+}
