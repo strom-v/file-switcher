@@ -2,14 +2,19 @@
   "app": {
     "settingsButton": "настройки",
     "settingsDrawerTitle": "настройки",
+    "logTab": "лог",
+    "statsTab": "статистика",
     "vpnActive": "VPN",
-    "vpnActiveHint": "активен VPN — трафик через него идёт мимо прокси и не будет отслеживаться. выключите VPN перед запуском отслеживания."
+    "vpnActiveHint": "активен VPN. по умолчанию его трафик прокси не трогает — разрешить отслеживание для конкретного VPN можно в «настройках»."
   },
   "rules": {
     "addButton": "добавить правило",
     "table": {
       "urlPattern": "правило",
       "localFile": "путь",
+      "noFile": "без подмены тела",
+      "hasAdvanced": "доп.",
+      "hasAdvancedHint": "правило меняет заголовки, задержку или статус ответа",
       "edit": "изменить",
       "delete": "удалить",
       "deleteConfirm": "удалить правило?"
@@ -24,18 +29,37 @@
       "urlPatternPlaceholder": "https://example.com/app.js",
       "urlPatternRequired": "укажите URL или regex",
       "isRegex": "regex",
-      "localFile": "локальный файл",
-      "localFileHint": "для regex-правил можно использовать $1, $2… — подставятся группы совпадения",
+      "localFile": "локальный файл (опционально)",
+      "localFileHint": "оставьте пустым, чтобы пропустить запрос на реальный сервер и применить только заголовки/задержку/статус ниже. для regex-правил можно использовать $1, $2… — подставятся группы совпадения",
       "localFilePlaceholder": "/path/to/file или /path/to/$2.$3",
-      "localFileRequired": "выберите файл",
       "selectFile": "выбрать…",
       "contentType": "Content-Type (опционально)",
-      "contentTypePlaceholder": "application/javascript"
-    }
+      "contentTypePlaceholder": "application/javascript",
+      "advancedSection": "дополнительно: заголовки, задержка, статус",
+      "statusCodeOverride": "подменить HTTP-статус ответа",
+      "statusCodeOverridePlaceholder": "например 500",
+      "delayMs": "задержка ответа, мс",
+      "requestHeaders": "заголовки запроса",
+      "responseHeaders": "заголовки ответа",
+      "headerName": "имя заголовка",
+      "headerValueHint": "значение (пусто — удалить заголовок)",
+      "addHeader": "добавить заголовок"
+    },
+    "exportButton": "экспортировать правила",
+    "importButton": "импортировать правила",
+    "importConfirm": "заменить текущие правила содержимым файла?",
+    "exportSuccess": "правила сохранены: {{path}}",
+    "importSuccess": "импортировано правил: {{count}}",
+    "importInvalidFormat": "файл не похож на экспорт правил FileSwitcher"
   },
   "log": {
     "clear": "очистить",
+    "exportHar": "экспорт в HAR",
+    "exportSuccess": "лог сохранён: {{path}}",
     "empty": "пока нет запросов",
+    "noMatches": "ничего не найдено по фильтру",
+    "searchPlaceholder": "поиск по URL",
+    "filterAll": "все",
     "matched": "подмена",
     "passed": "без изменений",
     "detailTitle": "детали запроса",
@@ -51,7 +75,19 @@
   },
   "settings": {
     "error": "ошибка",
+    "appearanceTitle": "внешний вид",
     "portLabel": "порт прокси:",
+    "sudoersAlertTitle": "прокси спрашивает пароль на каждый запуск/остановку",
+    "sudoersAlertDescription": "разрешите networksetup работать без пароля — один системный диалог авторизации, дальше запуск/остановка прокси без запроса пароля.",
+    "sudoersInstallButton": "настроить без пароля",
+    "sudoersInstallSuccess": "готово: запуск/остановка прокси больше не будут спрашивать пароль",
+    "sudoersInstallError": "не удалось настроить: {{message}}",
+    "vpnTitle": "VPN",
+    "vpnHint": "по умолчанию прокси не трогает VPN-туннели — включённый VPN обычно ломается, если настроить на нём системный прокси одновременно. разрешайте отслеживание точечно, только для VPN, где это безопасно (например рабочий VPN с доступом до внутренних сервисов).",
+    "vpnAllowedHint": "прокси настроен на этом VPN — трафик через него отслеживается",
+    "vpnNotAllowedHint": "прокси не трогает этот VPN — трафик через него идёт мимо",
+    "vpnUnnamed": "VPN без сетевого сервиса (WireGuard и т.п.)",
+    "vpnUnnamedHint": "не зарегистрирован как сетевой сервис — прокси нельзя настроить отдельно на нём, только индикация",
     "certTitle": "HTTPS-сертификат",
     "certStatus": "статус",
     "certListHint": "список CA-сертификатов mitmproxy (CN=mitmproxy) в связке ключей текущего пользователя. может накопиться несколько, если mitmproxy переустанавливался.",
@@ -76,18 +112,39 @@
       "crashed": "упал"
     },
     "themeLight": "светлая",
-    "themeDark": "тёмная"
+    "themeDark": "тёмная",
+    "rulesExportTitle": "правила",
+    "rulesExportHint": "сохранить текущие правила подмены в JSON-файл или заменить их содержимым другого файла",
+    "exportTitle": "лог",
+    "exportHint": "сохранить текущий лог прокси в HAR-файл — открывается в Chrome DevTools, Fiddler, Charles и т.п."
+  },
+  "stats": {
+    "totalRequests": "запросов всего",
+    "matchedCount": "подмен сработало",
+    "totalBytes": "суммарный размер ответов",
+    "topHosts": "топ хостов по числу запросов",
+    "statusBreakdown": "по статусам ответа",
+    "largestResponses": "самые крупные ответы"
   },
   "onboarding": {
     "title": "добро пожаловать в FileSwitcher",
     "intro": "чтобы подмена файлов заработала в браузере, выполните несколько шагов:",
     "ok": "понятно",
     "steps": {
-      "addRule": { "title": "добавьте правило", "description": "в блоке «правила» справа укажите URL и локальный файл" },
+      "addRule": {
+        "title": "добавьте правило",
+        "description": "в блоке «правила» справа укажите URL и локальный файл"
+      },
       "startProxy": { "title": "включите прокси", "description": "откройте «настройки» и нажмите «запустить прокси»" },
-      "openMitm": { "title": "откройте mitm.it", "description": "в браузере с активным прокси перейдите на http://mitm.it" },
+      "openMitm": {
+        "title": "откройте mitm.it",
+        "description": "в браузере с активным прокси перейдите на http://mitm.it"
+      },
       "downloadCert": { "title": "скачайте сертификат", "description": "скачайте сертификат для вашей ОС (macOS)" },
-      "trustCert": { "title": "доверьтесь сертификату", "description": "в «настройках» нажмите «установить автоматически», либо доверьтесь вручную через Keychain Access" }
+      "trustCert": {
+        "title": "доверьтесь сертификату",
+        "description": "в «настройках» нажмите «установить автоматически», либо доверьтесь вручную через Keychain Access"
+      }
     }
   },
   "proxyErrors": {

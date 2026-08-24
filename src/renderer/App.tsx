@@ -6,26 +6,21 @@ import {
   Layout,
   Space,
   Splitter,
+  Tabs,
   Tag,
   Tooltip,
   theme as antdTheme,
   Typography,
   message
 } from 'antd'
-import {
-  MoonOutlined,
-  PlayCircleOutlined,
-  PlusOutlined,
-  SettingOutlined,
-  StopOutlined,
-  SunOutlined
-} from '@ant-design/icons'
+import { PlayCircleOutlined, PlusOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons'
 import ruRU from 'antd/locale/ru_RU'
 import enUS from 'antd/locale/en_US'
 import { useTranslation } from 'react-i18next'
 import RulesTable from './components/RulesTable'
 import RuleFormModal from './components/RuleFormModal'
 import LogPanel from './components/LogPanel'
+import TrafficStats from './components/TrafficStats'
 import SettingsPanel from './components/SettingsPanel'
 import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
@@ -149,18 +144,6 @@ export default function App(): React.ReactElement {
           </Space>
           <Space>
             <IconButton
-              tooltip={currentLanguage === 'ru' ? 'English' : 'Русский'}
-              onClick={() => setLanguage(currentLanguage === 'ru' ? 'en' : 'ru')}
-              style={{ fontSize: 11 }}
-            >
-              {currentLanguage.toUpperCase()}
-            </IconButton>
-            <IconButton
-              tooltip={mode === 'dark' ? t('settings.themeDark') : t('settings.themeLight')}
-              icon={mode === 'dark' ? <MoonOutlined /> : <SunOutlined />}
-              onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
-            />
-            <IconButton
               tooltip={t('app.settingsButton')}
               icon={<SettingOutlined />}
               onClick={() => setSettingsOpen(true)}
@@ -182,9 +165,30 @@ export default function App(): React.ReactElement {
         <Splitter style={{ flex: 1, minHeight: 0 }}>
           <Splitter.Panel defaultSize="50%" min="20%" max="80%">
             <div className="panel-column" style={{ paddingRight: 16 }}>
-              <div className="scroll-panel">
-                <LogPanel logs={logs} onClear={clearLogs} />
-              </div>
+              <Tabs
+                size="small"
+                className="panel-column"
+                items={[
+                  {
+                    key: 'log',
+                    label: t('app.logTab'),
+                    children: (
+                      <div className="scroll-panel">
+                        <LogPanel logs={logs} onClear={clearLogs} />
+                      </div>
+                    )
+                  },
+                  {
+                    key: 'stats',
+                    label: t('app.statsTab'),
+                    children: (
+                      <div className="scroll-panel">
+                        <TrafficStats logs={logs} />
+                      </div>
+                    )
+                  }
+                ]}
+              />
             </div>
           </Splitter.Panel>
           <Splitter.Panel>
@@ -225,7 +229,18 @@ export default function App(): React.ReactElement {
           width={420}
           destroyOnHidden
         >
-          <SettingsPanel status={status} port={port} onPortChange={setPort} />
+          <SettingsPanel
+            status={status}
+            port={port}
+            onPortChange={setPort}
+            logs={logs}
+            rules={rules}
+            onRulesImport={persist}
+            language={currentLanguage}
+            onLanguageChange={setLanguage}
+            themeMode={mode}
+            onThemeModeChange={setMode}
+          />
         </Drawer>
       </Layout>
     </ConfigProvider>

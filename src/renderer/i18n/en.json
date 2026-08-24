@@ -2,14 +2,19 @@
   "app": {
     "settingsButton": "settings",
     "settingsDrawerTitle": "settings",
+    "logTab": "log",
+    "statsTab": "stats",
     "vpnActive": "VPN",
-    "vpnActiveHint": "VPN is active — its traffic bypasses the proxy and won't be tracked. turn off the VPN before starting tracking."
+    "vpnActiveHint": "VPN is active. by default its traffic bypasses the proxy — allow tracking for a specific VPN in Settings."
   },
   "rules": {
     "addButton": "add rule",
     "table": {
       "urlPattern": "rule",
       "localFile": "path",
+      "noFile": "no body substitution",
+      "hasAdvanced": "extra",
+      "hasAdvancedHint": "rule changes headers, delay, or response status",
       "edit": "edit",
       "delete": "delete",
       "deleteConfirm": "delete this rule?"
@@ -24,18 +29,37 @@
       "urlPatternPlaceholder": "https://example.com/app.js",
       "urlPatternRequired": "enter a URL or regex",
       "isRegex": "regex",
-      "localFile": "local file",
-      "localFileHint": "for regex rules you can use $1, $2… — match groups are substituted",
+      "localFile": "local file (optional)",
+      "localFileHint": "leave empty to pass the request through to the real server and only apply the headers/delay/status below. for regex rules you can use $1, $2… — match groups are substituted",
       "localFilePlaceholder": "/path/to/file or /path/to/$2.$3",
-      "localFileRequired": "choose a file",
       "selectFile": "browse…",
       "contentType": "Content-Type (optional)",
-      "contentTypePlaceholder": "application/javascript"
-    }
+      "contentTypePlaceholder": "application/javascript",
+      "advancedSection": "advanced: headers, delay, status",
+      "statusCodeOverride": "override response HTTP status",
+      "statusCodeOverridePlaceholder": "e.g. 500",
+      "delayMs": "response delay, ms",
+      "requestHeaders": "request headers",
+      "responseHeaders": "response headers",
+      "headerName": "header name",
+      "headerValueHint": "value (empty — remove header)",
+      "addHeader": "add header"
+    },
+    "exportButton": "export rules",
+    "importButton": "import rules",
+    "importConfirm": "replace current rules with the file's contents?",
+    "exportSuccess": "rules saved: {{path}}",
+    "importSuccess": "imported {{count}} rules",
+    "importInvalidFormat": "this file doesn't look like a FileSwitcher rules export"
   },
   "log": {
     "clear": "clear",
+    "exportHar": "export as HAR",
+    "exportSuccess": "log saved: {{path}}",
     "empty": "no requests yet",
+    "noMatches": "no matches for this filter",
+    "searchPlaceholder": "search by URL",
+    "filterAll": "all",
     "matched": "matched",
     "passed": "passed through",
     "detailTitle": "request details",
@@ -51,7 +75,19 @@
   },
   "settings": {
     "error": "error",
+    "appearanceTitle": "appearance",
     "portLabel": "proxy port:",
+    "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
+    "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
+    "sudoersInstallButton": "set up passwordless",
+    "sudoersInstallSuccess": "done: starting/stopping the proxy will no longer ask for a password",
+    "sudoersInstallError": "setup failed: {{message}}",
+    "vpnTitle": "VPN",
+    "vpnHint": "the proxy leaves VPN tunnels alone by default — an active VPN often breaks if the system proxy is configured on it too. allow tracking selectively, only for a VPN where it's safe (e.g. a work VPN reaching internal services).",
+    "vpnAllowedHint": "proxy is configured on this VPN — its traffic is tracked",
+    "vpnNotAllowedHint": "proxy leaves this VPN alone — its traffic bypasses it",
+    "vpnUnnamed": "VPN without a network service (WireGuard etc.)",
+    "vpnUnnamedHint": "not registered as a network service — the proxy can't be configured on it individually, indication only",
     "certTitle": "HTTPS certificate",
     "certStatus": "status",
     "certListHint": "mitmproxy CA certificates (CN=mitmproxy) in the current user's keychain. several can accumulate if mitmproxy was reinstalled.",
@@ -76,18 +112,42 @@
       "crashed": "crashed"
     },
     "themeLight": "light",
-    "themeDark": "dark"
+    "themeDark": "dark",
+    "rulesExportTitle": "rules",
+    "rulesExportHint": "save current substitution rules to a JSON file, or replace them with another file's contents",
+    "exportTitle": "log",
+    "exportHint": "save the current proxy log to a HAR file — opens in Chrome DevTools, Fiddler, Charles, etc."
+  },
+  "stats": {
+    "totalRequests": "total requests",
+    "matchedCount": "substitutions matched",
+    "totalBytes": "total response size",
+    "topHosts": "top hosts by request count",
+    "statusBreakdown": "by response status",
+    "largestResponses": "largest responses"
   },
   "onboarding": {
     "title": "welcome to FileSwitcher",
     "intro": "to make file substitution work in your browser, complete a few steps:",
     "ok": "got it",
     "steps": {
-      "addRule": { "title": "add a rule", "description": "in the Rules panel on the right, specify a URL and a local file" },
+      "addRule": {
+        "title": "add a rule",
+        "description": "in the Rules panel on the right, specify a URL and a local file"
+      },
       "startProxy": { "title": "start the proxy", "description": "open Settings and click «Start proxy»" },
-      "openMitm": { "title": "open mitm.it", "description": "with the proxy active, open http://mitm.it in your browser" },
-      "downloadCert": { "title": "download the certificate", "description": "download the certificate for your OS (macOS)" },
-      "trustCert": { "title": "trust the certificate", "description": "in Settings, click «Install automatically», or trust it manually via Keychain Access" }
+      "openMitm": {
+        "title": "open mitm.it",
+        "description": "with the proxy active, open http://mitm.it in your browser"
+      },
+      "downloadCert": {
+        "title": "download the certificate",
+        "description": "download the certificate for your OS (macOS)"
+      },
+      "trustCert": {
+        "title": "trust the certificate",
+        "description": "in Settings, click «Install automatically», or trust it manually via Keychain Access"
+      }
     }
   },
   "proxyErrors": {

@@ -40,6 +40,18 @@ body {
   flex-direction: column;
 }
 
+/* вкладки лог/статистика занимают остаток колонки, чтобы .scroll-panel внутри мог скроллиться */
+.panel-column.ant-tabs {
+  flex: 1;
+  min-height: 0;
+}
+
+.panel-column.ant-tabs .ant-tabs-content-holder,
+.panel-column.ant-tabs .ant-tabs-content,
+.panel-column.ant-tabs .ant-tabs-tabpane {
+  height: 100%;
+}
+
 /* отступ снизу для строки-тулбара над контентом панели */
 .panel-toolbar {
   margin-bottom: 12px;
@@ -71,10 +83,11 @@ html.dark-scrollbars .rule-row--complete > td.ant-table-cell {
   background-color: rgba(82, 196, 26, 0.15);
 }
 
-/* компактная запись лога прокси: меньше вертикальных отступов, чтобы помещалось больше строк */
-.log-item--compact.ant-list-item {
-  padding-top: 4px;
-  padding-bottom: 4px;
+/* компактная строка лога и таблицы правил: одинаковая высота, меньше отступов — помещается больше строк */
+.log-item--compact.ant-list-item,
+.rules-table--compact .ant-table-tbody > tr > td {
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 html.dark-scrollbars,
