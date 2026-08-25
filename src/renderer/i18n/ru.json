@@ -52,7 +52,9 @@
   "log": {
     "clear": "очистить",
     "detailButton": "открыть детали",
-    "exportHar": "экспорт в HAR",
+    "exportFormatHar": "экспорт HAR",
+    "exportFormatJson": "экспорт JSON",
+    "exportFormatCsv": "экспорт CSV",
     "exportSuccess": "лог сохранён: {{path}}",
     "empty": "пока нет запросов",
     "noMatches": "ничего не найдено по фильтру",
@@ -72,6 +74,9 @@
   },
   "settings": {
     "error": "ошибка",
+    "groupAppearance": "внешний вид",
+    "groupNetwork": "сеть и безопасность",
+    "groupData": "данные",
     "appearanceTitle": "внешний вид",
     "fontSizeLabel": "размер шрифта",
     "portLabel": "порт прокси:",

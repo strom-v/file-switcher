@@ -52,7 +52,9 @@
   "log": {
     "clear": "clear",
     "detailButton": "open details",
-    "exportHar": "export as HAR",
+    "exportFormatHar": "export HAR",
+    "exportFormatJson": "export JSON",
+    "exportFormatCsv": "export CSV",
     "exportSuccess": "log saved: {{path}}",
     "empty": "no requests yet",
     "noMatches": "no matches for this filter",
@@ -72,6 +74,9 @@
   },
   "settings": {
     "error": "error",
+    "groupAppearance": "appearance",
+    "groupNetwork": "network & security",
+    "groupData": "data",
     "appearanceTitle": "appearance",
     "fontSizeLabel": "font size",
     "portLabel": "proxy port:",

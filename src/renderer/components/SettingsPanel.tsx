@@ -3,10 +3,11 @@ import {
   Alert,
   Button,
   Descriptions,
+  Flex,
   InputNumber,
   List,
   Popconfirm,
-  Segmented,
+  Select,
   Slider,
   Space,
   Switch,
@@ -18,6 +19,8 @@ import {
 import { QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import SectionHeader from './SectionHeader'
+import SettingsGroup from './SettingsGroup'
+import { buildCsv } from '../csvExport'
 import { buildHar } from '../harExport'
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../hooks/useFontSize'
 import type { ThemeMode } from '../hooks/useThemeMode'
@@ -139,8 +142,16 @@ export default function SettingsPanel({
     if (savedPath) message.success(t(successKey, { path: savedPath }))
   }
 
-  const handleExportHar = (): Promise<void> =>
-    exportToFile(`file-switcher-log-${Date.now()}.har`, buildHar(logs), 'log.exportSuccess')
+  const LOG_EXPORT_BUILDERS: Record<'har' | 'json' | 'csv', { extension: string; build: () => string }> = {
+    har: { extension: 'har', build: () => buildHar(logs) },
+    json: { extension: 'json', build: () => JSON.stringify(logs, null, 2) },
+    csv: { extension: 'csv', build: () => buildCsv(logs) }
+  }
+
+  const handleExportLog = (format: keyof typeof LOG_EXPORT_BUILDERS): Promise<void> => {
+    const { extension, build } = LOG_EXPORT_BUILDERS[format]
+    return exportToFile(`file-switcher-log-${Date.now()}.${extension}`, build(), 'log.exportSuccess')
+  }
 
   const handleExportRules = (): Promise<void> =>
     exportToFile('file-switcher-rules.json', JSON.stringify(rules, null, 2), 'rules.exportSuccess')
@@ -162,31 +173,31 @@ export default function SettingsPanel({
   }
 
   return (
-    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+    <Space direction="vertical" size="large" style={{ width: '100%' }}>
       {status.error && <Alert type="error" message={t('settings.error')} description={status.error} />}
 
-      <SectionHeader title={t('settings.appearanceTitle')}>
-        <Space size="middle">
-          <Segmented
+      <SettingsGroup title={t('settings.groupAppearance')} first>
+        <Space.Compact block>
+          <Select<SupportedLanguage>
+            style={{ width: '50%' }}
             value={language}
-            onChange={(value) => onLanguageChange(value as SupportedLanguage)}
+            onChange={onLanguageChange}
             options={[
               { label: 'Русский', value: 'ru' },
               { label: 'English', value: 'en' }
             ]}
           />
-          <Segmented
+          <Select<ThemeMode>
+            style={{ width: '50%' }}
             value={themeMode}
-            onChange={(value) => onThemeModeChange(value as ThemeMode)}
+            onChange={onThemeModeChange}
             options={[
               { label: t('settings.themeLight'), value: 'light' },
               { label: t('settings.themeDark'), value: 'dark' }
             ]}
           />
-        </Space>
-      </SectionHeader>
+        </Space.Compact>
 
-      <SectionHeader title={t('settings.fontSizeLabel')}>
         <Slider
           min={FONT_SIZE_MIN}
           max={FONT_SIZE_MAX}
@@ -195,146 +206,154 @@ export default function SettingsPanel({
           onChange={onFontSizeChange}
           marks={{ [FONT_SIZE_MIN]: FONT_SIZE_MIN, [FONT_SIZE_MAX]: FONT_SIZE_MAX }}
           tooltip={{ formatter: (value) => `${value}px` }}
-          style={{ maxWidth: 240 }}
         />
-      </SectionHeader>
+      </SettingsGroup>
 
-      <SectionHeader title={t('settings.portLabel')}>
-        <InputNumber
-          min={1}
-          max={65535}
-          value={port}
-          onChange={(value) => onPortChange(value ?? port)}
-          disabled={status.status === 'running' || status.status === 'starting'}
-        />
-      </SectionHeader>
-
-      {!sudoersInstalled && (
-        <Alert
-          type="info"
-          message={t('settings.sudoersAlertTitle')}
-          description={t('settings.sudoersAlertDescription')}
-          action={
-            <Button size="small" onClick={handleInstallSudoersRule} loading={installingSudoers}>
-              {t('settings.sudoersInstallButton')}
-            </Button>
-          }
-        />
-      )}
-
-      {vpnServices.length > 0 && (
-        <SectionHeader title={t('settings.vpnTitle')} hint={t('settings.vpnHint')}>
-          <List
-            bordered
-            size="small"
-            dataSource={vpnServices}
-            renderItem={(vpn) => (
-              <List.Item
-                className="log-item--compact"
-                actions={
-                  vpn.name
-                    ? [
-                        <Switch
-                          key="allowed"
-                          checked={vpn.allowed}
-                          onChange={(checked) => handleToggleVpnAllowed(vpn.name as string, checked)}
-                        />
-                      ]
-                    : undefined
-                }
-              >
-                <Space direction="vertical" size={0}>
-                  <Typography.Text>{vpn.name ?? vpn.detectedClientName ?? t('settings.vpnUnnamed')}</Typography.Text>
-                  <Typography.Text type="secondary">
-                    {vpn.name
-                      ? vpn.allowed
-                        ? t('settings.vpnAllowedHint')
-                        : t('settings.vpnNotAllowedHint')
-                      : vpn.allowed
-                        ? t('settings.vpnUnnamedIgnoredHint')
-                        : t('settings.vpnUnnamedHint')}
-                  </Typography.Text>
-                </Space>
-              </List.Item>
-            )}
+      <SettingsGroup title={t('settings.groupNetwork')}>
+        <SectionHeader title={t('settings.portLabel')}>
+          <InputNumber
+            min={1}
+            max={65535}
+            value={port}
+            onChange={(value) => onPortChange(value ?? port)}
+            disabled={status.status === 'running' || status.status === 'starting'}
           />
         </SectionHeader>
-      )}
 
-      <SectionHeader title={t('settings.certTitle')} hint={t('settings.certListHint')}>
-        {certs.length === 0 ? (
-          <Descriptions bordered column={1} size="small">
-            <Descriptions.Item label={t('settings.certStatus')}>
-              {certStatus === 'not-generated' && t('settings.certNotGenerated')}
-              {certStatus !== 'not-generated' && t('settings.certNotTrusted')}
-            </Descriptions.Item>
-          </Descriptions>
-        ) : (
-          <List
-            bordered
-            size="small"
-            dataSource={certs}
-            renderItem={(cert) => (
-              <List.Item className="log-item--compact">
-                <Space direction="vertical" size={0}>
-                  <Space>
-                    <Typography.Text code copyable={{ text: cert.sha1 }}>
-                      {cert.sha1.slice(0, 16)}…
+        {!sudoersInstalled && (
+          <SectionHeader title={t('settings.sudoersAlertTitle')}>
+            <Alert
+              type="info"
+              message={t('settings.sudoersAlertDescription')}
+              action={
+                <Button size="small" onClick={handleInstallSudoersRule} loading={installingSudoers}>
+                  {t('settings.sudoersInstallButton')}
+                </Button>
+              }
+            />
+          </SectionHeader>
+        )}
+
+        {vpnServices.length > 0 && (
+          <SectionHeader title={t('settings.vpnTitle')} hint={t('settings.vpnHint')}>
+            <List
+              bordered
+              size="small"
+              dataSource={vpnServices}
+              renderItem={(vpn) => (
+                <List.Item
+                  className="log-item--compact"
+                  actions={
+                    vpn.name
+                      ? [
+                          <Switch
+                            key="allowed"
+                            checked={vpn.allowed}
+                            onChange={(checked) => handleToggleVpnAllowed(vpn.name as string, checked)}
+                          />
+                        ]
+                      : undefined
+                  }
+                >
+                  <Space direction="vertical" size={0}>
+                    <Typography.Text>{vpn.name ?? vpn.detectedClientName ?? t('settings.vpnUnnamed')}</Typography.Text>
+                    <Typography.Text type="secondary">
+                      {vpn.name
+                        ? vpn.allowed
+                          ? t('settings.vpnAllowedHint')
+                          : t('settings.vpnNotAllowedHint')
+                        : vpn.allowed
+                          ? t('settings.vpnUnnamedIgnoredHint')
+                          : t('settings.vpnUnnamedHint')}
                     </Typography.Text>
-                    <Tag color={cert.trusted ? 'success' : 'default'}>
-                      {cert.trusted ? t('settings.certTrusted') : t('settings.certNotTrusted')}
-                    </Tag>
                   </Space>
-                  <Typography.Text type="secondary">
-                    {t('settings.certExpiresAt', { date: cert.expiresAt })}
-                  </Typography.Text>
-                </Space>
-              </List.Item>
-            )}
-          />
+                </List.Item>
+              )}
+            />
+          </SectionHeader>
         )}
 
-        {certStatus === 'not-generated' && (
-          <Alert
-            style={{ marginTop: 8 }}
-            type="info"
-            message={t('settings.certNotGeneratedAlertTitle')}
-            description={t('settings.certNotGeneratedAlertDescription')}
-          />
-        )}
-
-        <Space style={{ marginTop: 8 }}>
-          {certStatus === 'trusted' ? (
-            <Button danger onClick={handleRemoveCert} loading={removing}>
-              {t('settings.removeCertButton')}
-            </Button>
+        <SectionHeader title={t('settings.certTitle')} hint={t('settings.certListHint')}>
+          {certs.length === 0 ? (
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label={t('settings.certStatus')}>
+                {certStatus === 'not-generated' && t('settings.certNotGenerated')}
+                {certStatus !== 'not-generated' && t('settings.certNotTrusted')}
+              </Descriptions.Item>
+            </Descriptions>
           ) : (
-            <Button onClick={handleInstallCert} loading={installing} disabled={certStatus === 'not-generated'}>
-              {t('settings.installCertButton')}
-            </Button>
+            <List
+              bordered
+              size="small"
+              dataSource={certs}
+              renderItem={(cert) => (
+                <List.Item className="log-item--compact">
+                  <Space direction="vertical" size={0}>
+                    <Space>
+                      <Typography.Text code copyable={{ text: cert.sha1 }}>
+                        {cert.sha1.slice(0, 16)}…
+                      </Typography.Text>
+                      <Tag color={cert.trusted ? 'success' : 'default'}>
+                        {cert.trusted ? t('settings.certTrusted') : t('settings.certNotTrusted')}
+                      </Tag>
+                    </Space>
+                    <Typography.Text type="secondary">
+                      {t('settings.certExpiresAt', { date: cert.expiresAt })}
+                    </Typography.Text>
+                  </Space>
+                </List.Item>
+              )}
+            />
           )}
-          <Tooltip title={`${t('settings.firefoxWarningTitle')}. ${t('settings.firefoxWarningDescription')}`}>
-            <QuestionCircleOutlined className="hint-icon" />
-          </Tooltip>
-        </Space>
-      </SectionHeader>
 
-      <SectionHeader title={t('settings.rulesExportTitle')} hint={t('settings.rulesExportHint')}>
-        <Space>
-          <Button onClick={handleExportRules} disabled={rules.length === 0}>
+          {certStatus === 'not-generated' && (
+            <Alert
+              style={{ marginTop: 8 }}
+              type="info"
+              message={t('settings.certNotGeneratedAlertTitle')}
+              description={t('settings.certNotGeneratedAlertDescription')}
+            />
+          )}
+
+          <Space style={{ marginTop: 8 }}>
+            {certStatus === 'trusted' ? (
+              <Button danger onClick={handleRemoveCert} loading={removing}>
+                {t('settings.removeCertButton')}
+              </Button>
+            ) : (
+              <Button onClick={handleInstallCert} loading={installing} disabled={certStatus === 'not-generated'}>
+                {t('settings.installCertButton')}
+              </Button>
+            )}
+            <Tooltip title={`${t('settings.firefoxWarningTitle')}. ${t('settings.firefoxWarningDescription')}`}>
+              <QuestionCircleOutlined className="hint-icon" />
+            </Tooltip>
+          </Space>
+        </SectionHeader>
+      </SettingsGroup>
+
+      <SettingsGroup title={t('settings.groupData')}>
+        <Flex gap={8}>
+          <Button style={{ flex: 1 }} onClick={handleExportRules} disabled={rules.length === 0}>
             {t('rules.exportButton')}
           </Button>
           <Popconfirm title={t('rules.importConfirm')} onConfirm={handleImportRules}>
-            <Button>{t('rules.importButton')}</Button>
+            <Button style={{ width: '100%', flex: 1 }}>{t('rules.importButton')}</Button>
           </Popconfirm>
-        </Space>
-      </SectionHeader>
+        </Flex>
 
-      <SectionHeader title={t('settings.exportTitle')} hint={t('settings.exportHint')}>
-        <Button onClick={handleExportHar} disabled={logs.length === 0}>
-          {t('log.exportHar')}
-        </Button>
-      </SectionHeader>
+        <Flex gap={8}>
+          <Button style={{ flex: 1 }} onClick={() => handleExportLog('har')} disabled={logs.length === 0}>
+            {t('log.exportFormatHar')}
+          </Button>
+          <Button style={{ flex: 1 }} onClick={() => handleExportLog('json')} disabled={logs.length === 0}>
+            {t('log.exportFormatJson')}
+          </Button>
+          <Button style={{ flex: 1 }} onClick={() => handleExportLog('csv')} disabled={logs.length === 0}>
+            {t('log.exportFormatCsv')}
+          </Button>
+        </Flex>
+      </SettingsGroup>
     </Space>
   )
 }

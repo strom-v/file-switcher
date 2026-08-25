@@ -155,7 +155,12 @@ export default function App(): React.ReactElement {
   // CSS-переменная для компактного текста (списки лога/правил, детали запроса) — на 1px меньше базового,
   // применяется через var(--app-font-size-sm) вместо хардкода, чтобы масштабироваться вместе с настройкой
   const rootStyle = useMemo(
-    () => ({ height: '100vh', padding: 8, '--app-font-size-sm': `${fontSize - COMPACT_FONT_SIZE_OFFSET}px` }) as React.CSSProperties,
+    () =>
+      ({
+        height: '100vh',
+        padding: 8,
+        '--app-font-size-sm': `${fontSize - COMPACT_FONT_SIZE_OFFSET}px`
+      }) as React.CSSProperties,
     [fontSize]
   )
 
@@ -226,7 +231,7 @@ export default function App(): React.ReactElement {
           title={t('app.settingsDrawerTitle')}
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
-          width={420}
+          width={460}
           destroyOnHidden
         >
           <SettingsPanel
