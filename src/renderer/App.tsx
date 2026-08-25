@@ -208,7 +208,7 @@ export default function App(): React.ReactElement {
           </Splitter.Panel>
           <Splitter.Panel>
             <div className="panel-column" style={{ paddingLeft: 8 }}>
-              <div className="scroll-panel scroll-panel--visible">
+              <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
                 <RulesTable rules={rules} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
               </div>
             </div>

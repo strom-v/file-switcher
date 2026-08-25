@@ -33,6 +33,19 @@ body {
   overflow: auto;
 }
 
+/* подложка списка лога/таблицы правил: белый фон и рамка растянуты на всю высоту колонки,
+   а не только до конца реальных строк — сами строки внутри теперь прозрачные (см. ниже) */
+.scroll-panel--panel-bg {
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+html.dark-scrollbars .scroll-panel--panel-bg {
+  background-color: #141414;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
 /* блок заголовков запроса/ответа в деталях лога: рамка, фиксированная высота, внутренний скролл */
 .headers-panel {
   height: 100px;
@@ -95,21 +108,12 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
   margin: 0;
 }
 
-/* компактная строка лога и таблицы правил: единая высота и фон —
-   antd даёт им разный фон по умолчанию, поэтому фон тоже задаём явно */
-.log-item--compact.ant-list-item,
-.rules-table--compact .ant-table-tbody > tr > td {
-  background-color: #fff;
-}
-
+/* компактная строка лога и таблицы правил: единая высота, без собственного фона —
+   фон теперь на подложке .scroll-panel--panel-bg, растянутой на всю высоту колонки */
 .log-item--compact.ant-list-item,
 .rules-table--compact .ant-table-tbody > tr > td {
   padding: 0 4px;
-}
-
-html.dark-scrollbars .log-item--compact.ant-list-item,
-html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr > td {
-  background-color: #141414;
+  background-color: transparent;
 }
 
 /* запись в логе о сработавшей подмене выделяется зелёным фоном среди остального трафика */
@@ -117,25 +121,16 @@ html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr > td {
   background-color: rgba(82, 196, 26, 0.15);
 }
 
-/* горизонтальный разделитель между строками таблицы правил — как между записями в списке лога
-   (вертикальные линии между колонками остаются выключены темой Table.borderColor: transparent) */
+/* горизонтальный разделитель между строками лога и таблицы правил (вертикальные линии между
+   колонками правил остаются выключены темой Table.borderColor: transparent) */
+.log-item--compact.ant-list-item:not(:last-child),
 .rules-table--compact .ant-table-tbody > tr:not(:last-child) > td {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+html.dark-scrollbars .log-item--compact.ant-list-item:not(:last-child),
 html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr:not(:last-child) > td {
   border-bottom-color: rgba(255, 255, 255, 0.12);
-}
-
-/* внешняя рамка и скругление вокруг всей таблицы правил — как у bordered-списка лога */
-.rules-table--compact.ant-table-wrapper .ant-table-container {
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-html.dark-scrollbars .rules-table--compact.ant-table-wrapper .ant-table-container {
-  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* компактные заголовки коллапса в формах — меньше внутренних отступов, чем в дефолте antd */

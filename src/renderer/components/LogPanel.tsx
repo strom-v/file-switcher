@@ -82,14 +82,13 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           style={{ flexShrink: 0 }}
         />
       </Flex>
-      <div className="scroll-panel scroll-panel--visible">
+      <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
         {filtered.length === 0 ? (
           <Empty description={t(logs.length === 0 ? 'log.empty' : 'log.noMatches')} />
         ) : (
           <ConfigProvider theme={LOG_LIST_THEME}>
             <List
               size="small"
-              bordered
               dataSource={visible}
               renderItem={(item) => {
                 const isMatched = item.event === 'matched'
