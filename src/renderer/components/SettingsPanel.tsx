@@ -7,6 +7,7 @@ import {
   List,
   Popconfirm,
   Segmented,
+  Slider,
   Space,
   Switch,
   Tag,
@@ -18,6 +19,7 @@ import { QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import SectionHeader from './SectionHeader'
 import { buildHar } from '../harExport'
+import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../hooks/useFontSize'
 import type { ThemeMode } from '../hooks/useThemeMode'
 import type { SupportedLanguage } from '../i18n'
 import type { CertInfo, CertStatus, ProxyLogEvent, ProxyState, Rule, VpnService } from '../../shared/types'
@@ -33,6 +35,8 @@ interface SettingsPanelProps {
   onLanguageChange: (language: SupportedLanguage) => void
   themeMode: ThemeMode
   onThemeModeChange: (mode: ThemeMode) => void
+  fontSize: number
+  onFontSizeChange: (size: number) => void
 }
 
 /** Проверяет, что распарсенный JSON похож на массив Rule — минимально, без строгой валидации формы каждого поля */
@@ -54,7 +58,9 @@ export default function SettingsPanel({
   language,
   onLanguageChange,
   themeMode,
-  onThemeModeChange
+  onThemeModeChange,
+  fontSize,
+  onFontSizeChange
 }: SettingsPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [certStatus, setCertStatus] = useState<CertStatus>('not-generated')
@@ -156,11 +162,11 @@ export default function SettingsPanel({
   }
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <Space direction="vertical" size="middle" style={{ width: '100%' }}>
       {status.error && <Alert type="error" message={t('settings.error')} description={status.error} />}
 
       <SectionHeader title={t('settings.appearanceTitle')}>
-        <Space size="large">
+        <Space size="middle">
           <Segmented
             value={language}
             onChange={(value) => onLanguageChange(value as SupportedLanguage)}
@@ -178,6 +184,19 @@ export default function SettingsPanel({
             ]}
           />
         </Space>
+      </SectionHeader>
+
+      <SectionHeader title={t('settings.fontSizeLabel')}>
+        <Slider
+          min={FONT_SIZE_MIN}
+          max={FONT_SIZE_MAX}
+          step={1}
+          value={fontSize}
+          onChange={onFontSizeChange}
+          marks={{ [FONT_SIZE_MIN]: FONT_SIZE_MIN, [FONT_SIZE_MAX]: FONT_SIZE_MAX }}
+          tooltip={{ formatter: (value) => `${value}px` }}
+          style={{ maxWidth: 240 }}
+        />
       </SectionHeader>
 
       <SectionHeader title={t('settings.portLabel')}>
@@ -211,6 +230,7 @@ export default function SettingsPanel({
             dataSource={vpnServices}
             renderItem={(vpn) => (
               <List.Item
+                className="log-item--compact"
                 actions={
                   vpn.name
                     ? [
@@ -224,13 +244,15 @@ export default function SettingsPanel({
                 }
               >
                 <Space direction="vertical" size={0}>
-                  <Typography.Text>{vpn.name ?? t('settings.vpnUnnamed')}</Typography.Text>
+                  <Typography.Text>{vpn.name ?? vpn.detectedClientName ?? t('settings.vpnUnnamed')}</Typography.Text>
                   <Typography.Text type="secondary">
                     {vpn.name
                       ? vpn.allowed
                         ? t('settings.vpnAllowedHint')
                         : t('settings.vpnNotAllowedHint')
-                      : t('settings.vpnUnnamedHint')}
+                      : vpn.allowed
+                        ? t('settings.vpnUnnamedIgnoredHint')
+                        : t('settings.vpnUnnamedHint')}
                   </Typography.Text>
                 </Space>
               </List.Item>
@@ -253,7 +275,7 @@ export default function SettingsPanel({
             size="small"
             dataSource={certs}
             renderItem={(cert) => (
-              <List.Item>
+              <List.Item className="log-item--compact">
                 <Space direction="vertical" size={0}>
                   <Space>
                     <Typography.Text code copyable={{ text: cert.sha1 }}>

@@ -2,8 +2,6 @@
   "app": {
     "settingsButton": "settings",
     "settingsDrawerTitle": "settings",
-    "logTab": "log",
-    "statsTab": "stats",
     "vpnActive": "VPN",
     "vpnActiveHint": "VPN is active. by default its traffic bypasses the proxy — allow tracking for a specific VPN in Settings."
   },
@@ -11,7 +9,6 @@
     "addButton": "add rule",
     "table": {
       "urlPattern": "rule",
-      "localFile": "path",
       "noFile": "no body substitution",
       "hasAdvanced": "extra",
       "hasAdvancedHint": "rule changes headers, delay, or response status",
@@ -54,28 +51,29 @@
   },
   "log": {
     "clear": "clear",
+    "detailButton": "open details",
     "exportHar": "export as HAR",
     "exportSuccess": "log saved: {{path}}",
     "empty": "no requests yet",
     "noMatches": "no matches for this filter",
     "searchPlaceholder": "search by URL",
+    "shownCount": "{{shown}}/{{limit}}",
     "filterAll": "all",
     "matched": "matched",
     "passed": "passed through",
-    "detailTitle": "request details",
     "detailUrl": "URL",
     "detailMethod": "method",
     "detailStatus": "status",
     "detailTime": "time",
-    "detailSize": "response size",
-    "detailEvent": "event",
-    "detailFile": "substituted file",
+    "detailSize": "size",
+    "detailFile": "file",
     "detailRequestHeaders": "request headers",
     "detailResponseHeaders": "response headers"
   },
   "settings": {
     "error": "error",
     "appearanceTitle": "appearance",
+    "fontSizeLabel": "font size",
     "portLabel": "proxy port:",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
@@ -88,6 +86,7 @@
     "vpnNotAllowedHint": "proxy leaves this VPN alone — its traffic bypasses it",
     "vpnUnnamed": "VPN without a network service (WireGuard etc.)",
     "vpnUnnamedHint": "not registered as a network service — the proxy can't be configured on it individually, indication only",
+    "vpnUnnamedIgnoredHint": "not registered as a network service — the proxy still doesn't work over it, but the header indicator is hidden for it per your request",
     "certTitle": "HTTPS certificate",
     "certStatus": "status",
     "certListHint": "mitmproxy CA certificates (CN=mitmproxy) in the current user's keychain. several can accumulate if mitmproxy was reinstalled.",
@@ -117,14 +116,6 @@
     "rulesExportHint": "save current substitution rules to a JSON file, or replace them with another file's contents",
     "exportTitle": "log",
     "exportHint": "save the current proxy log to a HAR file — opens in Chrome DevTools, Fiddler, Charles, etc."
-  },
-  "stats": {
-    "totalRequests": "total requests",
-    "matchedCount": "substitutions matched",
-    "totalBytes": "total response size",
-    "topHosts": "top hosts by request count",
-    "statusBreakdown": "by response status",
-    "largestResponses": "largest responses"
   },
   "onboarding": {
     "title": "welcome to FileSwitcher",

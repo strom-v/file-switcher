@@ -33,6 +33,45 @@ body {
   overflow: auto;
 }
 
+/* блок заголовков запроса/ответа в деталях лога: рамка, фиксированная высота, внутренний скролл */
+.headers-panel {
+  height: 100px;
+  overflow: auto;
+  margin-top: 2px;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+html.dark-scrollbars .headers-panel {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* видимая вертикальная полоса скролла в этих блоках — подсказывает, что содержимое прокручивается
+   (весь остальной интерфейс скрывает скроллбар по правилу выше) */
+.headers-panel,
+.scroll-panel--visible {
+  scrollbar-width: thin;
+}
+
+.headers-panel::-webkit-scrollbar,
+.scroll-panel--visible::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.headers-panel::-webkit-scrollbar-thumb,
+.scroll-panel--visible::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+}
+
+html.dark-scrollbars .headers-panel::-webkit-scrollbar-thumb,
+html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
 /* вертикальная колонка на всю высоту родителя (панель лога/правил внутри Splitter) */
 .panel-column {
   height: 100%;
@@ -40,21 +79,9 @@ body {
   flex-direction: column;
 }
 
-/* вкладки лог/статистика занимают остаток колонки, чтобы .scroll-panel внутри мог скроллиться */
-.panel-column.ant-tabs {
-  flex: 1;
-  min-height: 0;
-}
-
-.panel-column.ant-tabs .ant-tabs-content-holder,
-.panel-column.ant-tabs .ant-tabs-content,
-.panel-column.ant-tabs .ant-tabs-tabpane {
-  height: 100%;
-}
-
 /* отступ снизу для строки-тулбара над контентом панели */
 .panel-toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 /* длинные значения (URL, пути) переносятся по любому символу, не выходя за границы блока */
@@ -68,14 +95,21 @@ body {
   margin: 0;
 }
 
-/* правило с заполненными URL и путём выделяется на фоне строк с незаполненными полями;
-   background вместо filter — иначе на светлой теме filter выбеливает чекбокс до невидимости */
-.rule-row--complete > td.ant-table-cell {
-  background-color: rgba(0, 0, 0, 0.035);
+/* компактная строка лога и таблицы правил: единая высота и фон —
+   antd даёт им разный фон по умолчанию, поэтому фон тоже задаём явно */
+.log-item--compact.ant-list-item,
+.rules-table--compact .ant-table-tbody > tr > td {
+  background-color: #fff;
 }
 
-html.dark-scrollbars .rule-row--complete > td.ant-table-cell {
-  background-color: rgba(255, 255, 255, 0.06);
+.log-item--compact.ant-list-item,
+.rules-table--compact .ant-table-tbody > tr > td {
+  padding: 0 4px;
+}
+
+html.dark-scrollbars .log-item--compact.ant-list-item,
+html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr > td {
+  background-color: #141414;
 }
 
 /* запись в логе о сработавшей подмене выделяется зелёным фоном среди остального трафика */
@@ -83,11 +117,50 @@ html.dark-scrollbars .rule-row--complete > td.ant-table-cell {
   background-color: rgba(82, 196, 26, 0.15);
 }
 
-/* компактная строка лога и таблицы правил: одинаковая высота, меньше отступов — помещается больше строк */
-.log-item--compact.ant-list-item,
-.rules-table--compact .ant-table-tbody > tr > td {
-  padding-top: 2px;
-  padding-bottom: 2px;
+/* горизонтальный разделитель между строками таблицы правил — как между записями в списке лога
+   (вертикальные линии между колонками остаются выключены темой Table.borderColor: transparent) */
+.rules-table--compact .ant-table-tbody > tr:not(:last-child) > td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr:not(:last-child) > td {
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+/* внешняя рамка и скругление вокруг всей таблицы правил — как у bordered-списка лога */
+.rules-table--compact.ant-table-wrapper .ant-table-container {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+html.dark-scrollbars .rules-table--compact.ant-table-wrapper .ant-table-container {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* компактные заголовки коллапса в формах — меньше внутренних отступов, чем в дефолте antd */
+.ant-collapse.ant-collapse > .ant-collapse-item > .ant-collapse-header,
+.ant-collapse .ant-collapse-content .ant-collapse-content-box {
+  padding: 4px 8px;
+}
+
+/* компактные строки Descriptions в деталях лога — как в списках лога и правил (padding и шрифт);
+   двойной класс на первом сегменте нужен, чтобы перебить встроенные CSS-in-JS стили antd той же специфичности */
+.detail-descriptions.ant-descriptions-bordered .ant-descriptions-row > .ant-descriptions-item-label,
+.detail-descriptions.ant-descriptions-bordered .ant-descriptions-row > .ant-descriptions-item-content {
+  padding: 0 6px;
+  font-size: var(--app-font-size-sm, 12px);
+  line-height: 20px;
+}
+
+/* иконка копирования в таблице правил видна только при наведении на сам текст (URL или путь к файлу),
+   а не на всю строку — иначе наведение на URL показывало copy и у пути к файлу под ним */
+.rules-table--compact .ant-table-tbody .ant-typography-copy {
+  visibility: hidden;
+}
+
+.rules-table--compact .ant-table-tbody .ant-typography:hover .ant-typography-copy {
+  visibility: visible;
 }
 
 html.dark-scrollbars,

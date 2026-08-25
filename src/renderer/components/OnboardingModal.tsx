@@ -14,7 +14,14 @@ export default function OnboardingModal({ open, onClose }: OnboardingModalProps)
   const { t } = useTranslation()
 
   return (
-    <Modal title={t('onboarding.title')} open={open} onOk={onClose} onCancel={onClose} okText={t('onboarding.ok')}>
+    <Modal
+      title={t('onboarding.title')}
+      open={open}
+      onOk={onClose}
+      onCancel={onClose}
+      okText={t('onboarding.ok')}
+      centered
+    >
       <Typography.Paragraph>{t('onboarding.intro')}</Typography.Paragraph>
       <Steps
         direction="vertical"

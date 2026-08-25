@@ -2,8 +2,6 @@
   "app": {
     "settingsButton": "настройки",
     "settingsDrawerTitle": "настройки",
-    "logTab": "лог",
-    "statsTab": "статистика",
     "vpnActive": "VPN",
     "vpnActiveHint": "активен VPN. по умолчанию его трафик прокси не трогает — разрешить отслеживание для конкретного VPN можно в «настройках»."
   },
@@ -11,7 +9,6 @@
     "addButton": "добавить правило",
     "table": {
       "urlPattern": "правило",
-      "localFile": "путь",
       "noFile": "без подмены тела",
       "hasAdvanced": "доп.",
       "hasAdvancedHint": "правило меняет заголовки, задержку или статус ответа",
@@ -54,28 +51,29 @@
   },
   "log": {
     "clear": "очистить",
+    "detailButton": "открыть детали",
     "exportHar": "экспорт в HAR",
     "exportSuccess": "лог сохранён: {{path}}",
     "empty": "пока нет запросов",
     "noMatches": "ничего не найдено по фильтру",
     "searchPlaceholder": "поиск по URL",
+    "shownCount": "{{shown}}/{{limit}}",
     "filterAll": "все",
     "matched": "подмена",
     "passed": "без изменений",
-    "detailTitle": "детали запроса",
     "detailUrl": "URL",
     "detailMethod": "метод",
     "detailStatus": "статус",
     "detailTime": "время",
-    "detailSize": "размер ответа",
-    "detailEvent": "событие",
-    "detailFile": "файл подмены",
+    "detailSize": "размер",
+    "detailFile": "файл",
     "detailRequestHeaders": "заголовки запроса",
     "detailResponseHeaders": "заголовки ответа"
   },
   "settings": {
     "error": "ошибка",
     "appearanceTitle": "внешний вид",
+    "fontSizeLabel": "размер шрифта",
     "portLabel": "порт прокси:",
     "sudoersAlertTitle": "прокси спрашивает пароль на каждый запуск/остановку",
     "sudoersAlertDescription": "разрешите networksetup работать без пароля — один системный диалог авторизации, дальше запуск/остановка прокси без запроса пароля.",
@@ -88,6 +86,7 @@
     "vpnNotAllowedHint": "прокси не трогает этот VPN — трафик через него идёт мимо",
     "vpnUnnamed": "VPN без сетевого сервиса (WireGuard и т.п.)",
     "vpnUnnamedHint": "не зарегистрирован как сетевой сервис — прокси нельзя настроить отдельно на нём, только индикация",
+    "vpnUnnamedIgnoredHint": "не зарегистрирован как сетевой сервис — прокси через него всё ещё не работает, но индикатор в шапке для него скрыт по вашему запросу",
     "certTitle": "HTTPS-сертификат",
     "certStatus": "статус",
     "certListHint": "список CA-сертификатов mitmproxy (CN=mitmproxy) в связке ключей текущего пользователя. может накопиться несколько, если mitmproxy переустанавливался.",
@@ -117,14 +116,6 @@
     "rulesExportHint": "сохранить текущие правила подмены в JSON-файл или заменить их содержимым другого файла",
     "exportTitle": "лог",
     "exportHint": "сохранить текущий лог прокси в HAR-файл — открывается в Chrome DevTools, Fiddler, Charles и т.п."
-  },
-  "stats": {
-    "totalRequests": "запросов всего",
-    "matchedCount": "подмен сработало",
-    "totalBytes": "суммарный размер ответов",
-    "topHosts": "топ хостов по числу запросов",
-    "statusBreakdown": "по статусам ответа",
-    "largestResponses": "самые крупные ответы"
   },
   "onboarding": {
     "title": "добро пожаловать в FileSwitcher",

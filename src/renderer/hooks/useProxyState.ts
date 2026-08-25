@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProxyState, ProxyLogEvent } from '../../shared/types'
 
-const MAX_LOG_ENTRIES = 500
+const MAX_LOG_ENTRIES = 1000
 
 /** Подписывается на статус и лог прокси через IPC */
 export function useProxyState(onStderr?: (text: string) => void): {

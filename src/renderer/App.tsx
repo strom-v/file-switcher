@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   ConfigProvider,
   Drawer,
@@ -6,7 +6,6 @@ import {
   Layout,
   Space,
   Splitter,
-  Tabs,
   Tag,
   Tooltip,
   theme as antdTheme,
@@ -20,18 +19,30 @@ import { useTranslation } from 'react-i18next'
 import RulesTable from './components/RulesTable'
 import RuleFormModal from './components/RuleFormModal'
 import LogPanel from './components/LogPanel'
-import TrafficStats from './components/TrafficStats'
 import SettingsPanel from './components/SettingsPanel'
 import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
 import { useProxyState } from './hooks/useProxyState'
 import { useThemeMode } from './hooks/useThemeMode'
 import { useVpnStatus } from './hooks/useVpnStatus'
+import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
 import type { Rule } from '../shared/types'
 
 const ANTD_LOCALES = { ru: ruRU, en: enUS }
+
+const SPLITTER_SIZE_STORAGE_KEY = 'file-switcher:splitter-size'
+const DEFAULT_SPLITTER_SIZE = '50%'
+
+/** Сохранённая доля ширины левой панели (лог) из прошлого запуска, если она есть и валидна */
+function readStoredSplitterSize(): string {
+  const stored = localStorage.getItem(SPLITTER_SIZE_STORAGE_KEY)
+  if (stored && /^\d+(\.\d+)?%$/.test(stored)) {
+    return stored
+  }
+  return DEFAULT_SPLITTER_SIZE
+}
 
 // цвет кнопки старт/стоп отражает действие клика, а не сырой статус процесса:
 // зелёный — сейчас остановлена, клик запустит; красный — сейчас работает, клик остановит
@@ -46,13 +57,15 @@ const START_STOP_COLOR: Record<string, string> = {
 export default function App(): React.ReactElement {
   const { t, i18n } = useTranslation()
   const { mode, isDark, setMode } = useThemeMode()
-  const vpnActive = useVpnStatus()
+  const { fontSize, setFontSize } = useFontSize()
+  const vpnStatus = useVpnStatus()
   const [rules, setRules] = useState<Rule[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
   const [port, setPort] = useState(8080)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [splitterSize] = useState(readStoredSplitterSize)
   const { status, logs, clearLogs } = useProxyState((text) => {
     message.warning(text)
   })
@@ -76,10 +89,6 @@ export default function App(): React.ReactElement {
 
   const handleToggle = (rule: Rule, enabled: boolean): void => {
     persist(rules.map((r) => (r.id === rule.id ? { ...r, enabled } : r)))
-  }
-
-  const handleToggleAll = (enabled: boolean): void => {
-    persist(rules.map((r) => ({ ...r, enabled })))
   }
 
   const handleEdit = (rule: Rule): void => {
@@ -117,6 +126,13 @@ export default function App(): React.ReactElement {
     await window.api.proxy.stop()
   }
 
+  const handleSplitterResizeEnd = (sizes: number[]): void => {
+    const [left, right] = sizes
+    const total = left + right
+    if (total <= 0) return
+    localStorage.setItem(SPLITTER_SIZE_STORAGE_KEY, `${((left / total) * 100).toFixed(2)}%`)
+  }
+
   const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
   const statusLabels: Record<string, string> = {
     stopped: t('settings.statusLabels.stopped'),
@@ -125,24 +141,46 @@ export default function App(): React.ReactElement {
     crashed: t('settings.statusLabels.crashed')
   }
 
+  // мемоизация обязательна: без неё новый объект темы на каждый рендер (например, на каждое событие лога)
+  // заставляет ConfigProvider пересчитывать CSS-in-JS всего дерева — заметно тормозит перетаскивание Splitter
+  const theme = useMemo(
+    () => ({
+      algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+      token: { padding: 6, paddingLG: 10, marginLG: 10, borderRadius: 4, fontSize },
+      components: { Modal: { contentPadding: 12 } }
+    }),
+    [isDark, fontSize]
+  )
+
+  // CSS-переменная для компактного текста (списки лога/правил, детали запроса) — на 1px меньше базового,
+  // применяется через var(--app-font-size-sm) вместо хардкода, чтобы масштабироваться вместе с настройкой
+  const rootStyle = useMemo(
+    () => ({ height: '100vh', padding: 8, '--app-font-size-sm': `${fontSize - COMPACT_FONT_SIZE_OFFSET}px` }) as React.CSSProperties,
+    [fontSize]
+  )
+
   return (
-    <ConfigProvider
-      locale={ANTD_LOCALES[currentLanguage]}
-      theme={{ algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}
-    >
-      <Layout style={{ height: '100vh', padding: 16 }}>
+    <ConfigProvider locale={ANTD_LOCALES[currentLanguage]} theme={theme}>
+      <Layout style={rootStyle}>
         <Flex justify="space-between" className="panel-toolbar">
           <Space>
             <Typography.Title level={4} style={{ margin: 0 }}>
               FileSwitcher
             </Typography.Title>
-            {vpnActive && (
+            {vpnStatus.active && (
               <Tooltip title={t('app.vpnActiveHint')}>
-                <Tag color="error">{t('app.vpnActive')}</Tag>
+                <Tag color="error">{vpnStatus.name ?? t('app.vpnActive')}</Tag>
               </Tooltip>
             )}
           </Space>
           <Space>
+            <IconButton
+              tooltip={t('rules.addButton')}
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAdd}
+              style={{ backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
+            />
             <IconButton
               tooltip={t('app.settingsButton')}
               icon={<SettingOutlined />}
@@ -162,54 +200,16 @@ export default function App(): React.ReactElement {
           </Space>
         </Flex>
 
-        <Splitter style={{ flex: 1, minHeight: 0 }}>
-          <Splitter.Panel defaultSize="50%" min="20%" max="80%">
-            <div className="panel-column" style={{ paddingRight: 16 }}>
-              <Tabs
-                size="small"
-                className="panel-column"
-                items={[
-                  {
-                    key: 'log',
-                    label: t('app.logTab'),
-                    children: (
-                      <div className="scroll-panel">
-                        <LogPanel logs={logs} onClear={clearLogs} />
-                      </div>
-                    )
-                  },
-                  {
-                    key: 'stats',
-                    label: t('app.statsTab'),
-                    children: (
-                      <div className="scroll-panel">
-                        <TrafficStats logs={logs} />
-                      </div>
-                    )
-                  }
-                ]}
-              />
+        <Splitter style={{ flex: 1, minHeight: 0 }} onResizeEnd={handleSplitterResizeEnd}>
+          <Splitter.Panel defaultSize={splitterSize} min="20%" max="80%">
+            <div style={{ height: '100%', paddingRight: 8 }}>
+              <LogPanel logs={logs} onClear={clearLogs} />
             </div>
           </Splitter.Panel>
           <Splitter.Panel>
-            <div className="panel-column" style={{ paddingLeft: 16 }}>
-              <Flex justify="flex-end" className="panel-toolbar">
-                <IconButton
-                  tooltip={t('rules.addButton')}
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={handleAdd}
-                  style={{ backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
-                />
-              </Flex>
-              <div className="scroll-panel">
-                <RulesTable
-                  rules={rules}
-                  onToggle={handleToggle}
-                  onToggleAll={handleToggleAll}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                />
+            <div className="panel-column" style={{ paddingLeft: 8 }}>
+              <div className="scroll-panel scroll-panel--visible">
+                <RulesTable rules={rules} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
               </div>
             </div>
           </Splitter.Panel>
@@ -240,6 +240,8 @@ export default function App(): React.ReactElement {
             onLanguageChange={setLanguage}
             themeMode={mode}
             onThemeModeChange={setMode}
+            fontSize={fontSize}
+            onFontSizeChange={setFontSize}
           />
         </Drawer>
       </Layout>

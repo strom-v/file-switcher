@@ -62,6 +62,7 @@ export default function RuleFormModal({
       okText={t('rules.form.save')}
       cancelText={t('rules.form.cancel')}
       destroyOnClose
+      centered
     >
       <Form<FormValues> form={form} layout="vertical">
         <Form.Item name="enabled" label={t('rules.form.enabled')} valuePropName="checked">
