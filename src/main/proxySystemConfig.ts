@@ -92,35 +92,130 @@ async function getActiveNonVpnServices(vpnNames: string[]): Promise<string[]> {
     .filter((line) => line && !line.startsWith('*') && !vpnNameSet.has(line))
 }
 
-// Имена подключённых (Connected) VPN network services по данным `scutil --nc list`.
-async function getConnectedVpnServiceNames(): Promise<string[]> {
-  const output = await execAsync('scutil --nc list')
-  const names: string[] = []
-  for (const line of output.split('\n')) {
-    const match = line.match(/^\*?\s*\(Connected\).*"([^"]+)"/)
-    if (match) names.push(match[1])
-  }
-  return names
+interface ConnectedVpnService {
+  uuid: string
+  name: string
 }
 
-// Есть ли активный utun-туннель с IP — ловит любой VPN, включая безымянные (WireGuard и т.п.); пустые utun (AWDL и т.п.) не считаются.
-async function hasActiveUtunTunnel(): Promise<boolean> {
+// Подключённые (Connected) VPN network services по данным `scutil --nc list`, с UUID для сопоставления с интерфейсом.
+async function getConnectedVpnServices(): Promise<ConnectedVpnService[]> {
+  const output = await execAsync('scutil --nc list')
+  const services: ConnectedVpnService[] = []
+  for (const line of output.split('\n')) {
+    const match = line.match(/^\*?\s*\(Connected\)\s+(\S+).*"([^"]+)"/)
+    if (match) services.push({ uuid: match[1], name: match[2] })
+  }
+  return services
+}
+
+async function getConnectedVpnServiceNames(): Promise<string[]> {
+  return (await getConnectedVpnServices()).map((service) => service.name)
+}
+
+// Точное имя интерфейса (utunN) для сервиса по его UUID — из системного dynamic store
+// (то же место, что использует System Preferences), а не по эвристике/имени процесса.
+async function getServiceInterfaceName(uuid: string): Promise<string | null> {
+  for (const family of ['IPv4', 'IPv6']) {
+    try {
+      const output = await execAsync(`echo "show State:/Network/Service/${uuid}/${family}" | scutil`)
+      const match = output.match(/InterfaceName\s*:\s*(\S+)/)
+      if (match) return match[1]
+    } catch {
+      // сервис может не иметь состояния в этом family — пробуем следующий
+    }
+  }
+  return null
+}
+
+// utunN-интерфейсы, уже принадлежащие подключённым именованным VPN-сервисам — их не нужно
+// повторно учитывать как "безымянный" VPN при подсчёте активных utun-туннелей.
+async function getNamedServiceInterfaces(connectedServices: ConnectedVpnService[]): Promise<Set<string>> {
+  const interfaces = await Promise.all(connectedServices.map((service) => getServiceInterfaceName(service.uuid)))
+  return new Set(interfaces.filter((name): name is string => name !== null))
+}
+
+// Есть ли активный utun-туннель с IP, не принадлежащий уже учтённому именованному VPN-сервису —
+// ловит по-настоящему безымянные VPN (WireGuard и т.п.); пустые utun (AWDL и т.п.) не считаются.
+async function hasActiveUtunTunnel(namedServiceInterfaces: Set<string>): Promise<boolean> {
   const output = await execAsync('ifconfig')
   const interfaceBlocks = output.split(/\n(?=\S)/)
-  return interfaceBlocks.some((block) => /^utun\d+:/.test(block) && /\n\tinet\s/.test(block))
+  return interfaceBlocks.some((block) => {
+    const match = block.match(/^(utun\d+):/)
+    if (!match || namedServiceInterfaces.has(match[1])) return false
+    return /\n\tinet\s/.test(block)
+  })
+}
+
+// Процессы известных VPN-клиентов, создающих безымянный (не networksetup-сервис) utun-туннель.
+// Два разных способа обнаружения, т.к. клиенты по-разному владеют туннелем:
+// - amneziawg-go (WireGuard-based) сам держит видимый UDP-сокет наружу — его находит nettop без sudo,
+//   даже будучи root-процессом (в отличие от lsof).
+// - OpenVPN Connect (ovpnagent) обрабатывает туннель на уровне system extension/kernel и не оставляет
+//   в nettop никакого сетевого сокета от себя — там виден только "простой" трафик приложений через utun,
+//   не сам VPN-клиент. Поэтому для него проверяем просто факт, что процесс запущен (`ps`), не сетевую активность.
+const NETTOP_DETECTABLE_VPN_CLIENTS: Record<string, string> = {
+  'amneziawg-go': 'AmneziaVPN'
+}
+const PROCESS_ONLY_VPN_CLIENTS: Record<string, string> = {
+  ovpnagent: 'OpenVPN Connect'
+}
+
+// Клиенты, для которых индикатор не показывается красным по явному запросу пользователя (2026-08-24) —
+// подмена через них физически всё ещё не работает (нет networksetup-сервиса, см. IDEAS.md), это чисто
+// косметическое решение "не пугать индикатором для этого VPN", а не реальная поддержка проксирования.
+const UNNAMED_VPN_CLIENTS_TREATED_AS_ALLOWED = new Set(['OpenVPN Connect', 'OpenVPN'])
+
+// Пытается опознать владельца безымянного utun по активности/наличию известных VPN-клиентских процессов.
+// Возвращает имя клиента, только если ровно один из известных процессов сейчас активен —
+// при нескольких одновременно нельзя достоверно сказать, какой из них создал именно этот utun.
+async function detectUnnamedVpnClientName(): Promise<string | null> {
+  const nettopNames = Object.keys(NETTOP_DETECTABLE_VPN_CLIENTS)
+  const pFlags = nettopNames.map((name) => `-p ${name}`).join(' ')
+
+  let nettopOutput = ''
+  try {
+    nettopOutput = await execAsync(`nettop ${pFlags} -l 1 -x`)
+  } catch {
+    // nettop недоступен — считаем, что ни один из этих клиентов не активен
+  }
+  const activeFromNettop = nettopNames.filter((name) => new RegExp(`^\\S+ ${name}\\.\\d+`, 'm').test(nettopOutput))
+
+  let psOutput = ''
+  try {
+    psOutput = await execAsync('ps ax -o comm=')
+  } catch {
+    // ps недоступен — пропускаем эту группу клиентов
+  }
+  const processOnlyNames = Object.keys(PROCESS_ONLY_VPN_CLIENTS)
+  const activeFromPs = processOnlyNames.filter((name) => new RegExp(`(^|/)${name}$`, 'm').test(psOutput))
+
+  const detected = [
+    ...activeFromNettop.map((name) => NETTOP_DETECTABLE_VPN_CLIENTS[name]),
+    ...activeFromPs.map((name) => PROCESS_ONLY_VPN_CLIENTS[name])
+  ]
+  if (detected.length !== 1) return null
+  return detected[0]
 }
 
 /** Активен ли сейчас хоть один VPN — именованный сервис или безымянный utun-туннель. */
 export async function isVpnActive(): Promise<boolean> {
-  const [vpnNames, hasUtun] = await Promise.all([getConnectedVpnServiceNames(), hasActiveUtunTunnel()])
-  return vpnNames.length > 0 || hasUtun
+  const connectedServices = await getConnectedVpnServices()
+  if (connectedServices.length > 0) return true
+  const namedServiceInterfaces = await getNamedServiceInterfaces(connectedServices)
+  return hasActiveUtunTunnel(namedServiceInterfaces)
 }
 
-/** Список активных VPN для UI: именованные сервисы (можно разрешить/запретить прокси) плюс `{ name: null }`, если есть ещё и безымянный utun (только индикация). */
+/** Список активных VPN для UI: именованные сервисы (можно разрешить/запретить прокси) плюс `{ name: null }`, если есть ещё и безымянный utun, не принадлежащий ни одному из них (только индикация, имя клиента — best-effort). */
 export async function getVpnServices(): Promise<VpnService[]> {
-  const [vpnNames, hasUtun] = await Promise.all([getConnectedVpnServiceNames(), hasActiveUtunTunnel()])
-  const services: VpnService[] = vpnNames.map((name) => ({ name, allowed: vpnAllowlistStore.isAllowed(name) }))
-  if (hasUtun) services.push({ name: null, allowed: false })
+  const connectedServices = await getConnectedVpnServices()
+  const namedServiceInterfaces = await getNamedServiceInterfaces(connectedServices)
+  const hasUtun = await hasActiveUtunTunnel(namedServiceInterfaces)
+  const services: VpnService[] = connectedServices.map(({ name }) => ({ name, allowed: vpnAllowlistStore.isAllowed(name) }))
+  if (hasUtun) {
+    const detectedName = await detectUnnamedVpnClientName()
+    const allowed = detectedName !== null && UNNAMED_VPN_CLIENTS_TREATED_AS_ALLOWED.has(detectedName)
+    services.push({ name: null, allowed, detectedClientName: detectedName })
+  }
   return services
 }
 

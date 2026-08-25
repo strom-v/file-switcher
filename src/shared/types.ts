@@ -50,6 +50,8 @@ export interface ProxyLogEvent {
 export interface VpnService {
   name: string | null
   allowed: boolean
+  /** Best-effort имя клиента для безымянного (name: null) VPN, определённое по активности известных процессов (см. proxySystemConfig.ts) */
+  detectedClientName?: string | null
 }
 
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'
