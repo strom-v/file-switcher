@@ -22,7 +22,7 @@ import LogPanel from './components/LogPanel'
 import SettingsPanel from './components/SettingsPanel'
 import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
-import { useProxyState } from './hooks/useProxyState'
+import { LOG_LIMIT_OPTIONS, type LogLimit, useProxyState } from './hooks/useProxyState'
 import { useThemeMode } from './hooks/useThemeMode'
 import { useVpnStatus } from './hooks/useVpnStatus'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
@@ -66,7 +66,8 @@ export default function App(): React.ReactElement {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [splitterSize] = useState(readStoredSplitterSize)
-  const { status, logs, clearLogs } = useProxyState((text) => {
+  const [logLimit, setLogLimit] = useState<LogLimit>(LOG_LIMIT_OPTIONS[0])
+  const { status, logs, clearLogs } = useProxyState(logLimit, (text) => {
     message.warning(text)
   })
 
@@ -215,7 +216,7 @@ export default function App(): React.ReactElement {
         <Splitter style={{ flex: 1, minHeight: 0 }} onResizeEnd={handleSplitterResizeEnd}>
           <Splitter.Panel defaultSize={splitterSize} min="20%" max="80%">
             <div style={{ height: '100%', paddingRight: 8 }}>
-              <LogPanel logs={logs} onClear={clearLogs} />
+              <LogPanel logs={logs} onClear={clearLogs} logLimit={logLimit} onLogLimitChange={setLogLimit} />
             </div>
           </Splitter.Panel>
           <Splitter.Panel>

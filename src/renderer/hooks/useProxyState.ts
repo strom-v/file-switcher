@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProxyState, ProxyLogEvent } from '../../shared/types'
 
-const MAX_LOG_ENTRIES = 1000
+export const LOG_LIMIT_OPTIONS = [50, 100, 150, 300, 500, 1000] as const
+export type LogLimit = (typeof LOG_LIMIT_OPTIONS)[number]
 
-/** Подписывается на статус и лог прокси через IPC */
-export function useProxyState(onStderr?: (text: string) => void): {
+/** Подписывается на статус и лог прокси через IPC; в памяти хранится не больше maxLogEntries последних записей */
+export function useProxyState(
+  maxLogEntries: LogLimit,
+  onStderr?: (text: string) => void
+): {
   status: ProxyState
   logs: ProxyLogEvent[]
   clearLogs: () => void
@@ -14,6 +18,13 @@ export function useProxyState(onStderr?: (text: string) => void): {
   const mounted = useRef(true)
   const onStderrRef = useRef(onStderr)
   onStderrRef.current = onStderr
+  const maxLogEntriesRef = useRef(maxLogEntries)
+  maxLogEntriesRef.current = maxLogEntries
+
+  // при уменьшении лимита обрезаем уже накопленные записи сразу, не дожидаясь следующего события лога
+  useEffect(() => {
+    setLogs((prev) => (prev.length > maxLogEntries ? prev.slice(prev.length - maxLogEntries) : prev))
+  }, [maxLogEntries])
 
   useEffect(() => {
     mounted.current = true
@@ -29,7 +40,8 @@ export function useProxyState(onStderr?: (text: string) => void): {
     const offLog = window.api.proxy.onLog((event) => {
       setLogs((prev) => {
         const next = [...prev, event]
-        return next.length > MAX_LOG_ENTRIES ? next.slice(next.length - MAX_LOG_ENTRIES) : next
+        const max = maxLogEntriesRef.current
+        return next.length > max ? next.slice(next.length - max) : next
       })
     })
 

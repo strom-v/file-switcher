@@ -6,9 +6,9 @@ import LogDetailModal from './LogDetailModal'
 import IconButton from './IconButton'
 import { httpStatusColor } from '../theme'
 import { tsToDate } from '../formatters'
+import { LOG_LIMIT_OPTIONS, type LogLimit } from '../hooks/useProxyState'
 import type { ProxyLogEvent, ProxyLogEventType } from '../../shared/types'
 
-const VISIBLE_COUNT_OPTIONS = [50, 100, 150, 300, 500, 1000] as const
 const EVENT_FILTER_ALL = 'all' as const
 type EventFilter = ProxyLogEventType | typeof EVENT_FILTER_ALL
 
@@ -19,17 +19,19 @@ const LOG_LIST_THEME = { components: { List: { itemPaddingSM: '0 4px' } } }
 interface LogPanelProps {
   logs: ProxyLogEvent[]
   onClear: () => void
+  logLimit: LogLimit
+  onLogLimitChange: (limit: LogLimit) => void
 }
 
-/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL и фильтром по событию */
-export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
+/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL и фильтром по событию.
+ * logLimit ограничивает не только отображение, но и сколько записей вообще хранится в памяти (см. useProxyState). */
+export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
-  const [visibleCount, setVisibleCount] = useState<(typeof VISIBLE_COUNT_OPTIONS)[number]>(50)
   const [search, setSearch] = useState('')
   const [eventFilter, setEventFilter] = useState<EventFilter>(EVENT_FILTER_ALL)
 
-  const filtered = useMemo(() => {
+  const visible = useMemo(() => {
     const query = search.trim().toLowerCase()
     return [...logs].reverse().filter((item) => {
       if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter) return false
@@ -37,8 +39,6 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
       return true
     })
   }, [logs, search, eventFilter])
-
-  const visible = filtered.slice(0, visibleCount)
 
   return (
     <div className="panel-column">
@@ -64,14 +64,14 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
         </Space.Compact>
         <Select
           size="small"
-          value={visibleCount}
-          onChange={setVisibleCount}
-          options={VISIBLE_COUNT_OPTIONS.map((count) => ({ value: count, label: count }))}
+          value={logLimit}
+          onChange={onLogLimitChange}
+          options={LOG_LIMIT_OPTIONS.map((count) => ({ value: count, label: count }))}
           style={{ width: 80, flexShrink: 0 }}
         />
         {logs.length > 0 && (
           <Typography.Text type="secondary" className="text-sm" style={{ flexShrink: 0 }}>
-            {t('log.shownCount', { shown: visible.length, limit: visibleCount })}
+            {t('log.shownCount', { shown: logs.length, limit: logLimit })}
           </Typography.Text>
         )}
         <IconButton
@@ -83,7 +83,7 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
         />
       </Flex>
       <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
-        {filtered.length === 0 ? (
+        {visible.length === 0 ? (
           <Empty description={t(logs.length === 0 ? 'log.empty' : 'log.noMatches')} />
         ) : (
           <ConfigProvider theme={LOG_LIST_THEME}>
@@ -94,52 +94,41 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                 const isMatched = item.event === 'matched'
                 return (
                   <List.Item className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}>
-                    <Flex vertical gap={0} style={{ width: '100%', minWidth: 0 }}>
-                      <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
-                        <Typography.Text
-                          strong
-                          className="text-sm"
-                          style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
-                        >
-                          {item.method}
-                        </Typography.Text>
-                        <Typography.Text
-                          strong
-                          className="text-sm"
-                          style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
-                        >
-                          {item.statusCode ?? '—'}
-                        </Typography.Text>
-                        <Typography.Text
-                          type="secondary"
-                          className="text-sm"
-                          style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-                        >
-                          {tsToDate(item.ts).toLocaleTimeString()}
-                        </Typography.Text>
-                        <Typography.Text
-                          className="ellipsis-text text-sm"
-                          ellipsis={{ tooltip: item.url }}
-                          style={{ flex: 1, minWidth: 0 }}
-                        >
-                          {item.url}
-                        </Typography.Text>
-                        <Tooltip title={t('log.detailButton')}>
-                          <InfoCircleOutlined
-                            style={{ flexShrink: 0, cursor: 'pointer' }}
-                            onClick={() => setSelected(item)}
-                          />
-                        </Tooltip>
-                      </Flex>
-                      {isMatched && (
-                        <Typography.Text
-                          className="ellipsis-text text-sm"
-                          type="secondary"
-                          ellipsis={{ tooltip: item.file }}
-                        >
-                          {item.file}
-                        </Typography.Text>
-                      )}
+                    <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
+                      <Typography.Text
+                        strong
+                        className="text-sm"
+                        style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
+                      >
+                        {item.method}
+                      </Typography.Text>
+                      <Typography.Text
+                        strong
+                        className="text-sm"
+                        style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
+                      >
+                        {item.statusCode ?? '—'}
+                      </Typography.Text>
+                      <Typography.Text
+                        type="secondary"
+                        className="text-sm"
+                        style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                      >
+                        {tsToDate(item.ts).toLocaleTimeString()}
+                      </Typography.Text>
+                      <Typography.Text
+                        className="ellipsis-text text-sm"
+                        ellipsis={{ tooltip: item.url }}
+                        style={{ flex: 1, minWidth: 0 }}
+                      >
+                        {item.url}
+                      </Typography.Text>
+                      <Tooltip title={t('log.detailButton')}>
+                        <InfoCircleOutlined
+                          style={{ flexShrink: 0, cursor: 'pointer' }}
+                          onClick={() => setSelected(item)}
+                        />
+                      </Tooltip>
                     </Flex>
                   </List.Item>
                 )
