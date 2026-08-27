@@ -1,20 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import {
-  Alert,
-  Button,
-  Descriptions,
-  Flex,
-  InputNumber,
-  List,
-  Popconfirm,
-  Select,
-  Slider,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-  message
-} from 'antd'
+import { Alert, Button, Flex, InputNumber, Popconfirm, Select, Slider, Space, Tooltip, message } from 'antd'
 import { QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import SectionHeader from './SectionHeader'
@@ -25,7 +10,7 @@ import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../hooks/useFontSize'
 import { LOG_STORAGE_LIMIT_MAX, LOG_STORAGE_LIMIT_MIN } from '../hooks/useLogStorageLimit'
 import type { ThemeMode } from '../hooks/useThemeMode'
 import type { SupportedLanguage } from '../i18n'
-import type { CertInfo, CertStatus, ProxyLogEvent, ProxyState, Rule } from '../../shared/types'
+import type { CertStatus, ProxyLogEvent, ProxyState, Rule } from '../../shared/types'
 
 interface SettingsPanelProps {
   status: ProxyState
@@ -73,7 +58,6 @@ export default function SettingsPanel({
 }: SettingsPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [certStatus, setCertStatus] = useState<CertStatus>('not-generated')
-  const [certs, setCerts] = useState<CertInfo[]>([])
   const [installing, setInstalling] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [sudoersInstalled, setSudoersInstalled] = useState(true)
@@ -81,9 +65,7 @@ export default function SettingsPanel({
   const [refreshingRules, setRefreshingRules] = useState(false)
 
   const refreshCertStatus = async (): Promise<void> => {
-    const [next, list] = await Promise.all([window.api.cert.status(), window.api.cert.list()])
-    setCertStatus(next)
-    setCerts(list)
+    setCertStatus(await window.api.cert.status())
   }
 
   useEffect(() => {
@@ -240,49 +222,17 @@ export default function SettingsPanel({
           </SectionHeader>
         )}
 
-        <SectionHeader title={t('settings.certTitle')} hint={t('settings.certListHint')}>
-          {certs.length === 0 ? (
-            <Descriptions bordered column={1} size="small">
-              <Descriptions.Item label={t('settings.certStatus')}>
-                {certStatus === 'not-generated' && t('settings.certNotGenerated')}
-                {certStatus !== 'not-generated' && t('settings.certNotTrusted')}
-              </Descriptions.Item>
-            </Descriptions>
-          ) : (
-            <List
-              bordered
-              size="small"
-              dataSource={certs}
-              renderItem={(cert) => (
-                <List.Item className="log-item--compact">
-                  <Space direction="vertical" size={0}>
-                    <Space>
-                      <Typography.Text code copyable={{ text: cert.sha1 }}>
-                        {cert.sha1.slice(0, 16)}…
-                      </Typography.Text>
-                      <Tag color={cert.trusted ? 'success' : 'default'}>
-                        {cert.trusted ? t('settings.certTrusted') : t('settings.certNotTrusted')}
-                      </Tag>
-                    </Space>
-                    <Typography.Text type="secondary">
-                      {t('settings.certExpiresAt', { date: cert.expiresAt })}
-                    </Typography.Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
-          )}
-
+        <div>
           {certStatus === 'not-generated' && (
             <Alert
-              style={{ marginTop: 8 }}
+              style={{ marginBottom: 8 }}
               type="info"
               message={t('settings.certNotGeneratedAlertTitle')}
               description={t('settings.certNotGeneratedAlertDescription')}
             />
           )}
 
-          <Space style={{ marginTop: 8 }}>
+          <Space>
             {certStatus === 'trusted' ? (
               <Button danger onClick={handleRemoveCert} loading={removing}>
                 {t('settings.removeCertButton')}
@@ -296,7 +246,7 @@ export default function SettingsPanel({
               <QuestionCircleOutlined className="hint-icon" />
             </Tooltip>
           </Space>
-        </SectionHeader>
+        </div>
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupData')}>
