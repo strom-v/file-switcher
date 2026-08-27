@@ -10,12 +10,19 @@ export type { ProxyStatus, ProxyState, ProxyLogEvent } from '../shared/types'
 
 const DEFAULT_PORT = 8080
 
+// события лога копятся и эмиттятся пачкой раз в этот интервал, а не по одному на каждый запрос —
+// при активном трафике (десятки запросов в секунду, например при загрузке тяжёлой страницы) это
+// заметно снижает частоту IPC-сообщений и React-рендеров в renderer
+const LOG_BATCH_INTERVAL_MS = 50
+
 /** Управляет дочерним процессом mitmdump: запуск, остановка, разбор stdout */
 export class ProxyController extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | null = null
   private state: ProxyState = { status: 'stopped', port: DEFAULT_PORT }
   private stdoutBuffer = ''
   private lastStderr = ''
+  private pendingLogs: ProxyLogEvent[] = []
+  private logBatchTimer: NodeJS.Timeout | null = null
 
   getState(): ProxyState {
     return this.state
@@ -43,7 +50,7 @@ export class ProxyController extends EventEmitter {
     return join(process.resourcesPath, 'addon.py')
   }
 
-  start(rulesFilePath: string, traceSettingsFilePath: string, port: number = DEFAULT_PORT): void {
+  start(rulesFilePath: string, port: number = DEFAULT_PORT): void {
     if (this.child) {
       return
     }
@@ -62,38 +69,46 @@ export class ProxyController extends EventEmitter {
       this.resolveAddonPath(),
       '--set',
       `rules_file=${rulesFilePath}`,
-      '--set',
-      `trace_settings_file=${traceSettingsFilePath}`,
       '--listen-host',
       '127.0.0.1',
       '--listen-port',
       String(port)
     ]
 
-    this.child = spawn(mitmdumpPath, args)
+    const child = spawn(mitmdumpPath, args)
+    this.child = child
 
-    this.child.stdout.on('data', (chunk: Buffer) => {
+    // все обработчики ниже проверяют this.child === child перед тем, как трогать состояние
+    // контроллера — иначе события от уже убитого (Stop сразу после Start) или устаревшего
+    // (Stop → Start до того, как старый процесс успел завершиться) child могут перезаписать
+    // состояние актуального процесса или откатить системный прокси, который включил кто-то другой
+    child.stdout.on('data', (chunk: Buffer) => {
+      if (this.child !== child) return
       this.handleStdout(chunk.toString())
     })
 
-    this.child.stderr.on('data', (chunk: Buffer) => {
+    child.stderr.on('data', (chunk: Buffer) => {
       const text = chunk.toString()
       this.lastStderr = text
+      if (this.child !== child) return
       this.emit('stderr', text)
     })
 
-    this.child.on('spawn', () => {
+    child.on('spawn', () => {
+      if (this.child !== child) return
       this.setState({ status: 'running', port })
       this.applySystemProxy(port)
     })
 
-    this.child.on('error', (err) => {
+    child.on('error', (err) => {
+      if (this.child !== child) return
       this.setState({ status: 'crashed', port, error: err.message })
       this.child = null
       this.revertSystemProxy()
     })
 
-    this.child.on('exit', (code) => {
+    child.on('exit', (code) => {
+      if (this.child !== child) return
       const wasRunning = this.state.status === 'running' || this.state.status === 'starting'
       this.child = null
       if (wasRunning && code !== 0) {
@@ -108,11 +123,21 @@ export class ProxyController extends EventEmitter {
   }
 
   async stop(): Promise<void> {
+    if (this.logBatchTimer) {
+      clearTimeout(this.logBatchTimer)
+      this.logBatchTimer = null
+    }
+    this.pendingLogs = []
+
     if (!this.child) {
       this.setState({ status: 'stopped', port: this.state.port })
       return
     }
+    // обнуляем сразу, а не в обработчике 'exit' — иначе start(), вызванный сразу после stop()
+    // до того как старый процесс реально завершился, увидит this.child ещё не null и молча
+    // откажется запускать новый (early return в начале start())
     this.child.kill()
+    this.child = null
     this.setState({ status: 'stopped', port: this.state.port })
     await this.revertSystemProxy()
   }
@@ -151,11 +176,25 @@ export class ProxyController extends EventEmitter {
       if (!trimmed) continue
       try {
         const parsed = JSON.parse(trimmed) as ProxyLogEvent
-        this.emit('log', parsed)
+        this.queueLogEvent(parsed)
       } catch {
         // строки без JSON (баннер mitmdump и т.п.) молча пропускаем
       }
     }
+  }
+
+  // копит события в pendingLogs и один раз на интервал эмиттит их пачкой как 'logBatch' —
+  // вместо отдельного 'log'-события (и, соответственно, отдельного IPC-сообщения) на каждый запрос
+  private queueLogEvent(event: ProxyLogEvent): void {
+    this.pendingLogs.push(event)
+    if (this.logBatchTimer) return
+
+    this.logBatchTimer = setTimeout(() => {
+      const batch = this.pendingLogs
+      this.pendingLogs = []
+      this.logBatchTimer = null
+      this.emit('logBatch', batch)
+    }, LOG_BATCH_INTERVAL_MS)
   }
 }
 

@@ -8,9 +8,14 @@ import { readJsonFile, writeJsonFile } from './jsonFile'
 const SUDOERS_FILE = '/etc/sudoers.d/filesswitcher-networksetup'
 
 // Выполняет shell-скрипт с правами администратора через один системный диалог авторизации (Touch ID/пароль).
+// osascript сам не проходит через внешний shell (execFile), но AppleScript "do shell script" исполняет
+// переданную строку через свой собственный shell — экранирование здесь обязательно и остаётся, это
+// не Node.js shell-инъекция, а часть протокола AppleScript.
 async function runAsAdminViaOsascript(script: string): Promise<void> {
   const escaped = script.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  await execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
+  // без таймаута execAsync по умолчанию (10с) — пользователь может думать над Touch ID/паролем
+  // в системном диалоге сколько угодно, это не зависание, а ожидаемое ожидание ввода
+  await execAsync('osascript', ['-e', `do shell script "${escaped}" with administrator privileges`], 0)
 }
 
 // Разрешает networksetup без пароля/Touch ID при каждом старте/остановке прокси — NOPASSWD только на этот бинарник, не на произвольные команды.
@@ -66,21 +71,33 @@ function clearSavedStates(): void {
   if (existsSync(filePath)) unlinkSync(filePath)
 }
 
-// Выполняет networksetup-команды с правами администратора: сперва sudo -n по одной (см. scripts/setup_sudoers.sh), при неудаче — общий диалог авторизации macOS.
-async function execAsAdmin(networksetupArgs: string[]): Promise<void> {
+// экранирует один аргумент для вставки в POSIX-shell строку (single-quote wrapping,
+// стандартный приём: закрыть кавычку, вставить экранированную одинарную кавычку, открыть заново)
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
+// Выполняет networksetup-команды с правами администратора: сперва sudo -n по одной (см. scripts/setup_sudoers.sh),
+// при неудаче — общий диалог авторизации macOS. Каждая команда — массив аргументов networksetup
+// (без самого "networksetup" в начале), не готовая строка — исключает инъекцию через имя сервиса.
+async function execAsAdmin(networksetupCommands: string[][]): Promise<void> {
   try {
-    for (const args of networksetupArgs) {
-      await execAsync(`sudo -n networksetup ${args}`)
+    for (const args of networksetupCommands) {
+      await execAsync('sudo', ['-n', 'networksetup', ...args])
     }
   } catch {
-    const combined = networksetupArgs.map((args) => `networksetup ${args}`).join(' && ')
+    // do shell script принимает только строку — единственное место, где аргументы обратно
+    // собираются в shell-команду, поэтому здесь обязателен ручной shell-quoting каждого аргумента
+    const combined = networksetupCommands
+      .map((args) => ['networksetup', ...args].map(shellQuote).join(' '))
+      .join(' && ')
     await runAsAdminViaOsascript(combined)
   }
 }
 
 // Активные network services macOS (Wi-Fi, Ethernet и т.п.)
 async function getActiveServices(): Promise<string[]> {
-  const allOutput = await execAsync('networksetup -listallnetworkservices')
+  const allOutput = await execAsync('networksetup', ['-listallnetworkservices'])
   return allOutput
     .split('\n')
     .slice(1)
@@ -104,20 +121,20 @@ function parseProxyGetOutput(output: string): ProxyGetResult {
 /** Текущее состояние HTTP и HTTPS прокси конкретного сетевого сервиса */
 async function getServiceProxyState(service: string): Promise<{ web: ProxyGetResult; secureWeb: ProxyGetResult }> {
   const [webOutput, secureWebOutput] = await Promise.all([
-    execAsync(`networksetup -getwebproxy "${service}"`),
-    execAsync(`networksetup -getsecurewebproxy "${service}"`)
+    execAsync('networksetup', ['-getwebproxy', service]),
+    execAsync('networksetup', ['-getsecurewebproxy', service])
   ])
   return { web: parseProxyGetOutput(webOutput), secureWeb: parseProxyGetOutput(secureWebOutput) }
 }
 
-function buildRestoreCommand(service: string, saved: SavedProxyState): string[] {
+function buildRestoreCommand(service: string, saved: SavedProxyState): string[][] {
   return [
     saved.webEnabled && saved.webServer
-      ? `-setwebproxy "${service}" ${saved.webServer} ${saved.webPort}`
-      : `-setwebproxystate "${service}" off`,
+      ? ['-setwebproxy', service, saved.webServer, saved.webPort]
+      : ['-setwebproxystate', service, 'off'],
     saved.secureWebEnabled && saved.secureWebServer
-      ? `-setsecurewebproxy "${service}" ${saved.secureWebServer} ${saved.secureWebPort}`
-      : `-setsecurewebproxystate "${service}" off`
+      ? ['-setsecurewebproxy', service, saved.secureWebServer, saved.secureWebPort]
+      : ['-setsecurewebproxystate', service, 'off']
   ]
 }
 
@@ -127,17 +144,25 @@ async function restoreSavedStates(states: SavedStatesFile): Promise<void> {
   await execAsAdmin(commands)
 }
 
-/** Включает системный HTTP/HTTPS-прокси на всех активных сервисах, сохранив исходное состояние на диск для восстановления при остановке/падении. */
+/** Включает системный HTTP/HTTPS-прокси на всех активных сервисах, сохранив исходное состояние на диск для восстановления при остановке/падении.
+ * Бросает, если активных сетевых сервисов нет — иначе вызывающий код не может отличить "прокси
+ * реально применён" от "применять было не на что", а статус в UI всё равно станет "running". */
 export async function enableSystemProxy(host: string, port: number): Promise<void> {
   const services = await getActiveServices()
-  if (services.length === 0) return
+  if (services.length === 0) {
+    throw new Error('Нет активных сетевых сервисов — системный прокси не применён ни к одному интерфейсу')
+  }
+
+  // состояния сервисов независимы друг от друга — запрашиваем параллельно, а не по одному в цикле:
+  // с несколькими активными интерфейсами (Wi-Fi + Ethernet + VPN) это меньше networksetup-спавнов подряд
+  const serviceStates = await Promise.all(
+    services.map(async (service) => ({ service, ...(await getServiceProxyState(service)) }))
+  )
 
   const states: SavedStatesFile = {}
-  const commands: string[] = []
+  const commands: string[][] = []
 
-  for (const service of services) {
-    const { web, secureWeb } = await getServiceProxyState(service)
-
+  for (const { service, web, secureWeb } of serviceStates) {
     states[service] = {
       webEnabled: web.enabled,
       webServer: web.server,
@@ -147,8 +172,8 @@ export async function enableSystemProxy(host: string, port: number): Promise<voi
       secureWebPort: secureWeb.port
     }
 
-    commands.push(`-setwebproxy "${service}" ${host} ${port}`)
-    commands.push(`-setsecurewebproxy "${service}" ${host} ${port}`)
+    commands.push(['-setwebproxy', service, host, String(port)])
+    commands.push(['-setsecurewebproxy', service, host, String(port)])
   }
 
   writeSavedStates(states)
@@ -181,15 +206,17 @@ export async function recoverStaleSystemProxy(host: string): Promise<void> {
   }
 
   const services = await getActiveServices()
-  const staleCommands: string[] = []
-  for (const service of services) {
-    const { web, secureWeb } = await getServiceProxyState(service)
+  const serviceStates = await Promise.all(
+    services.map(async (service) => ({ service, ...(await getServiceProxyState(service)) }))
+  )
 
+  const staleCommands: string[][] = []
+  for (const { service, web, secureWeb } of serviceStates) {
     if (web.enabled && web.server === host) {
-      staleCommands.push(`-setwebproxystate "${service}" off`)
+      staleCommands.push(['-setwebproxystate', service, 'off'])
     }
     if (secureWeb.enabled && secureWeb.server === host) {
-      staleCommands.push(`-setsecurewebproxystate "${service}" off`)
+      staleCommands.push(['-setsecurewebproxystate', service, 'off'])
     }
   }
 

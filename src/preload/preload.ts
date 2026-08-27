@@ -1,15 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, TrafficCaptureSettings } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo } from '../shared/types'
 
 const api = {
   rules: {
     get: (): Promise<Rule[]> => ipcRenderer.invoke('rules:get'),
     save: (rules: Rule[]): Promise<Rule[]> => ipcRenderer.invoke('rules:save', rules)
-  },
-  trace: {
-    get: (): Promise<TrafficCaptureSettings> => ipcRenderer.invoke('trace:get'),
-    save: (settings: TrafficCaptureSettings): Promise<TrafficCaptureSettings> =>
-      ipcRenderer.invoke('trace:save', settings)
   },
   proxy: {
     start: (port: number): Promise<ProxyState> => ipcRenderer.invoke('proxy:start', port),
@@ -20,10 +15,12 @@ const api = {
       ipcRenderer.on('proxy:status', listener)
       return () => ipcRenderer.removeListener('proxy:status', listener)
     },
-    onLog: (callback: (event: ProxyLogEvent) => void): (() => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, log: ProxyLogEvent): void => callback(log)
-      ipcRenderer.on('proxy:log', listener)
-      return () => ipcRenderer.removeListener('proxy:log', listener)
+    // события лога приходят пачками (см. proxyController: LOG_BATCH_INTERVAL_MS), а не по одному —
+    // снижает частоту IPC-сообщений при активном трафике
+    onLogBatch: (callback: (events: ProxyLogEvent[]) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, batch: ProxyLogEvent[]): void => callback(batch)
+      ipcRenderer.on('proxy:logBatch', listener)
+      return () => ipcRenderer.removeListener('proxy:logBatch', listener)
     },
     onStderr: (callback: (text: string) => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent, text: string): void => callback(text)

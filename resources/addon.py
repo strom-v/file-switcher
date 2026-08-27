@@ -19,7 +19,6 @@ MATCH_FILE_KEY = "file_switcher_file"
 class ResponseSwitcher:
     def load(self, loader):
         loader.add_option("rules_file", str, "", "Path to rules.json")
-        loader.add_option("trace_settings_file", str, "", "Path to trace-settings.json")
 
     def configure(self, updated):
         if "rules_file" in updated:
@@ -32,39 +31,10 @@ class ResponseSwitcher:
                 except (OSError, json.JSONDecodeError, KeyError) as e:
                     ctx.log.warn(f"не удалось прочитать rules_file при старте: {e}")
 
-        if "trace_settings_file" in updated:
-            self.trace_settings_path = ctx.options.trace_settings_file
-            self.trace_settings = {}
-            self.trace_last_mtime = None
-            if self.trace_settings_path:
-                try:
-                    self._reload_trace_settings()
-                except (OSError, json.JSONDecodeError) as e:
-                    ctx.log.warn(f"не удалось прочитать trace_settings_file при старте: {e}")
-
     def _reload(self):
         with open(self.rules_path, encoding="utf-8") as f:
             self.rules = json.load(f)["rules"]
         self.last_mtime = os.path.getmtime(self.rules_path)
-
-    def _reload_trace_settings(self):
-        with open(self.trace_settings_path, encoding="utf-8") as f:
-            self.trace_settings = json.load(f)
-        self.trace_last_mtime = os.path.getmtime(self.trace_settings_path)
-
-    def _refresh_trace_settings(self):
-        if not self.trace_settings_path:
-            return
-        try:
-            mtime = os.path.getmtime(self.trace_settings_path)
-        except OSError as e:
-            ctx.log.warn(f"trace_settings_file недоступен: {e}")
-            return
-        if mtime != self.trace_last_mtime:
-            try:
-                self._reload_trace_settings()
-            except (OSError, json.JSONDecodeError) as e:
-                ctx.log.warn(f"не удалось перечитать trace_settings_file: {e}")
 
     @staticmethod
     def _decode_body(raw: bytes | None) -> str | None:
@@ -99,7 +69,13 @@ class ResponseSwitcher:
             if not rule.get("enabled"):
                 continue
 
-            pattern = rule["urlPattern"]
+            # .get() вместо [] — битое правило без urlPattern (например rules.json отредактирован
+            # вручную) не должно ронять обработку всех остальных запросов через KeyError
+            pattern = rule.get("urlPattern")
+            if not pattern:
+                ctx.log.warn(f"правило {rule.get('id')} пропущено: пустой urlPattern")
+                continue
+
             is_regex = rule.get("isRegex")
             try:
                 if is_regex:
@@ -193,8 +169,6 @@ class ResponseSwitcher:
             if status_override:
                 flow.response.status_code = status_override
 
-        self._refresh_trace_settings()
-
         log_entry = {
             "event": event,
             "url": flow.request.pretty_url,
@@ -205,13 +179,9 @@ class ResponseSwitcher:
             "responseHeaders": dict(flow.response.headers) if flow.response else {},
             "responseSize": len(flow.response.raw_content) if flow.response and flow.response.raw_content else 0,
             "ts": time.time(),
+            "requestBody": self._decode_body(flow.request.raw_content),
+            "responseBody": self._decode_body(flow.response.raw_content) if flow.response else "",
         }
-
-        if self.trace_settings.get("captureRequestBody"):
-            log_entry["requestBody"] = self._decode_body(flow.request.raw_content)
-
-        if self.trace_settings.get("captureResponseBody"):
-            log_entry["responseBody"] = self._decode_body(flow.response.raw_content) if flow.response else ""
 
         print(
             json.dumps(log_entry),

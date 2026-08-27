@@ -185,7 +185,8 @@ export default function SettingsPanel({
               onChange={onLanguageChange}
               options={[
                 { label: 'Русский', value: 'ru' },
-                { label: 'English', value: 'en' }
+                { label: 'English', value: 'en' },
+                { label: '中文', value: 'zh' }
               ]}
             />
             <Select<ThemeMode>

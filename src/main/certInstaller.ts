@@ -26,7 +26,7 @@ export async function getCertStatus(): Promise<CertStatus> {
   try {
     // exit code 0 — сертификат успешно верифицируется как доверенный root,
     // ненулевой (обычно CSSMERR_TP_NOT_TRUSTED) — доверия нет
-    await execAsync(`security verify-cert -c "${CA_CERT_PATH}" -l`)
+    await execAsync('security', ['verify-cert', '-c', CA_CERT_PATH, '-l'])
     return 'trusted'
   } catch {
     return 'not-trusted'
@@ -42,14 +42,14 @@ export async function getCertStatus(): Promise<CertStatus> {
 export async function installCert(): Promise<void> {
   assertCertExists('. Сначала запустите прокси и откройте http://mitm.it')
 
-  await execAsync(`security add-trusted-cert -r trustRoot "${CA_CERT_PATH}"`)
+  await execAsync('security', ['add-trusted-cert', '-r', 'trustRoot', CA_CERT_PATH])
 }
 
 /** Убирает доверие к CA-сертификату mitmproxy из user keychain (сам файл сертификата не удаляет) */
 export async function removeCertTrust(): Promise<void> {
   assertCertExists('')
 
-  await execAsync(`security remove-trusted-cert "${CA_CERT_PATH}"`)
+  await execAsync('security', ['remove-trusted-cert', CA_CERT_PATH])
 }
 
 /**
@@ -59,7 +59,7 @@ export async function removeCertTrust(): Promise<void> {
 export async function listCerts(): Promise<CertInfo[]> {
   let output: string
   try {
-    output = await execAsync(`security find-certificate -a -c "mitmproxy" -Z -p "${LOGIN_KEYCHAIN}"`)
+    output = await execAsync('security', ['find-certificate', '-a', '-c', 'mitmproxy', '-Z', '-p', LOGIN_KEYCHAIN])
   } catch {
     return []
   }
@@ -80,13 +80,13 @@ export async function listCerts(): Promise<CertInfo[]> {
         const certPath = join(tmpDir, `${sha1}.pem`)
         writeFileSync(certPath, pem)
 
-        const expiresAt = (await execAsync(`openssl x509 -in "${certPath}" -noout -enddate`))
+        const expiresAt = (await execAsync('openssl', ['x509', '-in', certPath, '-noout', '-enddate']))
           .replace('notAfter=', '')
           .trim()
 
         let trusted = false
         try {
-          await execAsync(`security verify-cert -c "${certPath}" -l`)
+          await execAsync('security', ['verify-cert', '-c', certPath, '-l'])
           trusted = true
         } catch {
           trusted = false

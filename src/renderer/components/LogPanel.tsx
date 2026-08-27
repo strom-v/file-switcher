@@ -13,10 +13,8 @@ import LogDetailModal from './LogDetailModal'
 import IconButton from './IconButton'
 import { COLOR_INFO, COLOR_SUCCESS, httpStatusColor } from '../theme'
 import { tsToDate } from '../formatters'
-import type { ProxyLogEvent, ProxyLogEventType } from '../../shared/types'
-
-const EVENT_FILTER_ALL = 'all' as const
-type EventFilter = ProxyLogEventType | typeof EVENT_FILTER_ALL
+import { EVENT_FILTER_ALL, useLogFilters } from '../hooks/useLogFilters'
+import type { ProxyLogEvent } from '../../shared/types'
 
 // вынесено из компонента: список логов рендерится на каждое новое событие трафика,
 // пересоздание объекта темы на каждый такой рендер лишний раз нагружает ConfigProvider
@@ -25,40 +23,36 @@ const LOG_LIST_THEME = { components: { List: { itemPaddingSM: '0 4px' } } }
 interface LogPanelProps {
   logs: ProxyLogEvent[]
   onClear: () => void
-  captureRequestBody: boolean
-  onCaptureRequestBodyChange: (value: boolean) => void
-  captureResponseBody: boolean
-  onCaptureResponseBodyChange: (value: boolean) => void
 }
 
-/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL и фильтром по событию.
- * Сколько записей на категорию ("подмена" / "без подмены") хранится в памяти — настраивается
- * в панели настроек (см. useLogStorageLimit, useProxyState). */
-export default function LogPanel({
-  logs,
-  onClear,
-  captureRequestBody,
-  onCaptureRequestBodyChange,
-  captureResponseBody,
-  onCaptureResponseBodyChange
-}: LogPanelProps): React.ReactElement {
+/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL, фильтром по событию
+ * и фильтром по наличию тела запроса/ответа. Сколько записей на категорию ("подмена" / "без подмены")
+ * хранится в памяти — настраивается в панели настроек (см. useLogStorageLimit, useProxyState). */
+export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
   const [search, setSearch] = useState('')
-  const [eventFilter, setEventFilter] = useState<EventFilter>(EVENT_FILTER_ALL)
+  const { eventFilter, setEventFilter, bodyFilter, toggleBodyFilter } = useLogFilters()
 
+  // фильтруем сначала (обычно отсекает большую часть буфера), разворачиваем уже отфильтрованный
+  // результат — дешевле, чем сначала копировать и разворачивать весь буфер (до 10000 записей),
+  // а уже потом фильтровать
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return [...logs].reverse().filter((item) => {
-      if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter) return false
-      if (query) {
-        const matchesUrl = item.url.toLowerCase().includes(query)
-        const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
-        if (!matchesUrl && !matchesFile) return false
-      }
-      return true
-    })
-  }, [logs, search, eventFilter])
+    return logs
+      .filter((item) => {
+        if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter) return false
+        if (bodyFilter === 'request' && !item.requestBody) return false
+        if (bodyFilter === 'response' && !item.responseBody) return false
+        if (query) {
+          const matchesUrl = item.url.toLowerCase().includes(query)
+          const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
+          if (!matchesUrl && !matchesFile) return false
+        }
+        return true
+      })
+      .reverse()
+  }, [logs, search, eventFilter, bodyFilter])
 
   return (
     <div className="panel-column">
@@ -87,18 +81,20 @@ export default function LogPanel({
         </Space.Compact>
         <Space.Compact size="small" style={{ flexShrink: 0 }}>
           <IconButton
-            tooltip={t(captureRequestBody ? 'log.captureRequestBodyOn' : 'log.captureRequestBodyOff')}
-            type={captureRequestBody ? 'primary' : 'default'}
+            tooltip={t('log.filterHasRequestBody')}
+            type={bodyFilter === 'request' ? 'primary' : 'default'}
             icon={<ArrowUpOutlined />}
-            onClick={() => onCaptureRequestBodyChange(!captureRequestBody)}
-            style={captureRequestBody ? { backgroundColor: COLOR_INFO, borderColor: COLOR_INFO } : undefined}
+            onClick={() => toggleBodyFilter('request')}
+            style={bodyFilter === 'request' ? { backgroundColor: COLOR_INFO, borderColor: COLOR_INFO } : undefined}
           />
           <IconButton
-            tooltip={t(captureResponseBody ? 'log.captureResponseBodyOn' : 'log.captureResponseBodyOff')}
-            type={captureResponseBody ? 'primary' : 'default'}
+            tooltip={t('log.filterHasResponseBody')}
+            type={bodyFilter === 'response' ? 'primary' : 'default'}
             icon={<ArrowDownOutlined />}
-            onClick={() => onCaptureResponseBodyChange(!captureResponseBody)}
-            style={captureResponseBody ? { backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS } : undefined}
+            onClick={() => toggleBodyFilter('response')}
+            style={
+              bodyFilter === 'response' ? { backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS } : undefined
+            }
           />
         </Space.Compact>
         <Popconfirm title={t('log.clearConfirm')} onConfirm={onClear} disabled={logs.length === 0}>
@@ -127,13 +123,14 @@ export default function LogPanel({
                   <List.Item className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}>
                     <Flex vertical gap={0} style={{ width: '100%', minWidth: 0 }}>
                       <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
-                        <span style={{ flexShrink: 0, width: 14, display: 'inline-flex' }}>
-                          {item.responseBody !== undefined ? (
-                            <ArrowDownOutlined style={{ color: COLOR_SUCCESS }} title={t('log.detailResponseBody')} />
-                          ) : item.requestBody !== undefined ? (
+                        <Space size={2} style={{ flexShrink: 0, width: 28 }}>
+                          {item.requestBody ? (
                             <ArrowUpOutlined style={{ color: COLOR_INFO }} title={t('log.detailRequestBody')} />
                           ) : null}
-                        </span>
+                          {item.responseBody ? (
+                            <ArrowDownOutlined style={{ color: COLOR_SUCCESS }} title={t('log.detailResponseBody')} />
+                          ) : null}
+                        </Space>
                         <Typography.Text
                           strong
                           className="text-sm"

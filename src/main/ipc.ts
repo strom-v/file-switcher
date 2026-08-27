@@ -2,10 +2,8 @@ import { readFile, writeFile } from 'fs/promises'
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
-import { traceSettingsStore } from './traceSettingsStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
 import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
-import type { TrafficCaptureSettings } from '../shared/types'
 
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
 export function registerIpcHandlers(): void {
@@ -13,12 +11,11 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('rules:save', (_event, rules: Rule[]) => rulesStore.saveAll(rules))
 
-  ipcMain.handle('trace:get', () => traceSettingsStore.get())
-
-  ipcMain.handle('trace:save', (_event, settings: TrafficCaptureSettings) => traceSettingsStore.save(settings))
-
   ipcMain.handle('proxy:start', (_event, port: number) => {
-    proxyController.start(rulesStore.getFilePath(), traceSettingsStore.getFilePath(), port)
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return { ...proxyController.getState(), status: 'crashed', error: `Некорректный порт: ${port}` }
+    }
+    proxyController.start(rulesStore.getFilePath(), port)
     return proxyController.getState()
   })
 
@@ -71,12 +68,19 @@ export function registerIpcHandlers(): void {
     broadcast('proxy:status', state)
   })
 
-  proxyController.on('log', (event) => {
-    broadcast('proxy:log', event)
+  proxyController.on('logBatch', (batch) => {
+    broadcast('proxy:logBatch', batch)
   })
 
   proxyController.on('stderr', (text: string) => {
     broadcast('proxy:stderr', text)
+  })
+
+  // переиспользуем тот же канал, что и ошибки прокси — rulesStore не EventEmitter-компонент прокси,
+  // но пользователю без разницы, откуда пришло предупреждение, а заводить отдельный IPC-канал
+  // ради одного редкого события (повреждённый rules.json) избыточно
+  rulesStore.on('corrupted', (message: string) => {
+    broadcast('proxy:stderr', `rules.json повреждён, правила сброшены к пустому списку: ${message}`)
   })
 }
 

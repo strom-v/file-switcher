@@ -11,32 +11,19 @@ interface LogDetailModalProps {
 
 interface BodySectionProps {
   title: React.ReactNode
-  body: string | undefined
-  notCapturedHint: string
+  body: string
 }
 
 /** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой ручного форматирования под JSON */
-function BodySection({ title, body, notCapturedHint }: BodySectionProps): React.ReactElement {
+function BodySection({ title, body }: BodySectionProps): React.ReactElement {
   const { t } = useTranslation()
   const [formatted, setFormatted] = useState(false)
 
-  if (body === undefined) {
-    return (
-      <>
-        <Typography.Text strong className="text-sm">
-          {title}
-        </Typography.Text>
-        <div className="headers-panel">
-          <Typography.Paragraph type="secondary" className="pre-wrap text-sm">
-            {notCapturedHint}
-          </Typography.Paragraph>
-        </div>
-      </>
-    )
-  }
-
   const pretty = formatted ? tryFormatJson(body) : null
   const displayed = pretty ?? body
+  // кнопка нажата, но текст не изменился — либо это не JSON, либо тело слишком большое для
+  // форматирования (см. FORMAT_JSON_MAX_LENGTH); пользователю нужно явное объяснение, а не молчание
+  const formatDidNothing = formatted && pretty === null
 
   return (
     <>
@@ -46,6 +33,12 @@ function BodySection({ title, body, notCapturedHint }: BodySectionProps): React.
       <Button size="small" type="link" onClick={() => setFormatted((prev) => !prev)}>
         {t(formatted ? 'log.formatRawButton' : 'log.formatButton')}
       </Button>
+      {formatDidNothing && (
+        <Typography.Text type="secondary" className="text-sm">
+          {' '}
+          {t('log.formatNotApplicable')}
+        </Typography.Text>
+      )}
       <div className="headers-panel">
         <Typography.Paragraph className="pre-wrap text-sm">{displayed || '—'}</Typography.Paragraph>
       </div>
@@ -107,16 +100,8 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             </Typography.Paragraph>
           </div>
 
-          <BodySection
-            title={t('log.detailRequestBody')}
-            body={event.requestBody}
-            notCapturedHint={t('log.detailBodyNotCaptured')}
-          />
-          <BodySection
-            title={t('log.detailResponseBody')}
-            body={event.responseBody}
-            notCapturedHint={t('log.detailBodyNotCaptured')}
-          />
+          <BodySection title={t('log.detailRequestBody')} body={event.requestBody} />
+          <BodySection title={t('log.detailResponseBody')} body={event.responseBody} />
         </>
       )}
     </Modal>

@@ -1,7 +1,7 @@
 {
   "app": {
     "settingsButton": "settings",
-    "titleClickHint": "click the title to start or stop the proxy. title color shows status: green — stopped, yellow — starting, red — running"
+    "titleClickHint": "click the title to start or stop the proxy. title color shows status: green — stopped, yellow — starting, red — running. with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app"
   },
   "rules": {
     "addButton": "add rule",
@@ -41,12 +41,10 @@
     "empty": "no requests yet",
     "noMatches": "no matches for this filter",
     "searchPlaceholder": "search",
-    "filterAll": "all",
-    "matched": "rules that fired only",
-    "captureRequestBodyOn": "request body capture is on — click to turn off",
-    "captureRequestBodyOff": "request body capture is off — click to turn on",
-    "captureResponseBodyOn": "response body capture is on — click to turn off",
-    "captureResponseBodyOff": "response body capture is off — click to turn on",
+    "filterAll": "show all requests, including ones without a substitution",
+    "matched": "show only requests where the file substitution fired",
+    "filterHasRequestBody": "show only requests that had a body in the outgoing (sent) request",
+    "filterHasResponseBody": "show only requests that had a body in the incoming (received) response",
     "detailUrl": "URL",
     "detailMethod": "method",
     "detailStatus": "status",
@@ -57,9 +55,9 @@
     "detailResponseHeaders": "response headers",
     "detailRequestBody": "request body",
     "detailResponseBody": "response body",
-    "detailBodyNotCaptured": "body capture is off — enable it with the button in the log toolbar",
     "formatButton": "format",
-    "formatRawButton": "raw view"
+    "formatRawButton": "raw view",
+    "formatNotApplicable": "(couldn't format: not JSON, or the body is too large)"
   },
   "settings": {
     "error": "error",

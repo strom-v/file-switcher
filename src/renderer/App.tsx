@@ -14,6 +14,7 @@ import {
 import { PlusOutlined, QuestionCircleOutlined, SettingOutlined } from '@ant-design/icons'
 import ruRU from 'antd/locale/ru_RU'
 import enUS from 'antd/locale/en_US'
+import zhCN from 'antd/locale/zh_CN'
 import { useTranslation } from 'react-i18next'
 import RulesTable from './components/RulesTable'
 import RuleFormModal from './components/RuleFormModal'
@@ -24,7 +25,6 @@ import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './compon
 import { useProxyState } from './hooks/useProxyState'
 import { useLogStorageLimit } from './hooks/useLogStorageLimit'
 import { useProxySettings } from './hooks/useProxySettings'
-import { useTraceSettings } from './hooks/useTraceSettings'
 import { useSplitterSize } from './hooks/useSplitterSize'
 import { useThemeMode } from './hooks/useThemeMode'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
@@ -32,7 +32,7 @@ import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
 import type { Rule } from '../shared/types'
 
-const ANTD_LOCALES = { ru: ruRU, en: enUS }
+const ANTD_LOCALES = { ru: ruRU, en: enUS, zh: zhCN }
 
 // ключи настроек, которые сбрасывает "сбросить все настройки"
 const RESETTABLE_STORAGE_KEYS = [
@@ -67,7 +67,6 @@ export default function App(): React.ReactElement {
   const { splitterSize, setSplitterSize } = useSplitterSize()
   const { logStorageLimit, setLogStorageLimit } = useLogStorageLimit()
   const { port, setPort, autoStart, setAutoStart } = useProxySettings()
-  const { captureRequestBody, setCaptureRequestBody, captureResponseBody, setCaptureResponseBody } = useTraceSettings()
   const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
     message.warning(text)
   })
@@ -92,9 +91,17 @@ export default function App(): React.ReactElement {
     setOnboardingOpen(false)
   }
 
+  // сохраняет оптимистично (сразу отражает next в UI); если main отклонит правила (например,
+  // невалидный regex в urlPattern) — откатывает UI к состоянию, которое реально на диске, и показывает причину
   const persist = async (next: Rule[]): Promise<void> => {
     setRules(next)
-    await window.api.rules.save(next)
+    try {
+      await window.api.rules.save(next)
+    } catch (err) {
+      const text = err instanceof Error ? err.message : String(err)
+      message.error(text)
+      setRules(await window.api.rules.get())
+    }
   }
 
   const updateRuleById = (id: string, patch: Partial<Rule>): Rule[] =>
@@ -160,7 +167,9 @@ export default function App(): React.ReactElement {
     setSplitterSize(Math.round((left / total) * 100))
   }
 
-  const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
+  const currentLanguage = (
+    i18n.language.startsWith('ru') ? 'ru' : i18n.language.startsWith('zh') ? 'zh' : 'en'
+  ) as SupportedLanguage
   const statusLabels: Record<string, string> = {
     stopped: t('settings.statusLabels.stopped'),
     starting: t('settings.statusLabels.starting'),
@@ -237,14 +246,7 @@ export default function App(): React.ReactElement {
         <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
           <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">
             <div style={{ height: '100%', paddingRight: 8 }}>
-              <LogPanel
-                logs={logs}
-                onClear={clearLogs}
-                captureRequestBody={captureRequestBody}
-                onCaptureRequestBodyChange={setCaptureRequestBody}
-                captureResponseBody={captureResponseBody}
-                onCaptureResponseBodyChange={setCaptureResponseBody}
-              />
+              <LogPanel logs={logs} onClear={clearLogs} />
             </div>
           </Splitter.Panel>
           <Splitter.Panel>

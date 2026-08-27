@@ -2,23 +2,28 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import ru from './ru.json'
 import en from './en.json'
+import zh from './zh.json'
 
-export type SupportedLanguage = 'ru' | 'en'
+export type SupportedLanguage = 'ru' | 'en' | 'zh'
 
 const LANGUAGE_STORAGE_KEY = 'file-switcher:language'
 
 function getInitialLanguage(): SupportedLanguage {
   const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY)
-  if (stored === 'ru' || stored === 'en') {
+  if (stored === 'ru' || stored === 'en' || stored === 'zh') {
     return stored
   }
-  return navigator.language.toLowerCase().startsWith('ru') ? 'ru' : 'en'
+  const browserLang = navigator.language.toLowerCase()
+  if (browserLang.startsWith('ru')) return 'ru'
+  if (browserLang.startsWith('zh')) return 'zh'
+  return 'en'
 }
 
 i18n.use(initReactI18next).init({
   resources: {
     ru: { translation: ru },
-    en: { translation: en }
+    en: { translation: en },
+    zh: { translation: zh }
   },
   lng: getInitialLanguage(),
   fallbackLng: 'en',

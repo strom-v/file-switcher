@@ -17,8 +17,15 @@ export function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-/** Пытается разобрать текст как JSON и вернуть его в читаемом виде с отступами; если это не JSON — null */
+// тело запроса/ответа логируется без лимита размера (см. AGENTS.md, "Известные ограничения") — но
+// JSON.parse + JSON.stringify(..., null, 2) на многомегабайтном тексте синхронно блокирует UI-поток
+// на заметное время, а результат всё равно нечитаем для человека при такой длине
+const FORMAT_JSON_MAX_LENGTH = 2 * 1024 * 1024 // 2 МБ
+
+/** Пытается разобрать текст как JSON и вернуть его в читаемом виде с отступами; если это не JSON
+ * или текст длиннее лимита — null (для лимита форматирование просто не делается, а не молча режется) */
 export function tryFormatJson(text: string): string | null {
+  if (text.length > FORMAT_JSON_MAX_LENGTH) return null
   try {
     return JSON.stringify(JSON.parse(text), null, 2)
   } catch {

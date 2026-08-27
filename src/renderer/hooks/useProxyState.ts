@@ -59,8 +59,10 @@ export function useProxyState(
       setStatus(state)
     })
 
-    const offLog = window.api.proxy.onLog((event) => {
-      updateLogs((prev) => trimByCategory([...prev, event], storageLimitRef.current))
+    // события приходят пачками — один updateLogs (и, соответственно, один React-рендер)
+    // на пачку, а не на каждое отдельное событие трафика
+    const offLog = window.api.proxy.onLogBatch((batch) => {
+      updateLogs((prev) => trimByCategory([...prev, ...batch], storageLimitRef.current))
     })
 
     const offStderr = window.api.proxy.onStderr((text) => {
