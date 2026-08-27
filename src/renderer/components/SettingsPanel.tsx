@@ -261,10 +261,6 @@ export default function SettingsPanel({
             </Tooltip>
           </Space>
         </div>
-
-        <Popconfirm title={t('settings.resetConfirm')} onConfirm={onResetSettings}>
-          <Button danger>{t('settings.resetButton')}</Button>
-        </Popconfirm>
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupData')}>
@@ -311,6 +307,12 @@ export default function SettingsPanel({
           />
         </SectionHeader>
       </SettingsGroup>
+
+      <Flex justify="flex-end">
+        <Popconfirm title={t('settings.resetConfirm')} onConfirm={onResetSettings}>
+          <Button danger>{t('settings.resetButton')}</Button>
+        </Popconfirm>
+      </Flex>
     </Space>
   )
 }
