@@ -58,8 +58,6 @@
     "exportFormatJson": "export JSON",
     "exportFormatCsv": "export CSV",
     "exportSuccess": "log saved: {{path}}",
-    "empty": "no requests yet",
-    "noMatches": "no matches for this filter",
     "searchPlaceholder": "search by URL",
     "shownCount": "{{shown}}/{{limit}}",
     "filterAll": "all",
