@@ -41,14 +41,6 @@ export function registerIpcHandlers(): void {
     return getCertStatus()
   })
 
-  ipcMain.handle('dialog:selectFile', async () => {
-    const result = await dialog.showOpenDialog({ properties: ['openFile'] })
-    if (result.canceled || result.filePaths.length === 0) {
-      return null
-    }
-    return result.filePaths[0]
-  })
-
   ipcMain.handle('dialog:openTextFile', async (_event, extensions?: string[]) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],

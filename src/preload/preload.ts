@@ -33,7 +33,6 @@ const api = {
     list: (): Promise<CertInfo[]> => ipcRenderer.invoke('cert:list')
   },
   dialog: {
-    selectFile: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectFile'),
     saveTextFile: (defaultFileName: string, content: string): Promise<string | null> =>
       ipcRenderer.invoke('dialog:saveTextFile', defaultFileName, content),
     openTextFile: (extensions?: string[]): Promise<string | null> =>
