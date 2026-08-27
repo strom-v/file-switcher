@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Button, ConfigProvider, Flex, Input, List, Select, Space, Tooltip, Typography } from 'antd'
+import { Button, ConfigProvider, Empty, Flex, Input, List, Select, Space, Tooltip, Typography } from 'antd'
 import { ClearOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import LogDetailModal from './LogDetailModal'
@@ -83,7 +83,11 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
         />
       </Flex>
       <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
-        {visible.length > 0 && (
+        {visible.length === 0 ? (
+          <Flex justify="center" align="center" style={{ height: '100%' }}>
+            <Empty description={t(logs.length === 0 ? 'log.empty' : 'log.noMatches')} />
+          </Flex>
+        ) : (
           <ConfigProvider theme={LOG_LIST_THEME}>
             <List
               size="small"
