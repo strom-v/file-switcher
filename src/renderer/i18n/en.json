@@ -55,6 +55,8 @@
   "settings": {
     "error": "error",
     "groupAppearance": "interface",
+    "splitterSizeLabel": "log/rules panel width",
+    "splitterSizeHint": "the width ratio between the left panel (log) and the right one (rules) — can also be changed by dragging the splitter between the panels",
     "groupNetwork": "general",
     "groupData": "data",
     "groupDataRules": "rules",

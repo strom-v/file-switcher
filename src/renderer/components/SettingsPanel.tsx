@@ -8,6 +8,7 @@ import { buildCsv } from '../csvExport'
 import { buildHar } from '../harExport'
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../hooks/useFontSize'
 import { LOG_STORAGE_LIMIT_MAX, LOG_STORAGE_LIMIT_MIN } from '../hooks/useLogStorageLimit'
+import { SPLITTER_SIZE_MAX, SPLITTER_SIZE_MIN } from '../hooks/useSplitterSize'
 import type { ThemeMode } from '../hooks/useThemeMode'
 import type { SupportedLanguage } from '../i18n'
 import type { CertStatus, ProxyLogEvent, ProxyState, Rule } from '../../shared/types'
@@ -28,6 +29,8 @@ interface SettingsPanelProps {
   onThemeModeChange: (mode: ThemeMode) => void
   fontSize: number
   onFontSizeChange: (size: number) => void
+  splitterSize: number
+  onSplitterSizeChange: (size: number) => void
   logStorageLimit: number
   onLogStorageLimitChange: (limit: number) => void
   onResetSettings: () => void
@@ -58,6 +61,8 @@ export default function SettingsPanel({
   onThemeModeChange,
   fontSize,
   onFontSizeChange,
+  splitterSize,
+  onSplitterSizeChange,
   logStorageLimit,
   onLogStorageLimitChange,
   onResetSettings
@@ -203,6 +208,18 @@ export default function SettingsPanel({
             marks={{ [FONT_SIZE_MIN]: FONT_SIZE_MIN, [FONT_SIZE_MAX]: FONT_SIZE_MAX }}
             tooltip={{ formatter: (value) => `${value}px` }}
           />
+
+          <SectionHeader title={t('settings.splitterSizeLabel')} hint={t('settings.splitterSizeHint')}>
+            <Slider
+              min={SPLITTER_SIZE_MIN}
+              max={SPLITTER_SIZE_MAX}
+              step={1}
+              value={splitterSize}
+              onChange={onSplitterSizeChange}
+              marks={{ [SPLITTER_SIZE_MIN]: `${SPLITTER_SIZE_MIN}%`, [SPLITTER_SIZE_MAX]: `${SPLITTER_SIZE_MAX}%` }}
+              tooltip={{ formatter: (value) => `${value}%` }}
+            />
+          </SectionHeader>
         </SettingsGroup>
 
         <SettingsGroup title={t('settings.groupNetwork')}>

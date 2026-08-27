@@ -24,6 +24,7 @@ import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './compon
 import { useProxyState } from './hooks/useProxyState'
 import { useLogStorageLimit } from './hooks/useLogStorageLimit'
 import { useProxySettings } from './hooks/useProxySettings'
+import { useSplitterSize } from './hooks/useSplitterSize'
 import { useThemeMode } from './hooks/useThemeMode'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
@@ -32,28 +33,16 @@ import type { Rule } from '../shared/types'
 
 const ANTD_LOCALES = { ru: ruRU, en: enUS }
 
-const SPLITTER_SIZE_STORAGE_KEY = 'file-switcher:splitter-size'
-const DEFAULT_SPLITTER_SIZE = '50%'
-
-// ключи настроек, которые сбрасывает "сбросить все настройки" — splitter-size сюда намеренно не входит,
-// это раскладка UI, а не пользовательская настройка
+// ключи настроек, которые сбрасывает "сбросить все настройки"
 const RESETTABLE_STORAGE_KEYS = [
   'file-switcher:theme',
   'file-switcher:language',
   'file-switcher:font-size',
   'file-switcher:log-storage-limit',
   'file-switcher:port',
-  'file-switcher:auto-start-proxy'
+  'file-switcher:auto-start-proxy',
+  'file-switcher:splitter-size'
 ]
-
-/** Сохранённая доля ширины левой панели (лог) из прошлого запуска, если она есть и валидна */
-function readStoredSplitterSize(): string {
-  const stored = localStorage.getItem(SPLITTER_SIZE_STORAGE_KEY)
-  if (stored && /^\d+(\.\d+)?%$/.test(stored)) {
-    return stored
-  }
-  return DEFAULT_SPLITTER_SIZE
-}
 
 // цвет кнопки старт/стоп отражает действие клика, а не сырой статус процесса:
 // зелёный — сейчас остановлена, клик запустит; красный — сейчас работает, клик остановит
@@ -74,7 +63,7 @@ export default function App(): React.ReactElement {
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [splitterSize] = useState(readStoredSplitterSize)
+  const { splitterSize, setSplitterSize } = useSplitterSize()
   const { logStorageLimit, setLogStorageLimit } = useLogStorageLimit()
   const { port, setPort, autoStart, setAutoStart } = useProxySettings()
   const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
@@ -165,7 +154,7 @@ export default function App(): React.ReactElement {
     const [left, right] = sizes
     const total = left + right
     if (total <= 0) return
-    localStorage.setItem(SPLITTER_SIZE_STORAGE_KEY, `${((left / total) * 100).toFixed(2)}%`)
+    setSplitterSize(Math.round((left / total) * 100))
   }
 
   const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
@@ -242,8 +231,8 @@ export default function App(): React.ReactElement {
           </Space>
         </Flex>
 
-        <Splitter style={{ flex: 1, minHeight: 0 }} onResizeEnd={handleSplitterResizeEnd}>
-          <Splitter.Panel defaultSize={splitterSize} min="20%" max="80%">
+        <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
+          <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">
             <div style={{ height: '100%', paddingRight: 8 }}>
               <LogPanel logs={logs} onClear={clearLogs} />
             </div>
@@ -281,6 +270,8 @@ export default function App(): React.ReactElement {
             onThemeModeChange={setMode}
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
+            splitterSize={splitterSize}
+            onSplitterSizeChange={setSplitterSize}
             logStorageLimit={logStorageLimit}
             onLogStorageLimitChange={setLogStorageLimit}
             onResetSettings={handleResetSettings}
