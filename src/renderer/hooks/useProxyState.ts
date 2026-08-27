@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ProxyState, ProxyLogEvent } from '../../shared/types'
 
-export const LOG_LIMIT_OPTIONS = [50, 100, 150, 300, 500, 1000] as const
-export type LogLimit = (typeof LOG_LIMIT_OPTIONS)[number]
-
 // буфер живёт на window, а не в useState: в dev-режиме Vite HMR при live-редактировании
 // этого хука/LogPanel может пересоздать компонент с чистым состоянием — window переживает
 // такую пересборку модуля, так что накопленные логи не пропадают на лету во время правок

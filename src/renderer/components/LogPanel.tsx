@@ -1,12 +1,11 @@
 import React, { useMemo, useState } from 'react'
-import { Button, ConfigProvider, Empty, Flex, Input, List, Select, Space, Tooltip, Typography } from 'antd'
+import { Button, ConfigProvider, Empty, Flex, Input, List, Space, Tooltip, Typography } from 'antd'
 import { ClearOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import LogDetailModal from './LogDetailModal'
 import IconButton from './IconButton'
 import { httpStatusColor } from '../theme'
 import { tsToDate } from '../formatters'
-import { LOG_LIMIT_OPTIONS, type LogLimit } from '../hooks/useProxyState'
 import type { ProxyLogEvent, ProxyLogEventType } from '../../shared/types'
 
 const EVENT_FILTER_ALL = 'all' as const
@@ -19,14 +18,12 @@ const LOG_LIST_THEME = { components: { List: { itemPaddingSM: '0 4px' } } }
 interface LogPanelProps {
   logs: ProxyLogEvent[]
   onClear: () => void
-  logLimit: LogLimit
-  onLogLimitChange: (limit: LogLimit) => void
 }
 
 /** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL и фильтром по событию.
- * logLimit ограничивает, сколько записей хранится в памяти отдельно для каждой категории — "подмена" и
- * "без подмены" не вытесняют друг друга (см. useProxyState). */
-export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: LogPanelProps): React.ReactElement {
+ * Сколько записей на категорию ("подмена" / "без подмены") хранится в памяти — настраивается
+ * в панели настроек (см. useLogStorageLimit, useProxyState). */
+export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
   const [search, setSearch] = useState('')
@@ -40,10 +37,6 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
       return true
     })
   }, [logs, search, eventFilter])
-
-  // счётчик и лимит относятся к текущей выбранной категории — у "подмена" и "без подмены"
-  // свой независимый буфер (см. useProxyState), поэтому общий logs.length тут не подходит
-  const shownCount = eventFilter === EVENT_FILTER_ALL ? logs.length : logs.filter((l) => l.event === eventFilter).length
 
   return (
     <div className="panel-column">
@@ -67,18 +60,6 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
             {t('log.matched')}
           </Button>
         </Space.Compact>
-        <Select
-          size="small"
-          value={logLimit}
-          onChange={onLogLimitChange}
-          options={LOG_LIMIT_OPTIONS.map((count) => ({ value: count, label: count }))}
-          style={{ width: 80, flexShrink: 0 }}
-        />
-        {logs.length > 0 && (
-          <Typography.Text type="secondary" className="text-sm" style={{ flexShrink: 0 }}>
-            {t('log.shownCount', { shown: shownCount, limit: logLimit })}
-          </Typography.Text>
-        )}
         <IconButton
           tooltip={t('log.clear')}
           icon={<ClearOutlined />}

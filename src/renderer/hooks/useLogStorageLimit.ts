@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-export const LOG_STORAGE_LIMIT_MIN = 100
-export const LOG_STORAGE_LIMIT_MAX = 10000
-export const LOG_STORAGE_LIMIT_DEFAULT = 1000
+export const LOG_STORAGE_LIMIT_MIN = 500
+export const LOG_STORAGE_LIMIT_MAX = 5000
+export const LOG_STORAGE_LIMIT_DEFAULT = 500
 const LOG_STORAGE_LIMIT_STORAGE_KEY = 'file-switcher:log-storage-limit'
 
 function readStoredLogStorageLimit(): number {
