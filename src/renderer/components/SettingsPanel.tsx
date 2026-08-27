@@ -69,6 +69,7 @@ export default function SettingsPanel({
   const [sudoersInstalled, setSudoersInstalled] = useState(true)
   const [installingSudoers, setInstallingSudoers] = useState(false)
   const [refreshingRules, setRefreshingRules] = useState(false)
+  const [logExportFormat, setLogExportFormat] = useState<keyof typeof LOG_EXPORT_BUILDERS>('har')
 
   const refreshCertStatus = async (): Promise<void> => {
     setCertStatus(await window.api.cert.status())
@@ -132,8 +133,8 @@ export default function SettingsPanel({
     csv: { extension: 'csv', build: () => buildCsv(logs) }
   }
 
-  const handleExportLog = (format: keyof typeof LOG_EXPORT_BUILDERS): Promise<void> => {
-    const { extension, build } = LOG_EXPORT_BUILDERS[format]
+  const handleExportLog = (): Promise<void> => {
+    const { extension, build } = LOG_EXPORT_BUILDERS[logExportFormat]
     return exportToFile(`file-switcher-log-${Date.now()}.${extension}`, build(), 'log.exportSuccess')
   }
 
@@ -283,14 +284,18 @@ export default function SettingsPanel({
 
         <SectionHeader title={t('settings.groupDataLog')} hint={t('settings.groupDataLogHint')}>
           <Flex gap={8}>
-            <Button style={{ flex: 1 }} onClick={() => handleExportLog('har')} disabled={logs.length === 0}>
-              {t('log.exportFormatHar')}
-            </Button>
-            <Button style={{ flex: 1 }} onClick={() => handleExportLog('json')} disabled={logs.length === 0}>
-              {t('log.exportFormatJson')}
-            </Button>
-            <Button style={{ flex: 1 }} onClick={() => handleExportLog('csv')} disabled={logs.length === 0}>
-              {t('log.exportFormatCsv')}
+            <Select<keyof typeof LOG_EXPORT_BUILDERS>
+              value={logExportFormat}
+              onChange={setLogExportFormat}
+              style={{ flex: 1 }}
+              options={[
+                { value: 'har', label: 'HAR' },
+                { value: 'json', label: 'JSON' },
+                { value: 'csv', label: 'CSV' }
+              ]}
+            />
+            <Button style={{ flex: 1 }} onClick={handleExportLog} disabled={logs.length === 0}>
+              {t('log.exportButton')}
             </Button>
           </Flex>
         </SectionHeader>
