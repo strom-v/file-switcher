@@ -246,13 +246,7 @@ export default function App(): React.ReactElement {
           onSubmit={handleSubmit}
         />
         <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
-        <Drawer
-          open={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-          width={460}
-          closeIcon={false}
-          destroyOnHidden
-        >
+        <Drawer open={settingsOpen} onClose={() => setSettingsOpen(false)} size={460} closeIcon={false} destroyOnHidden>
           <SettingsPanel
             status={status}
             port={port}

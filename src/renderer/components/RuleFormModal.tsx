@@ -61,7 +61,7 @@ export default function RuleFormModal({
       onOk={handleOk}
       okText={t('rules.form.save')}
       cancelText={t('rules.form.cancel')}
-      destroyOnClose
+      destroyOnHidden
       centered
     >
       <Form<FormValues> form={form} layout="vertical">
