@@ -62,8 +62,9 @@ function compareGroupNames(a: string, b: string): number {
   return a.localeCompare(b)
 }
 
-/** Группирует правила по репозиторию из localFilePath; группы и правила внутри них отсортированы по алфавиту
- * (латинские названия групп впереди кириллических), правила без распознанного репозитория — в "остальные" */
+/** Группирует правила по репозиторию из localFilePath, заголовок группы показывается всегда, даже если группа одна;
+ * группы и правила внутри них отсортированы по алфавиту (латинские названия групп впереди кириллических),
+ * правила без распознанного репозитория — в "остальные" */
 function groupRulesByRepo(rules: Rule[], otherLabel: string): GroupedRow {
   const groups = new Map<string, Rule[]>()
   for (const rule of rules) {
@@ -77,14 +78,11 @@ function groupRulesByRepo(rules: Rule[], otherLabel: string): GroupedRow {
   }
 
   const sortedRepos = [...groups.keys()].sort(compareGroupNames)
-  const showGroups = groups.size > 1
 
   const rows: GroupedRow = []
   sortedRepos.forEach((repo, i) => {
     const groupRules = groups.get(repo)!.sort((a, b) => a.urlPattern.localeCompare(b.urlPattern))
-    if (showGroups) {
-      rows.push({ __group: true, key: `group:${repo}`, label: repo, isFirst: i === 0 })
-    }
+    rows.push({ __group: true, key: `group:${repo}`, label: repo, isFirst: i === 0 })
     rows.push(...groupRules)
   })
   return rows

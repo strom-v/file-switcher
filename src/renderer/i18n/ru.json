@@ -51,6 +51,7 @@
   },
   "log": {
     "clear": "очистить",
+    "clearConfirm": "очистить весь лог?",
     "detailButton": "открыть детали",
     "exportFormatHar": "экспорт HAR",
     "exportFormatJson": "экспорт JSON",

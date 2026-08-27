@@ -51,6 +51,7 @@
   },
   "log": {
     "clear": "clear",
+    "clearConfirm": "clear the entire log?",
     "detailButton": "open details",
     "exportFormatHar": "export HAR",
     "exportFormatJson": "export JSON",
