@@ -24,6 +24,7 @@ import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './compon
 import { useProxyState } from './hooks/useProxyState'
 import { useLogStorageLimit } from './hooks/useLogStorageLimit'
 import { useProxySettings } from './hooks/useProxySettings'
+import { useTraceSettings } from './hooks/useTraceSettings'
 import { useSplitterSize } from './hooks/useSplitterSize'
 import { useThemeMode } from './hooks/useThemeMode'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
@@ -66,6 +67,7 @@ export default function App(): React.ReactElement {
   const { splitterSize, setSplitterSize } = useSplitterSize()
   const { logStorageLimit, setLogStorageLimit } = useLogStorageLimit()
   const { port, setPort, autoStart, setAutoStart } = useProxySettings()
+  const { captureRequestBody, setCaptureRequestBody, captureResponseBody, setCaptureResponseBody } = useTraceSettings()
   const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
     message.warning(text)
   })
@@ -109,6 +111,7 @@ export default function App(): React.ReactElement {
 
   const handleDelete = (rule: Rule): void => {
     persist(rules.filter((r) => r.id !== rule.id))
+    setModalOpen(false)
   }
 
   const handleAdd = (): void => {
@@ -234,13 +237,20 @@ export default function App(): React.ReactElement {
         <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
           <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">
             <div style={{ height: '100%', paddingRight: 8 }}>
-              <LogPanel logs={logs} onClear={clearLogs} />
+              <LogPanel
+                logs={logs}
+                onClear={clearLogs}
+                captureRequestBody={captureRequestBody}
+                onCaptureRequestBodyChange={setCaptureRequestBody}
+                captureResponseBody={captureResponseBody}
+                onCaptureResponseBodyChange={setCaptureResponseBody}
+              />
             </div>
           </Splitter.Panel>
           <Splitter.Panel>
             <div className="panel-column" style={{ paddingLeft: 8 }}>
               <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
-                <RulesTable rules={rules} onToggle={handleToggle} onEdit={handleEdit} onDelete={handleDelete} />
+                <RulesTable rules={rules} onToggle={handleToggle} onEdit={handleEdit} />
               </div>
             </div>
           </Splitter.Panel>
@@ -251,6 +261,7 @@ export default function App(): React.ReactElement {
           initialValue={editingRule}
           onCancel={() => setModalOpen(false)}
           onSubmit={handleSubmit}
+          onDelete={handleDelete}
         />
         <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
         <Drawer open={settingsOpen} onClose={() => setSettingsOpen(false)} size={460} closeIcon={false} destroyOnHidden>

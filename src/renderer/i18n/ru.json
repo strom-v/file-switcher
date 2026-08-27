@@ -42,7 +42,11 @@
     "noMatches": "ничего не найдено по фильтру",
     "searchPlaceholder": "поиск",
     "filterAll": "все",
-    "matched": "подмена",
+    "matched": "только сработавшие правила",
+    "captureRequestBodyOn": "запись тела запроса включена — нажмите, чтобы отключить",
+    "captureRequestBodyOff": "запись тела запроса отключена — нажмите, чтобы включить",
+    "captureResponseBodyOn": "запись тела ответа включена — нажмите, чтобы отключить",
+    "captureResponseBodyOff": "запись тела ответа отключена — нажмите, чтобы включить",
     "detailUrl": "URL",
     "detailMethod": "метод",
     "detailStatus": "статус",
@@ -50,7 +54,12 @@
     "detailSize": "размер",
     "detailFile": "файл",
     "detailRequestHeaders": "заголовки запроса",
-    "detailResponseHeaders": "заголовки ответа"
+    "detailResponseHeaders": "заголовки ответа",
+    "detailRequestBody": "тело запроса",
+    "detailResponseBody": "тело ответа",
+    "detailBodyNotCaptured": "запись тела отключена — включите её кнопкой в тулбаре лога",
+    "formatButton": "форматировать",
+    "formatRawButton": "исходный вид"
   },
   "settings": {
     "error": "ошибка",

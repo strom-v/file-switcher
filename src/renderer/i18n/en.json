@@ -42,7 +42,11 @@
     "noMatches": "no matches for this filter",
     "searchPlaceholder": "search",
     "filterAll": "all",
-    "matched": "matched",
+    "matched": "rules that fired only",
+    "captureRequestBodyOn": "request body capture is on — click to turn off",
+    "captureRequestBodyOff": "request body capture is off — click to turn on",
+    "captureResponseBodyOn": "response body capture is on — click to turn off",
+    "captureResponseBodyOff": "response body capture is off — click to turn on",
     "detailUrl": "URL",
     "detailMethod": "method",
     "detailStatus": "status",
@@ -50,7 +54,12 @@
     "detailSize": "size",
     "detailFile": "file",
     "detailRequestHeaders": "request headers",
-    "detailResponseHeaders": "response headers"
+    "detailResponseHeaders": "response headers",
+    "detailRequestBody": "request body",
+    "detailResponseBody": "response body",
+    "detailBodyNotCaptured": "body capture is off — enable it with the button in the log toolbar",
+    "formatButton": "format",
+    "formatRawButton": "raw view"
   },
   "settings": {
     "error": "error",

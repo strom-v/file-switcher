@@ -2,8 +2,10 @@ import { readFile, writeFile } from 'fs/promises'
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
+import { traceSettingsStore } from './traceSettingsStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
 import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
+import type { TrafficCaptureSettings } from '../shared/types'
 
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
 export function registerIpcHandlers(): void {
@@ -11,8 +13,12 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('rules:save', (_event, rules: Rule[]) => rulesStore.saveAll(rules))
 
+  ipcMain.handle('trace:get', () => traceSettingsStore.get())
+
+  ipcMain.handle('trace:save', (_event, settings: TrafficCaptureSettings) => traceSettingsStore.save(settings))
+
   ipcMain.handle('proxy:start', (_event, port: number) => {
-    proxyController.start(rulesStore.getFilePath(), port)
+    proxyController.start(rulesStore.getFilePath(), traceSettingsStore.getFilePath(), port)
     return proxyController.getState()
   })
 

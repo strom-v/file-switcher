@@ -43,7 +43,7 @@ export class ProxyController extends EventEmitter {
     return join(process.resourcesPath, 'addon.py')
   }
 
-  start(rulesFilePath: string, port: number = DEFAULT_PORT): void {
+  start(rulesFilePath: string, traceSettingsFilePath: string, port: number = DEFAULT_PORT): void {
     if (this.child) {
       return
     }
@@ -62,6 +62,8 @@ export class ProxyController extends EventEmitter {
       this.resolveAddonPath(),
       '--set',
       `rules_file=${rulesFilePath}`,
+      '--set',
+      `trace_settings_file=${traceSettingsFilePath}`,
       '--listen-host',
       '127.0.0.1',
       '--listen-port',

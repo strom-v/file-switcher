@@ -19,20 +19,54 @@ MATCH_FILE_KEY = "file_switcher_file"
 class ResponseSwitcher:
     def load(self, loader):
         loader.add_option("rules_file", str, "", "Path to rules.json")
+        loader.add_option("trace_settings_file", str, "", "Path to trace-settings.json")
 
     def configure(self, updated):
-        if "rules_file" not in updated:
-            return
-        self.rules_path = ctx.options.rules_file
-        self.rules = []
-        self.last_mtime = None
-        if self.rules_path:
-            self._reload()
+        if "rules_file" in updated:
+            self.rules_path = ctx.options.rules_file
+            self.rules = []
+            self.last_mtime = None
+            if self.rules_path:
+                self._reload()
+
+        if "trace_settings_file" in updated:
+            self.trace_settings_path = ctx.options.trace_settings_file
+            self.trace_settings = {}
+            self.trace_last_mtime = None
+            if self.trace_settings_path:
+                self._reload_trace_settings()
 
     def _reload(self):
         with open(self.rules_path, encoding="utf-8") as f:
             self.rules = json.load(f)["rules"]
         self.last_mtime = os.path.getmtime(self.rules_path)
+
+    def _reload_trace_settings(self):
+        with open(self.trace_settings_path, encoding="utf-8") as f:
+            self.trace_settings = json.load(f)
+        self.trace_last_mtime = os.path.getmtime(self.trace_settings_path)
+
+    def _refresh_trace_settings(self):
+        if not self.trace_settings_path:
+            return
+        try:
+            mtime = os.path.getmtime(self.trace_settings_path)
+        except OSError as e:
+            ctx.log.warn(f"trace_settings_file недоступен: {e}")
+            return
+        if mtime != self.trace_last_mtime:
+            try:
+                self._reload_trace_settings()
+            except (OSError, json.JSONDecodeError) as e:
+                ctx.log.warn(f"не удалось перечитать trace_settings_file: {e}")
+
+    @staticmethod
+    def _decode_body(raw: bytes | None) -> str | None:
+        # тело показывается пользователю как текст; для бинарных данных (картинки, шрифты)
+        # errors="replace" не падает, просто получится нечитаемая строка вместо исключения
+        if not raw:
+            return ""
+        return raw.decode("utf-8", errors="replace")
 
     @staticmethod
     def _substitute_groups(path: str, matched: "re.Match") -> str:
@@ -153,20 +187,28 @@ class ResponseSwitcher:
             if status_override:
                 flow.response.status_code = status_override
 
+        self._refresh_trace_settings()
+
+        log_entry = {
+            "event": event,
+            "url": flow.request.pretty_url,
+            "file": matched_file or "",
+            "method": flow.request.method,
+            "statusCode": flow.response.status_code if flow.response else None,
+            "requestHeaders": dict(flow.request.headers),
+            "responseHeaders": dict(flow.response.headers) if flow.response else {},
+            "responseSize": len(flow.response.raw_content) if flow.response and flow.response.raw_content else 0,
+            "ts": time.time(),
+        }
+
+        if self.trace_settings.get("captureRequestBody"):
+            log_entry["requestBody"] = self._decode_body(flow.request.raw_content)
+
+        if self.trace_settings.get("captureResponseBody"):
+            log_entry["responseBody"] = self._decode_body(flow.response.raw_content) if flow.response else ""
+
         print(
-            json.dumps(
-                {
-                    "event": event,
-                    "url": flow.request.pretty_url,
-                    "file": matched_file or "",
-                    "method": flow.request.method,
-                    "statusCode": flow.response.status_code if flow.response else None,
-                    "requestHeaders": dict(flow.request.headers),
-                    "responseHeaders": dict(flow.response.headers) if flow.response else {},
-                    "responseSize": len(flow.response.raw_content) if flow.response and flow.response.raw_content else 0,
-                    "ts": time.time(),
-                }
-            ),
+            json.dumps(log_entry),
             flush=True,
         )
 

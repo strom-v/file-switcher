@@ -16,3 +16,12 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
+
+/** Пытается разобрать текст как JSON и вернуть его в читаемом виде с отступами; если это не JSON — null */
+export function tryFormatJson(text: string): string | null {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2)
+  } catch {
+    return null
+  }
+}

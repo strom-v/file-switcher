@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Form, Input, Modal } from 'antd'
+import { Button, Flex, Form, Input, Modal, Popconfirm } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { COLOR_DANGER } from '../theme'
 import type { Rule } from '../../shared/types'
@@ -9,6 +9,7 @@ interface RuleFormModalProps {
   initialValue: Rule | null
   onCancel: () => void
   onSubmit: (rule: Omit<Rule, 'id'> & { id?: string }) => void
+  onDelete: (rule: Rule) => void
 }
 
 interface FormValues {
@@ -23,7 +24,8 @@ export default function RuleFormModal({
   open,
   initialValue,
   onCancel,
-  onSubmit
+  onSubmit,
+  onDelete
 }: RuleFormModalProps): React.ReactElement {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
@@ -56,17 +58,34 @@ export default function RuleFormModal({
     })
   }
 
+  const handleDelete = (): void => {
+    if (initialValue) onDelete(initialValue)
+  }
+
   return (
     <Modal
       open={open}
       onCancel={onCancel}
-      onOk={handleOk}
-      okText={t('rules.form.save')}
-      okButtonProps={{ disabled: isUnchanged || isUrlPatternEmpty }}
-      cancelText={t('rules.form.cancel')}
       closeIcon={false}
       destroyOnHidden
       centered
+      footer={
+        <Flex justify="space-between">
+          {initialValue ? (
+            <Popconfirm title={t('rules.table.deleteConfirm')} onConfirm={handleDelete}>
+              <Button danger>{t('rules.table.delete')}</Button>
+            </Popconfirm>
+          ) : (
+            <span />
+          )}
+          <Flex gap={8}>
+            <Button onClick={onCancel}>{t('rules.form.cancel')}</Button>
+            <Button type="primary" onClick={handleOk} disabled={isUnchanged || isUrlPatternEmpty}>
+              {t('rules.form.save')}
+            </Button>
+          </Flex>
+        </Flex>
+      }
     >
       <Form<FormValues>
         form={form}

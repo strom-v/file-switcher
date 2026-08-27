@@ -1,13 +1,11 @@
 import React, { useMemo } from 'react'
-import { Checkbox, ConfigProvider, Flex, Popconfirm, Space, Table, Tag, Tooltip, Typography } from 'antd'
-import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { Checkbox, ConfigProvider, Flex, Table, Tag, Tooltip, Typography } from 'antd'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
-import { COLOR_DANGER } from '../theme'
 import type { Rule } from '../../shared/types'
 
 const actionIconStyle: React.CSSProperties = { cursor: 'pointer' }
-const deleteIconStyle: React.CSSProperties = { ...actionIconStyle, color: COLOR_DANGER }
 
 // вынесено из компонента: не зависит от пропсов/state, пересоздание на каждый рендер
 // заставляет ConfigProvider зря пересчитывать CSS-in-JS таблицы (заметно при частых ре-рендерах во время drag)
@@ -92,11 +90,11 @@ interface RulesTableProps {
   rules: Rule[]
   onToggle: (rule: Rule, enabled: boolean) => void
   onEdit: (rule: Rule) => void
-  onDelete: (rule: Rule) => void
 }
 
-/** Таблица правил подмены, сгруппированных по репозиторию из пути подмены, с чекбоксом и действиями */
-export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesTableProps): React.ReactElement {
+/** Таблица правил подмены, сгруппированных по репозиторию из пути подмены, с чекбоксом и действиями.
+ * Редактирование и удаление правила — через модалку (иконка "?"), открываемую по onEdit. */
+export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps): React.ReactElement {
   const { t } = useTranslation()
 
   const groupedRows = useMemo(() => groupRulesByRepo(rules, t('rules.table.otherGroup')), [rules, t])
@@ -166,21 +164,14 @@ export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesT
     },
     {
       title: '',
-      width: 44,
+      width: 28,
       align: 'right',
       onCell: (row) => (isGroupRow(row) ? { colSpan: 0 } : {}),
       render: (_, row) =>
         isGroupRow(row) ? null : (
-          <Space size={8}>
-            <Tooltip title={t('rules.table.edit')}>
-              <EditOutlined style={actionIconStyle} onClick={() => onEdit(row)} />
-            </Tooltip>
-            <Popconfirm title={t('rules.table.deleteConfirm')} onConfirm={() => onDelete(row)}>
-              <Tooltip title={t('rules.table.delete')}>
-                <DeleteOutlined style={deleteIconStyle} />
-              </Tooltip>
-            </Popconfirm>
-          </Space>
+          <Tooltip title={t('rules.table.edit')}>
+            <InfoCircleOutlined style={actionIconStyle} onClick={() => onEdit(row)} />
+          </Tooltip>
         )
     }
   ]

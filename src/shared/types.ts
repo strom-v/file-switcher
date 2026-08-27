@@ -44,6 +44,16 @@ export interface ProxyLogEvent {
   responseHeaders: Record<string, string>
   responseSize: number
   ts: number
+  /** тело запроса; присутствует только если включён захват (см. TrafficCaptureSettings) */
+  requestBody?: string
+  /** тело ответа; присутствует только если включён захват (см. TrafficCaptureSettings) */
+  responseBody?: string
+}
+
+/** Включение/отключение записи тела запросов и ответов в лог трафика */
+export interface TrafficCaptureSettings {
+  captureRequestBody: boolean
+  captureResponseBody: boolean
 }
 
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'

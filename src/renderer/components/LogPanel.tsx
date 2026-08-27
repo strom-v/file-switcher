@@ -1,10 +1,17 @@
 import React, { useMemo, useState } from 'react'
-import { Button, ConfigProvider, Empty, Flex, Input, List, Popconfirm, Space, Tooltip, Typography } from 'antd'
-import { ClearOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { ConfigProvider, Empty, Flex, Input, List, Popconfirm, Space, Tooltip, Typography } from 'antd'
+import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  ClearOutlined,
+  ColumnHeightOutlined,
+  InfoCircleOutlined,
+  UnorderedListOutlined
+} from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import LogDetailModal from './LogDetailModal'
 import IconButton from './IconButton'
-import { httpStatusColor } from '../theme'
+import { COLOR_INFO, COLOR_SUCCESS, httpStatusColor } from '../theme'
 import { tsToDate } from '../formatters'
 import type { ProxyLogEvent, ProxyLogEventType } from '../../shared/types'
 
@@ -18,12 +25,23 @@ const LOG_LIST_THEME = { components: { List: { itemPaddingSM: '0 4px' } } }
 interface LogPanelProps {
   logs: ProxyLogEvent[]
   onClear: () => void
+  captureRequestBody: boolean
+  onCaptureRequestBodyChange: (value: boolean) => void
+  captureResponseBody: boolean
+  onCaptureResponseBodyChange: (value: boolean) => void
 }
 
 /** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL и фильтром по событию.
  * Сколько записей на категорию ("подмена" / "без подмены") хранится в памяти — настраивается
  * в панели настроек (см. useLogStorageLimit, useProxyState). */
-export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
+export default function LogPanel({
+  logs,
+  onClear,
+  captureRequestBody,
+  onCaptureRequestBodyChange,
+  captureResponseBody,
+  onCaptureResponseBodyChange
+}: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
   const [search, setSearch] = useState('')
@@ -54,15 +72,34 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           style={{ flex: 1, minWidth: 0 }}
         />
         <Space.Compact size="small">
-          <Button
+          <IconButton
+            tooltip={t('log.filterAll')}
             type={eventFilter === EVENT_FILTER_ALL ? 'primary' : 'default'}
+            icon={<UnorderedListOutlined />}
             onClick={() => setEventFilter(EVENT_FILTER_ALL)}
-          >
-            {t('log.filterAll')}
-          </Button>
-          <Button type={eventFilter === 'matched' ? 'primary' : 'default'} onClick={() => setEventFilter('matched')}>
-            {t('log.matched')}
-          </Button>
+          />
+          <IconButton
+            tooltip={t('log.matched')}
+            type={eventFilter === 'matched' ? 'primary' : 'default'}
+            icon={<ColumnHeightOutlined />}
+            onClick={() => setEventFilter('matched')}
+          />
+        </Space.Compact>
+        <Space.Compact size="small" style={{ flexShrink: 0 }}>
+          <IconButton
+            tooltip={t(captureRequestBody ? 'log.captureRequestBodyOn' : 'log.captureRequestBodyOff')}
+            type={captureRequestBody ? 'primary' : 'default'}
+            icon={<ArrowUpOutlined />}
+            onClick={() => onCaptureRequestBodyChange(!captureRequestBody)}
+            style={captureRequestBody ? { backgroundColor: COLOR_INFO, borderColor: COLOR_INFO } : undefined}
+          />
+          <IconButton
+            tooltip={t(captureResponseBody ? 'log.captureResponseBodyOn' : 'log.captureResponseBodyOff')}
+            type={captureResponseBody ? 'primary' : 'default'}
+            icon={<ArrowDownOutlined />}
+            onClick={() => onCaptureResponseBodyChange(!captureResponseBody)}
+            style={captureResponseBody ? { backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS } : undefined}
+          />
         </Space.Compact>
         <Popconfirm title={t('log.clearConfirm')} onConfirm={onClear} disabled={logs.length === 0}>
           <IconButton
@@ -90,6 +127,13 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                   <List.Item className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}>
                     <Flex vertical gap={0} style={{ width: '100%', minWidth: 0 }}>
                       <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
+                        <span style={{ flexShrink: 0, width: 14, display: 'inline-flex' }}>
+                          {item.responseBody !== undefined ? (
+                            <ArrowDownOutlined style={{ color: COLOR_SUCCESS }} title={t('log.detailResponseBody')} />
+                          ) : item.requestBody !== undefined ? (
+                            <ArrowUpOutlined style={{ color: COLOR_INFO }} title={t('log.detailRequestBody')} />
+                          ) : null}
+                        </span>
                         <Typography.Text
                           strong
                           className="text-sm"

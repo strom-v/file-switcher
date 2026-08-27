@@ -1,10 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, TrafficCaptureSettings } from '../shared/types'
 
 const api = {
   rules: {
     get: (): Promise<Rule[]> => ipcRenderer.invoke('rules:get'),
     save: (rules: Rule[]): Promise<Rule[]> => ipcRenderer.invoke('rules:save', rules)
+  },
+  trace: {
+    get: (): Promise<TrafficCaptureSettings> => ipcRenderer.invoke('trace:get'),
+    save: (settings: TrafficCaptureSettings): Promise<TrafficCaptureSettings> =>
+      ipcRenderer.invoke('trace:save', settings)
   },
   proxy: {
     start: (port: number): Promise<ProxyState> => ipcRenderer.invoke('proxy:start', port),
