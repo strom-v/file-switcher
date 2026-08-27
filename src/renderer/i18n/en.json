@@ -94,7 +94,7 @@
     "installCertButton": "install automatically",
     "installCertSuccess": "certificate added to trusted",
     "installCertError": "failed to install certificate: {{message}}",
-    "removeCertButton": "remove certificate trust",
+    "removeCertButton": "remove certificate",
     "removeCertSuccess": "certificate trust removed",
     "removeCertError": "failed to remove trust: {{message}}",
     "firefoxWarningTitle": "Firefox is not supported in the MVP",

@@ -94,7 +94,7 @@
     "installCertButton": "установить автоматически",
     "installCertSuccess": "сертификат добавлен в доверенные",
     "installCertError": "не удалось установить сертификат: {{message}}",
-    "removeCertButton": "удалить доверие к сертификату",
+    "removeCertButton": "удалить сертификат",
     "removeCertSuccess": "доверие к сертификату удалено",
     "removeCertError": "не удалось удалить доверие: {{message}}",
     "firefoxWarningTitle": "Firefox не поддерживается в MVP",
