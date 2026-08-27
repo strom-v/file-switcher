@@ -70,7 +70,7 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           style={{ width: 80, flexShrink: 0 }}
         />
         {logs.length > 0 && (
-          <Typography.Text type="secondary" style={{ fontSize: 'var(--app-font-size-sm)', flexShrink: 0 }}>
+          <Typography.Text type="secondary" className="text-sm" style={{ flexShrink: 0 }}>
             {t('log.shownCount', { shown: visible.length, limit: visibleCount })}
           </Typography.Text>
         )}
@@ -98,36 +98,29 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                       <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
                         <Typography.Text
                           strong
-                          style={{
-                            width: 48,
-                            flexShrink: 0,
-                            fontSize: 'var(--app-font-size-sm)',
-                            overflow: 'hidden',
-                            whiteSpace: 'nowrap'
-                          }}
+                          className="text-sm"
+                          style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
                         >
                           {item.method}
                         </Typography.Text>
                         <Typography.Text
                           strong
-                          style={{
-                            color: httpStatusColor(item.statusCode),
-                            flexShrink: 0,
-                            fontSize: 'var(--app-font-size-sm)'
-                          }}
+                          className="text-sm"
+                          style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
                         >
                           {item.statusCode ?? '—'}
                         </Typography.Text>
                         <Typography.Text
                           type="secondary"
-                          style={{ flexShrink: 0, whiteSpace: 'nowrap', fontSize: 'var(--app-font-size-sm)' }}
+                          className="text-sm"
+                          style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
                         >
                           {tsToDate(item.ts).toLocaleTimeString()}
                         </Typography.Text>
                         <Typography.Text
-                          className="ellipsis-text"
+                          className="ellipsis-text text-sm"
                           ellipsis={{ tooltip: item.url }}
-                          style={{ flex: 1, minWidth: 0, fontSize: 'var(--app-font-size-sm)' }}
+                          style={{ flex: 1, minWidth: 0 }}
                         >
                           {item.url}
                         </Typography.Text>
@@ -140,10 +133,9 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                       </Flex>
                       {isMatched && (
                         <Typography.Text
-                          className="ellipsis-text"
+                          className="ellipsis-text text-sm"
                           type="secondary"
                           ellipsis={{ tooltip: item.file }}
-                          style={{ fontSize: 'var(--app-font-size-sm)' }}
                         >
                           {item.file}
                         </Typography.Text>

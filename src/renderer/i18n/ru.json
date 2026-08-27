@@ -9,7 +9,6 @@
     "addButton": "добавить правило",
     "refreshButton": "обновить",
     "table": {
-      "urlPattern": "правило",
       "otherGroup": "остальные",
       "noFile": "без подмены тела",
       "hasAdvanced": "доп.",
@@ -65,7 +64,6 @@
     "shownCount": "{{shown}}/{{limit}}",
     "filterAll": "все",
     "matched": "подмена",
-    "passed": "без изменений",
     "detailUrl": "URL",
     "detailMethod": "метод",
     "detailStatus": "статус",
@@ -82,8 +80,6 @@
     "groupData": "данные",
     "groupDataRules": "правила",
     "groupDataLog": "лог",
-    "appearanceTitle": "внешний вид",
-    "fontSizeLabel": "размер шрифта",
     "portLabel": "порт прокси:",
     "sudoersAlertTitle": "прокси спрашивает пароль на каждый запуск/остановку",
     "sudoersAlertDescription": "разрешите networksetup работать без пароля — один системный диалог авторизации, дальше запуск/остановка прокси без запроса пароля.",
@@ -121,11 +117,7 @@
       "crashed": "упал"
     },
     "themeLight": "светлая",
-    "themeDark": "тёмная",
-    "rulesExportTitle": "правила",
-    "rulesExportHint": "сохранить текущие правила подмены в JSON-файл или заменить их содержимым другого файла",
-    "exportTitle": "лог",
-    "exportHint": "сохранить текущий лог прокси в HAR-файл — открывается в Chrome DevTools, Fiddler, Charles и т.п."
+    "themeDark": "тёмная"
   },
   "onboarding": {
     "title": "добро пожаловать в FileSwitcher",

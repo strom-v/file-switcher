@@ -111,7 +111,8 @@ export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesT
               <Typography.Text
                 type="secondary"
                 strong
-                style={{ fontSize: 'var(--app-font-size-sm)', textTransform: 'uppercase', letterSpacing: 0.5 }}
+                className="text-sm"
+                style={{ textTransform: 'uppercase', letterSpacing: 0.5 }}
               >
                 {row.label}
               </Typography.Text>
@@ -122,26 +123,25 @@ export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesT
         return (
           <Flex vertical gap={0} style={{ width: '100%' }}>
             <Typography.Text
-              className="ellipsis-text"
+              className="ellipsis-text text-sm"
               ellipsis={{ tooltip: urlPattern }}
               copyable={!!urlPattern}
-              style={{ fontSize: 'var(--app-font-size-sm)' }}
             >
               {urlPattern}
             </Typography.Text>
             <Flex gap={4} align="center" style={{ width: '100%' }}>
               {rule.localFilePath ? (
                 <Typography.Text
-                  className="ellipsis-text"
+                  className="ellipsis-text text-sm"
                   type="secondary"
                   ellipsis={{ tooltip: rule.localFilePath }}
                   copyable
-                  style={{ fontSize: 'var(--app-font-size-sm)', flex: 1, minWidth: 0 }}
+                  style={{ flex: 1, minWidth: 0 }}
                 >
                   {rule.localFilePath}
                 </Typography.Text>
               ) : (
-                <Typography.Text type="secondary" style={{ fontSize: 'var(--app-font-size-sm)' }}>
+                <Typography.Text type="secondary" className="text-sm">
                   {t('rules.table.noFile')}
                 </Typography.Text>
               )}

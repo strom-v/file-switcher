@@ -87,8 +87,11 @@ export default function App(): React.ReactElement {
     await window.api.rules.save(next)
   }
 
+  const updateRuleById = (id: string, patch: Partial<Rule>): Rule[] =>
+    rules.map((r) => (r.id === id ? { ...r, ...patch } : r))
+
   const handleToggle = (rule: Rule, enabled: boolean): void => {
-    persist(rules.map((r) => (r.id === rule.id ? { ...r, enabled } : r)))
+    persist(updateRuleById(rule.id, { enabled }))
   }
 
   const handleEdit = (rule: Rule): void => {
@@ -111,7 +114,7 @@ export default function App(): React.ReactElement {
 
   const handleSubmit = (rule: Omit<Rule, 'id'> & { id?: string }): void => {
     if (rule.id) {
-      persist(rules.map((r) => (r.id === rule.id ? { ...r, ...rule, id: rule.id! } : r)))
+      persist(updateRuleById(rule.id, rule))
     } else {
       const id = crypto.randomUUID()
       persist([...rules, { ...rule, id }])

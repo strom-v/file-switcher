@@ -20,7 +20,7 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
         <>
           <Descriptions bordered column={1} size="small" className="detail-descriptions" style={{ marginBottom: 8 }}>
             <Descriptions.Item label={t('log.detailUrl')}>
-              <Typography.Text copyable className="break-all" style={{ fontSize: 'var(--app-font-size-sm)' }}>
+              <Typography.Text copyable className="break-all text-sm">
                 {event.url}
               </Typography.Text>
             </Descriptions.Item>
@@ -30,27 +30,27 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             <Descriptions.Item label={t('log.detailSize')}>{formatSize(event.responseSize)}</Descriptions.Item>
             {event.event === 'matched' && (
               <Descriptions.Item label={t('log.detailFile')}>
-                <Typography.Text copyable className="break-all" style={{ fontSize: 'var(--app-font-size-sm)' }}>
+                <Typography.Text copyable className="break-all text-sm">
                   {event.file}
                 </Typography.Text>
               </Descriptions.Item>
             )}
           </Descriptions>
 
-          <Typography.Text strong copyable={{ text: formatHeaders(event.requestHeaders) }} style={{ fontSize: 'var(--app-font-size-sm)' }}>
+          <Typography.Text strong copyable={{ text: formatHeaders(event.requestHeaders) }} className="text-sm">
             {t('log.detailRequestHeaders')}
           </Typography.Text>
           <div className="headers-panel">
-            <Typography.Paragraph className="pre-wrap" style={{ fontSize: 'var(--app-font-size-sm)' }}>
+            <Typography.Paragraph className="pre-wrap text-sm">
               {formatHeaders(event.requestHeaders)}
             </Typography.Paragraph>
           </div>
 
-          <Typography.Text strong copyable={{ text: formatHeaders(event.responseHeaders) }} style={{ fontSize: 'var(--app-font-size-sm)' }}>
+          <Typography.Text strong copyable={{ text: formatHeaders(event.responseHeaders) }} className="text-sm">
             {t('log.detailResponseHeaders')}
           </Typography.Text>
           <div className="headers-panel">
-            <Typography.Paragraph className="pre-wrap" style={{ fontSize: 'var(--app-font-size-sm)' }}>
+            <Typography.Paragraph className="pre-wrap text-sm">
               {formatHeaders(event.responseHeaders)}
             </Typography.Paragraph>
           </div>

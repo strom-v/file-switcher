@@ -148,6 +148,11 @@ html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr:not(:last-child
   line-height: 20px;
 }
 
+/* компактный текст списков лога/правил и деталей запроса — масштабируется вместе с настройкой размера шрифта */
+.text-sm {
+  font-size: var(--app-font-size-sm, 12px);
+}
+
 /* иконка копирования в таблице правил видна только при наведении на сам текст (URL или путь к файлу),
    а не на всю строку — иначе наведение на URL показывало copy и у пути к файлу под ним */
 .rules-table--compact .ant-table-tbody .ant-typography-copy {

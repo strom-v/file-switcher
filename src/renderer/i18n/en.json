@@ -9,7 +9,6 @@
     "addButton": "add rule",
     "refreshButton": "refresh",
     "table": {
-      "urlPattern": "rule",
       "otherGroup": "other",
       "noFile": "no body substitution",
       "hasAdvanced": "extra",
@@ -65,7 +64,6 @@
     "shownCount": "{{shown}}/{{limit}}",
     "filterAll": "all",
     "matched": "matched",
-    "passed": "passed through",
     "detailUrl": "URL",
     "detailMethod": "method",
     "detailStatus": "status",
@@ -82,8 +80,6 @@
     "groupData": "data",
     "groupDataRules": "rules",
     "groupDataLog": "log",
-    "appearanceTitle": "appearance",
-    "fontSizeLabel": "font size",
     "portLabel": "proxy port:",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
@@ -121,11 +117,7 @@
       "crashed": "crashed"
     },
     "themeLight": "light",
-    "themeDark": "dark",
-    "rulesExportTitle": "rules",
-    "rulesExportHint": "save current substitution rules to a JSON file, or replace them with another file's contents",
-    "exportTitle": "log",
-    "exportHint": "save the current proxy log to a HAR file — opens in Chrome DevTools, Fiddler, Charles, etc."
+    "themeDark": "dark"
   },
   "onboarding": {
     "title": "welcome to FileSwitcher",
