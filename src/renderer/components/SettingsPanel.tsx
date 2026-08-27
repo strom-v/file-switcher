@@ -198,7 +198,7 @@ export default function SettingsPanel({
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupNetwork')}>
-        <SectionHeader title={t('settings.portLabel')}>
+        <Space>
           <InputNumber
             min={1}
             max={65535}
@@ -206,7 +206,10 @@ export default function SettingsPanel({
             onChange={(value) => onPortChange(value ?? port)}
             disabled={status.status === 'running' || status.status === 'starting'}
           />
-        </SectionHeader>
+          <Tooltip title={t('settings.portHint')}>
+            <QuestionCircleOutlined className="hint-icon" />
+          </Tooltip>
+        </Space>
 
         {!sudoersInstalled && (
           <SectionHeader title={t('settings.sudoersAlertTitle')}>

@@ -79,7 +79,7 @@
     "groupDataLog": "log",
     "logStorageLimitLabel": "entries kept in memory (per category)",
     "logStorageLimitHint": "how many recent log entries are kept separately for \"matched\" and \"passed\"",
-    "portLabel": "proxy port:",
+    "portHint": "the port the local proxy server runs on — point your browser's or system's traffic at it",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
     "sudoersInstallButton": "set up passwordless",
