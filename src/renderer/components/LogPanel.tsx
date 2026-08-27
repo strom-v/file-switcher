@@ -40,6 +40,10 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
     })
   }, [logs, search, eventFilter])
 
+  // счётчик рядом с лимитом отражает выбранную категорию: при фильтре "подмена" считаем только
+  // matched-записи в общем буфере, а не logs.length целиком — иначе цифра не соответствует списку
+  const shownCount = eventFilter === EVENT_FILTER_ALL ? logs.length : logs.filter((l) => l.event === eventFilter).length
+
   return (
     <div className="panel-column">
       <Flex justify="space-between" align="center" className="panel-toolbar" gap={8}>
@@ -71,7 +75,7 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
         />
         {logs.length > 0 && (
           <Typography.Text type="secondary" className="text-sm" style={{ flexShrink: 0 }}>
-            {t('log.shownCount', { shown: logs.length, limit: logLimit })}
+            {t('log.shownCount', { shown: shownCount, limit: logLimit })}
           </Typography.Text>
         )}
         <IconButton
@@ -92,6 +96,7 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
             <List
               size="small"
               dataSource={visible}
+              rowKey={(item) => `${item.ts}-${item.url}`}
               renderItem={(item) => {
                 const isMatched = item.event === 'matched'
                 return (
