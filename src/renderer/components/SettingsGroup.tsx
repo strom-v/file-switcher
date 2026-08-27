@@ -15,7 +15,7 @@ export default function SettingsGroup({ title, first, children }: SettingsGroupP
       <Typography.Title level={5} style={{ marginTop: first ? 0 : undefined, marginBottom: 12 }}>
         {title}
       </Typography.Title>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         {children}
       </Space>
     </div>

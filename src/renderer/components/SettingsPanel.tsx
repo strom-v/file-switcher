@@ -174,8 +174,8 @@ export default function SettingsPanel({
 
   return (
     <Flex vertical style={{ minHeight: '100%' }}>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        {status.error && <Alert type="error" message={t('settings.error')} description={status.error} />}
+      <Space orientation="vertical" size="large" style={{ width: '100%' }}>
+        {status.error && <Alert type="error" title={t('settings.error')} description={status.error} />}
 
         <SettingsGroup title={t('settings.groupAppearance')} first>
           <Space.Compact block>
@@ -185,8 +185,7 @@ export default function SettingsPanel({
               onChange={onLanguageChange}
               options={[
                 { label: 'Русский', value: 'ru' },
-                { label: 'English', value: 'en' },
-                { label: '中文', value: 'zh' }
+                { label: 'English', value: 'en' }
               ]}
             />
             <Select<ThemeMode>
@@ -245,7 +244,7 @@ export default function SettingsPanel({
             <SectionHeader title={t('settings.sudoersAlertTitle')}>
               <Alert
                 type="info"
-                message={t('settings.sudoersAlertDescription')}
+                title={t('settings.sudoersAlertDescription')}
                 action={
                   <Button size="small" onClick={handleInstallSudoersRule} loading={installingSudoers}>
                     {t('settings.sudoersInstallButton')}
@@ -260,7 +259,7 @@ export default function SettingsPanel({
               <Alert
                 style={{ marginBottom: 8 }}
                 type="info"
-                message={t('settings.certNotGeneratedAlertTitle')}
+                title={t('settings.certNotGeneratedAlertTitle')}
                 description={t('settings.certNotGeneratedAlertDescription')}
               />
             )}

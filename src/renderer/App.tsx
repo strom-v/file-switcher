@@ -14,7 +14,6 @@ import {
 import { PlusOutlined, QuestionCircleOutlined, SettingOutlined } from '@ant-design/icons'
 import ruRU from 'antd/locale/ru_RU'
 import enUS from 'antd/locale/en_US'
-import zhCN from 'antd/locale/zh_CN'
 import { useTranslation } from 'react-i18next'
 import RulesTable from './components/RulesTable'
 import RuleFormModal from './components/RuleFormModal'
@@ -32,7 +31,7 @@ import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
 import type { Rule } from '../shared/types'
 
-const ANTD_LOCALES = { ru: ruRU, en: enUS, zh: zhCN }
+const ANTD_LOCALES = { ru: ruRU, en: enUS }
 
 // ключи настроек, которые сбрасывает "сбросить все настройки"
 const RESETTABLE_STORAGE_KEYS = [
@@ -167,9 +166,7 @@ export default function App(): React.ReactElement {
     setSplitterSize(Math.round((left / total) * 100))
   }
 
-  const currentLanguage = (
-    i18n.language.startsWith('ru') ? 'ru' : i18n.language.startsWith('zh') ? 'zh' : 'en'
-  ) as SupportedLanguage
+  const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
   const statusLabels: Record<string, string> = {
     stopped: t('settings.statusLabels.stopped'),
     starting: t('settings.statusLabels.starting'),
