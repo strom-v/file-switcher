@@ -10,6 +10,13 @@ export type { CertInfo, CertStatus } from '../shared/types'
 const CA_CERT_PATH = join(homedir(), '.mitmproxy', 'mitmproxy-ca-cert.pem')
 const LOGIN_KEYCHAIN = join(homedir(), 'Library', 'Keychains', 'login.keychain-db')
 
+/** Бросает, если CA-сертификат mitmproxy ещё не сгенерирован */
+function assertCertExists(hint: string): void {
+  if (!existsSync(CA_CERT_PATH)) {
+    throw new Error(`Сертификат не найден: ${CA_CERT_PATH}${hint}`)
+  }
+}
+
 /** Проверяет, доверен ли CA-сертификат mitmproxy как root в системе текущего пользователя */
 export async function getCertStatus(): Promise<CertStatus> {
   if (!existsSync(CA_CERT_PATH)) {
@@ -33,18 +40,14 @@ export async function getCertStatus(): Promise<CertStatus> {
  * (SecTrustSettingsSetTrustSettings отказывает без полноценного GUI-авторизационного контекста).
  */
 export async function installCert(): Promise<void> {
-  if (!existsSync(CA_CERT_PATH)) {
-    throw new Error(`Сертификат не найден: ${CA_CERT_PATH}. Сначала запустите прокси и откройте http://mitm.it`)
-  }
+  assertCertExists('. Сначала запустите прокси и откройте http://mitm.it')
 
   await execAsync(`security add-trusted-cert -r trustRoot "${CA_CERT_PATH}"`)
 }
 
 /** Убирает доверие к CA-сертификату mitmproxy из user keychain (сам файл сертификата не удаляет) */
 export async function removeCertTrust(): Promise<void> {
-  if (!existsSync(CA_CERT_PATH)) {
-    throw new Error(`Сертификат не найден: ${CA_CERT_PATH}`)
-  }
+  assertCertExists('')
 
   await execAsync(`security remove-trusted-cert "${CA_CERT_PATH}"`)
 }
@@ -65,30 +68,33 @@ export async function listCerts(): Promise<CertInfo[]> {
   const tmpDir = mkdtempSync(join(tmpdir(), 'filewitcher-certs-'))
 
   try {
-    const certs: CertInfo[] = []
-    for (const block of blocks) {
-      const sha1Match = block.match(/SHA-1 hash:\s*([0-9A-F]+)/)
-      const pemMatch = block.match(/-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/)
-      if (!sha1Match || !pemMatch) continue
+    const parsedBlocks = blocks
+      .map((block) => ({
+        sha1: block.match(/SHA-1 hash:\s*([0-9A-F]+)/)?.[1],
+        pem: block.match(/-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/)?.[0]
+      }))
+      .filter((b): b is { sha1: string; pem: string } => !!b.sha1 && !!b.pem)
 
-      const sha1 = sha1Match[1]
-      const certPath = join(tmpDir, `${sha1}.pem`)
-      writeFileSync(certPath, pemMatch[0])
+    const certs = await Promise.all(
+      parsedBlocks.map(async ({ sha1, pem }) => {
+        const certPath = join(tmpDir, `${sha1}.pem`)
+        writeFileSync(certPath, pem)
 
-      const expiresAt = (await execAsync(`openssl x509 -in "${certPath}" -noout -enddate`))
-        .replace('notAfter=', '')
-        .trim()
+        const expiresAt = (await execAsync(`openssl x509 -in "${certPath}" -noout -enddate`))
+          .replace('notAfter=', '')
+          .trim()
 
-      let trusted = false
-      try {
-        await execAsync(`security verify-cert -c "${certPath}" -l`)
-        trusted = true
-      } catch {
-        trusted = false
-      }
+        let trusted = false
+        try {
+          await execAsync(`security verify-cert -c "${certPath}" -l`)
+          trusted = true
+        } catch {
+          trusted = false
+        }
 
-      certs.push({ sha1, expiresAt, trusted })
-    }
+        return { sha1, expiresAt, trusted }
+      })
+    )
     return certs
   } finally {
     rmSync(tmpDir, { recursive: true, force: true })

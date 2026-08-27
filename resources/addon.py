@@ -62,13 +62,15 @@ class ResponseSwitcher:
             pattern = rule["urlPattern"]
             is_regex = rule.get("isRegex")
             try:
-                matched = re.search(pattern, url) if is_regex else (pattern == url)
+                if is_regex:
+                    matched = re.search(pattern, url)
+                    if matched:
+                        return rule, matched
+                elif pattern == url:
+                    return rule, None
             except re.error as e:
                 ctx.log.warn(f"некорректный regex в правиле {rule.get('id')}: {e}")
                 continue
-
-            if matched:
-                return rule, matched
         return None, None
 
     async def request(self, flow: http.HTTPFlow):

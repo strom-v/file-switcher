@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import { readJsonFile, writeJsonFile } from './jsonFile'
 
 interface AllowlistFile {
   allowedServices: string[]
@@ -15,15 +15,7 @@ export class VpnAllowlistStore {
   }
 
   getAll(): string[] {
-    if (!existsSync(this.filePath)) return []
-    try {
-      const parsed = JSON.parse(readFileSync(this.filePath, 'utf-8')) as AllowlistFile
-      return parsed.allowedServices ?? []
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error(`vpn-allowlist.json повреждён или недоступен (${this.filePath}): ${message}`)
-      return []
-    }
+    return readJsonFile<AllowlistFile>(this.filePath, { allowedServices: [] }).allowedServices ?? []
   }
 
   isAllowed(serviceName: string): boolean {
@@ -37,7 +29,7 @@ export class VpnAllowlistStore {
     } else {
       current.delete(serviceName)
     }
-    writeFileSync(this.filePath, JSON.stringify({ allowedServices: [...current] }, null, 2), 'utf-8')
+    writeJsonFile(this.filePath, { allowedServices: [...current] })
   }
 }
 

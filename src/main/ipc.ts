@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'fs'
+import { readFile, writeFile } from 'fs/promises'
 import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
@@ -85,7 +85,7 @@ export function registerIpcHandlers(): void {
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
-    return readFileSync(result.filePaths[0], 'utf-8')
+    return readFile(result.filePaths[0], 'utf-8')
   })
 
   ipcMain.handle('dialog:saveTextFile', async (_event, defaultFileName: string, content: string) => {
@@ -93,7 +93,7 @@ export function registerIpcHandlers(): void {
     if (result.canceled || !result.filePath) {
       return null
     }
-    writeFileSync(result.filePath, content, 'utf-8')
+    await writeFile(result.filePath, content, 'utf-8')
     return result.filePath
   })
 

@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import { readJsonFile, writeJsonFile } from './jsonFile'
 import type { Rule } from '../shared/types'
 
 export type { Rule } from '../shared/types'
@@ -34,19 +35,12 @@ export class RulesStore {
   }
 
   private read(): RulesFile {
-    try {
-      const raw = readFileSync(this.filePath, 'utf-8')
-      const parsed = JSON.parse(raw) as RulesFile
-      return { rules: parsed.rules ?? [] }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error(`rules.json повреждён или недоступен (${this.filePath}): ${message}`)
-      return { rules: [] }
-    }
+    const parsed = readJsonFile<Partial<RulesFile>>(this.filePath, {})
+    return { rules: parsed.rules ?? [] }
   }
 
   private write(data: RulesFile): void {
-    writeFileSync(this.filePath, JSON.stringify(data, null, 2), 'utf-8')
+    writeJsonFile(this.filePath, data)
   }
 }
 

@@ -1,12 +1,19 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir, userInfo } from 'os'
 import { app } from 'electron'
 import { execAsync } from './execAsync'
+import { readJsonFile, writeJsonFile } from './jsonFile'
 import { vpnAllowlistStore } from './vpnAllowlistStore'
 import type { VpnService } from '../shared/types'
 
 const SUDOERS_FILE = '/etc/sudoers.d/filesswitcher-networksetup'
+
+// Выполняет shell-скрипт с правами администратора через один системный диалог авторизации (Touch ID/пароль).
+async function runAsAdminViaOsascript(script: string): Promise<void> {
+  const escaped = script.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  await execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
+}
 
 // Разрешает networksetup без пароля/Touch ID при каждом старте/остановке прокси — NOPASSWD только на этот бинарник, не на произвольные команды.
 export function isSudoersRuleInstalled(): boolean {
@@ -26,8 +33,7 @@ export async function installSudoersRule(): Promise<void> {
       `chmod 440 "${SUDOERS_FILE}"`,
       `chown root:wheel "${SUDOERS_FILE}"`
     ].join(' && ')
-    const escaped = script.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    await execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
+    await runAsAdminViaOsascript(script)
   } finally {
     unlinkSync(tmpFile)
   }
@@ -50,17 +56,11 @@ function getStateFilePath(): string {
 }
 
 function readSavedStates(): SavedStatesFile | null {
-  const filePath = getStateFilePath()
-  if (!existsSync(filePath)) return null
-  try {
-    return JSON.parse(readFileSync(filePath, 'utf-8')) as SavedStatesFile
-  } catch {
-    return null
-  }
+  return readJsonFile<SavedStatesFile | null>(getStateFilePath(), null)
 }
 
 function writeSavedStates(states: SavedStatesFile): void {
-  writeFileSync(getStateFilePath(), JSON.stringify(states, null, 2), 'utf-8')
+  writeJsonFile(getStateFilePath(), states)
 }
 
 function clearSavedStates(): void {
@@ -76,8 +76,7 @@ async function execAsAdmin(networksetupArgs: string[]): Promise<void> {
     }
   } catch {
     const combined = networksetupArgs.map((args) => `networksetup ${args}`).join(' && ')
-    const escaped = combined.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-    await execAsync(`osascript -e 'do shell script "${escaped}" with administrator privileges'`)
+    await runAsAdminViaOsascript(combined)
   }
 }
 
@@ -210,7 +209,10 @@ export async function getVpnServices(): Promise<VpnService[]> {
   const connectedServices = await getConnectedVpnServices()
   const namedServiceInterfaces = await getNamedServiceInterfaces(connectedServices)
   const hasUtun = await hasActiveUtunTunnel(namedServiceInterfaces)
-  const services: VpnService[] = connectedServices.map(({ name }) => ({ name, allowed: vpnAllowlistStore.isAllowed(name) }))
+  const services: VpnService[] = connectedServices.map(({ name }) => ({
+    name,
+    allowed: vpnAllowlistStore.isAllowed(name)
+  }))
   if (hasUtun) {
     const detectedName = await detectUnnamedVpnClientName()
     const allowed = detectedName !== null && UNNAMED_VPN_CLIENTS_TREATED_AS_ALLOWED.has(detectedName)
