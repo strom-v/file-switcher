@@ -204,6 +204,10 @@ export default function SettingsPanel({
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupNetwork')}>
+        <Checkbox checked={autoStart} onChange={(e) => onAutoStartChange(e.target.checked)}>
+          {t('settings.autoStartLabel')}
+        </Checkbox>
+
         <Space>
           <InputNumber
             min={1}
@@ -216,10 +220,6 @@ export default function SettingsPanel({
             <QuestionCircleOutlined className="hint-icon" />
           </Tooltip>
         </Space>
-
-        <Checkbox checked={autoStart} onChange={(e) => onAutoStartChange(e.target.checked)}>
-          {t('settings.autoStartLabel')}
-        </Checkbox>
 
         {!sudoersInstalled && (
           <SectionHeader title={t('settings.sudoersAlertTitle')}>
