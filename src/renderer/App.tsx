@@ -12,6 +12,7 @@ import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
 import { useProxyState } from './hooks/useProxyState'
 import { useLogStorageLimit } from './hooks/useLogStorageLimit'
+import { useProxySettings } from './hooks/useProxySettings'
 import { useThemeMode } from './hooks/useThemeMode'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
@@ -22,6 +23,17 @@ const ANTD_LOCALES = { ru: ruRU, en: enUS }
 
 const SPLITTER_SIZE_STORAGE_KEY = 'file-switcher:splitter-size'
 const DEFAULT_SPLITTER_SIZE = '50%'
+
+// ключи настроек, которые сбрасывает "сбросить все настройки" — splitter-size сюда намеренно не входит,
+// это раскладка UI, а не пользовательская настройка
+const RESETTABLE_STORAGE_KEYS = [
+  'file-switcher:theme',
+  'file-switcher:language',
+  'file-switcher:font-size',
+  'file-switcher:log-storage-limit',
+  'file-switcher:port',
+  'file-switcher:auto-start-proxy'
+]
 
 /** Сохранённая доля ширины левой панели (лог) из прошлого запуска, если она есть и валидна */
 function readStoredSplitterSize(): string {
@@ -49,11 +61,11 @@ export default function App(): React.ReactElement {
   const [rules, setRules] = useState<Rule[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
-  const [port, setPort] = useState(8080)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [splitterSize] = useState(readStoredSplitterSize)
   const { logStorageLimit, setLogStorageLimit } = useLogStorageLimit()
+  const { port, setPort, autoStart, setAutoStart } = useProxySettings()
   const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
     message.warning(text)
   })
@@ -62,6 +74,14 @@ export default function App(): React.ReactElement {
     window.api.rules.get().then(setRules)
     if (!hasSeenOnboarding()) {
       setOnboardingOpen(true)
+    }
+  }, [])
+
+  // автозапуск прокси при старте приложения, если включено в настройках; порт на этот момент
+  // уже прочитан из localStorage синхронно при инициализации useProxySettings, поэтому не в deps
+  useEffect(() => {
+    if (autoStart) {
+      window.api.proxy.start(port)
     }
   }, [])
 
@@ -119,6 +139,15 @@ export default function App(): React.ReactElement {
 
   const handleStop = async (): Promise<void> => {
     await window.api.proxy.stop()
+  }
+
+  // сбрасывает язык/тему/шрифт/порт/автостарт/лимит лога к дефолту и перезагружает окно,
+  // чтобы все хуки с персистентностью заново прочитали чистое состояние из localStorage
+  const handleResetSettings = (): void => {
+    for (const key of RESETTABLE_STORAGE_KEYS) {
+      localStorage.removeItem(key)
+    }
+    location.reload()
   }
 
   const handleSplitterResizeEnd = (sizes: number[]): void => {
@@ -218,16 +247,18 @@ export default function App(): React.ReactElement {
         />
         <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
         <Drawer
-          title={t('app.settingsDrawerTitle')}
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
           width={460}
+          closeIcon={false}
           destroyOnHidden
         >
           <SettingsPanel
             status={status}
             port={port}
             onPortChange={setPort}
+            autoStart={autoStart}
+            onAutoStartChange={setAutoStart}
             logs={logs}
             rules={rules}
             onRulesImport={persist}
@@ -240,6 +271,7 @@ export default function App(): React.ReactElement {
             onFontSizeChange={setFontSize}
             logStorageLimit={logStorageLimit}
             onLogStorageLimitChange={setLogStorageLimit}
+            onResetSettings={handleResetSettings}
           />
         </Drawer>
       </Layout>

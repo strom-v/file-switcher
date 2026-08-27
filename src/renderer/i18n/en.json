@@ -1,7 +1,6 @@
 {
   "app": {
-    "settingsButton": "settings",
-    "settingsDrawerTitle": "settings"
+    "settingsButton": "settings"
   },
   "rules": {
     "addButton": "add rule",
@@ -72,8 +71,8 @@
   },
   "settings": {
     "error": "error",
-    "groupAppearance": "appearance",
-    "groupNetwork": "network & security",
+    "groupAppearance": "interface",
+    "groupNetwork": "general",
     "groupData": "data",
     "groupDataRules": "rules",
     "groupDataRulesHint": "export — save current rules to a file; import — replace them with a file's contents; refresh — re-read the rules list from disk",
@@ -82,6 +81,9 @@
     "logStorageLimitLabel": "entries kept in memory (per category)",
     "logStorageLimitHint": "how many recent log entries are kept separately for \"matched\" and \"passed\"",
     "portHint": "the port the local proxy server runs on — point your browser's or system's traffic at it",
+    "autoStartLabel": "start the proxy automatically when the app launches",
+    "resetButton": "reset all settings",
+    "resetConfirm": "reset language, theme, font size, port, auto-start, and log limit to their defaults?",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
     "sudoersInstallButton": "set up passwordless",

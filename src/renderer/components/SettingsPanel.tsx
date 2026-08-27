@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Button, Flex, InputNumber, Popconfirm, Select, Slider, Space, Tooltip, message } from 'antd'
+import { Alert, Button, Checkbox, Flex, InputNumber, Popconfirm, Select, Slider, Space, Tooltip, message } from 'antd'
 import { QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import SectionHeader from './SectionHeader'
@@ -16,6 +16,8 @@ interface SettingsPanelProps {
   status: ProxyState
   port: number
   onPortChange: (port: number) => void
+  autoStart: boolean
+  onAutoStartChange: (autoStart: boolean) => void
   logs: ProxyLogEvent[]
   rules: Rule[]
   onRulesImport: (rules: Rule[]) => void
@@ -28,6 +30,7 @@ interface SettingsPanelProps {
   onFontSizeChange: (size: number) => void
   logStorageLimit: number
   onLogStorageLimitChange: (limit: number) => void
+  onResetSettings: () => void
 }
 
 /** Проверяет, что распарсенный JSON похож на массив Rule — минимально, без строгой валидации формы каждого поля */
@@ -43,6 +46,8 @@ export default function SettingsPanel({
   status,
   port,
   onPortChange,
+  autoStart,
+  onAutoStartChange,
   logs,
   rules,
   onRulesImport,
@@ -54,7 +59,8 @@ export default function SettingsPanel({
   fontSize,
   onFontSizeChange,
   logStorageLimit,
-  onLogStorageLimitChange
+  onLogStorageLimitChange,
+  onResetSettings
 }: SettingsPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [certStatus, setCertStatus] = useState<CertStatus>('not-generated')
@@ -211,6 +217,10 @@ export default function SettingsPanel({
           </Tooltip>
         </Space>
 
+        <Checkbox checked={autoStart} onChange={(e) => onAutoStartChange(e.target.checked)}>
+          {t('settings.autoStartLabel')}
+        </Checkbox>
+
         {!sudoersInstalled && (
           <SectionHeader title={t('settings.sudoersAlertTitle')}>
             <Alert
@@ -250,6 +260,10 @@ export default function SettingsPanel({
             </Tooltip>
           </Space>
         </div>
+
+        <Popconfirm title={t('settings.resetConfirm')} onConfirm={onResetSettings}>
+          <Button danger>{t('settings.resetButton')}</Button>
+        </Popconfirm>
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupData')}>
