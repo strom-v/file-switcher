@@ -34,6 +34,7 @@ interface SettingsPanelProps {
   logs: ProxyLogEvent[]
   rules: Rule[]
   onRulesImport: (rules: Rule[]) => void
+  onRulesRefresh: () => Promise<void>
   language: SupportedLanguage
   onLanguageChange: (language: SupportedLanguage) => void
   themeMode: ThemeMode
@@ -58,6 +59,7 @@ export default function SettingsPanel({
   logs,
   rules,
   onRulesImport,
+  onRulesRefresh,
   language,
   onLanguageChange,
   themeMode,
@@ -73,6 +75,7 @@ export default function SettingsPanel({
   const [vpnServices, setVpnServices] = useState<VpnService[]>([])
   const [sudoersInstalled, setSudoersInstalled] = useState(true)
   const [installingSudoers, setInstallingSudoers] = useState(false)
+  const [refreshingRules, setRefreshingRules] = useState(false)
 
   const refreshCertStatus = async (): Promise<void> => {
     const [next, list] = await Promise.all([window.api.cert.status(), window.api.cert.list()])
@@ -155,6 +158,16 @@ export default function SettingsPanel({
 
   const handleExportRules = (): Promise<void> =>
     exportToFile('file-switcher-rules.json', JSON.stringify(rules, null, 2), 'rules.exportSuccess')
+
+  const handleRefreshRules = async (): Promise<void> => {
+    setRefreshingRules(true)
+    try {
+      await onRulesRefresh()
+      message.success(t('rules.refreshSuccess'))
+    } finally {
+      setRefreshingRules(false)
+    }
+  }
 
   const handleImportRules = async (): Promise<void> => {
     const content = await window.api.dialog.openTextFile(['json'])
@@ -333,26 +346,33 @@ export default function SettingsPanel({
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupData')}>
-        <Flex gap={8}>
-          <Button style={{ flex: 1 }} onClick={handleExportRules} disabled={rules.length === 0}>
-            {t('rules.exportButton')}
-          </Button>
-          <Popconfirm title={t('rules.importConfirm')} onConfirm={handleImportRules}>
-            <Button style={{ width: '100%', flex: 1 }}>{t('rules.importButton')}</Button>
-          </Popconfirm>
-        </Flex>
+        <SectionHeader title={t('settings.groupDataRules')}>
+          <Flex gap={8}>
+            <Button style={{ flex: 1 }} onClick={handleExportRules} disabled={rules.length === 0}>
+              {t('rules.exportButton')}
+            </Button>
+            <Popconfirm title={t('rules.importConfirm')} onConfirm={handleImportRules}>
+              <Button style={{ width: '100%', flex: 1 }}>{t('rules.importButton')}</Button>
+            </Popconfirm>
+            <Button style={{ flex: 1 }} onClick={handleRefreshRules} loading={refreshingRules}>
+              {t('rules.refreshButton')}
+            </Button>
+          </Flex>
+        </SectionHeader>
 
-        <Flex gap={8}>
-          <Button style={{ flex: 1 }} onClick={() => handleExportLog('har')} disabled={logs.length === 0}>
-            {t('log.exportFormatHar')}
-          </Button>
-          <Button style={{ flex: 1 }} onClick={() => handleExportLog('json')} disabled={logs.length === 0}>
-            {t('log.exportFormatJson')}
-          </Button>
-          <Button style={{ flex: 1 }} onClick={() => handleExportLog('csv')} disabled={logs.length === 0}>
-            {t('log.exportFormatCsv')}
-          </Button>
-        </Flex>
+        <SectionHeader title={t('settings.groupDataLog')}>
+          <Flex gap={8}>
+            <Button style={{ flex: 1 }} onClick={() => handleExportLog('har')} disabled={logs.length === 0}>
+              {t('log.exportFormatHar')}
+            </Button>
+            <Button style={{ flex: 1 }} onClick={() => handleExportLog('json')} disabled={logs.length === 0}>
+              {t('log.exportFormatJson')}
+            </Button>
+            <Button style={{ flex: 1 }} onClick={() => handleExportLog('csv')} disabled={logs.length === 0}>
+              {t('log.exportFormatCsv')}
+            </Button>
+          </Flex>
+        </SectionHeader>
       </SettingsGroup>
     </Space>
   )

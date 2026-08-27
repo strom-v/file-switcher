@@ -105,6 +105,10 @@ export default function App(): React.ReactElement {
     setModalOpen(true)
   }
 
+  const handleRefreshRules = async (): Promise<void> => {
+    setRules(await window.api.rules.get())
+  }
+
   const handleSubmit = (rule: Omit<Rule, 'id'> & { id?: string }): void => {
     if (rule.id) {
       persist(rules.map((r) => (r.id === rule.id ? { ...r, ...rule, id: rule.id! } : r)))
@@ -241,6 +245,7 @@ export default function App(): React.ReactElement {
             logs={logs}
             rules={rules}
             onRulesImport={persist}
+            onRulesRefresh={handleRefreshRules}
             language={currentLanguage}
             onLanguageChange={setLanguage}
             themeMode={mode}

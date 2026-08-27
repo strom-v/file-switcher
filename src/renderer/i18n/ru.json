@@ -7,8 +7,10 @@
   },
   "rules": {
     "addButton": "добавить правило",
+    "refreshButton": "обновить",
     "table": {
       "urlPattern": "правило",
+      "otherGroup": "остальные",
       "noFile": "без подмены тела",
       "hasAdvanced": "доп.",
       "hasAdvancedHint": "правило меняет заголовки, задержку или статус ответа",
@@ -42,11 +44,12 @@
       "headerValueHint": "значение (пусто — удалить заголовок)",
       "addHeader": "добавить заголовок"
     },
-    "exportButton": "экспортировать правила",
-    "importButton": "импортировать правила",
+    "exportButton": "экспорт",
+    "importButton": "импорт",
     "importConfirm": "заменить текущие правила содержимым файла?",
     "exportSuccess": "правила сохранены: {{path}}",
     "importSuccess": "импортировано правил: {{count}}",
+    "refreshSuccess": "список правил обновлён",
     "importInvalidFormat": "файл не похож на экспорт правил FileSwitcher"
   },
   "log": {
@@ -77,6 +80,8 @@
     "groupAppearance": "внешний вид",
     "groupNetwork": "сеть и безопасность",
     "groupData": "данные",
+    "groupDataRules": "правила",
+    "groupDataLog": "лог",
     "appearanceTitle": "внешний вид",
     "fontSizeLabel": "размер шрифта",
     "portLabel": "порт прокси:",

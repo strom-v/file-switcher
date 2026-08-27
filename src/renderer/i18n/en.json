@@ -7,8 +7,10 @@
   },
   "rules": {
     "addButton": "add rule",
+    "refreshButton": "refresh",
     "table": {
       "urlPattern": "rule",
+      "otherGroup": "other",
       "noFile": "no body substitution",
       "hasAdvanced": "extra",
       "hasAdvancedHint": "rule changes headers, delay, or response status",
@@ -42,11 +44,12 @@
       "headerValueHint": "value (empty — remove header)",
       "addHeader": "add header"
     },
-    "exportButton": "export rules",
-    "importButton": "import rules",
+    "exportButton": "export",
+    "importButton": "import",
     "importConfirm": "replace current rules with the file's contents?",
     "exportSuccess": "rules saved: {{path}}",
     "importSuccess": "imported {{count}} rules",
+    "refreshSuccess": "rules list refreshed",
     "importInvalidFormat": "this file doesn't look like a FileSwitcher rules export"
   },
   "log": {
@@ -77,6 +80,8 @@
     "groupAppearance": "appearance",
     "groupNetwork": "network & security",
     "groupData": "data",
+    "groupDataRules": "rules",
+    "groupDataLog": "log",
     "appearanceTitle": "appearance",
     "fontSizeLabel": "font size",
     "portLabel": "proxy port:",
