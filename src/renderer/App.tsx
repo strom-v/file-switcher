@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ConfigProvider, Drawer, Flex, Layout, Space, Splitter, theme as antdTheme, Typography, message } from 'antd'
-import { PlayCircleOutlined, PlusOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons'
+import {
+  ConfigProvider,
+  Drawer,
+  Flex,
+  Layout,
+  Space,
+  Splitter,
+  theme as antdTheme,
+  Tooltip,
+  Typography,
+  message
+} from 'antd'
+import { PlusOutlined, QuestionCircleOutlined, SettingOutlined } from '@ant-design/icons'
 import ruRU from 'antd/locale/ru_RU'
 import enUS from 'antd/locale/en_US'
 import { useTranslation } from 'react-i18next'
@@ -193,9 +204,27 @@ export default function App(): React.ReactElement {
       <Layout style={rootStyle}>
         <Flex justify="space-between" className="panel-toolbar">
           <Space>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              FileSwitcher
-            </Typography.Title>
+            <Tooltip
+              title={status.error ? `${statusLabels[status.status]}: ${status.error}` : statusLabels[status.status]}
+            >
+              <Typography.Title
+                level={4}
+                style={{
+                  margin: 0,
+                  color: START_STOP_COLOR[status.status],
+                  cursor: status.status === 'starting' ? 'default' : 'pointer',
+                  userSelect: 'none'
+                }}
+                onClick={
+                  status.status === 'starting' ? undefined : status.status === 'running' ? handleStop : handleStart
+                }
+              >
+                FileSwitcher
+              </Typography.Title>
+            </Tooltip>
+            <Tooltip title={t('app.titleClickHint')}>
+              <QuestionCircleOutlined className="hint-icon" />
+            </Tooltip>
           </Space>
           <Space>
             <IconButton
@@ -209,17 +238,6 @@ export default function App(): React.ReactElement {
               tooltip={t('app.settingsButton')}
               icon={<SettingOutlined />}
               onClick={() => setSettingsOpen(true)}
-            />
-            <IconButton
-              tooltip={status.error ? `${statusLabels[status.status]}: ${status.error}` : statusLabels[status.status]}
-              icon={status.status === 'running' ? <StopOutlined /> : <PlayCircleOutlined />}
-              onClick={status.status === 'running' ? handleStop : handleStart}
-              disabled={status.status === 'starting'}
-              style={{
-                backgroundColor: START_STOP_COLOR[status.status],
-                borderColor: START_STOP_COLOR[status.status],
-                color: '#fff'
-              }}
             />
           </Space>
         </Flex>

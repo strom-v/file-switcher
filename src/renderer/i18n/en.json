@@ -1,6 +1,7 @@
 {
   "app": {
-    "settingsButton": "settings"
+    "settingsButton": "settings",
+    "titleClickHint": "click the title to start or stop the proxy. title color shows status: green — stopped, yellow — starting, red — running"
   },
   "rules": {
     "addButton": "add rule",
