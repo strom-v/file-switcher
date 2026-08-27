@@ -253,7 +253,7 @@ export default function SettingsPanel({
       </SettingsGroup>
 
       <SettingsGroup title={t('settings.groupData')}>
-        <SectionHeader title={t('settings.groupDataRules')}>
+        <SectionHeader title={t('settings.groupDataRules')} hint={t('settings.groupDataRulesHint')}>
           <Flex gap={8}>
             <Button style={{ flex: 1 }} onClick={handleExportRules} disabled={rules.length === 0}>
               {t('rules.exportButton')}
@@ -267,7 +267,7 @@ export default function SettingsPanel({
           </Flex>
         </SectionHeader>
 
-        <SectionHeader title={t('settings.groupDataLog')}>
+        <SectionHeader title={t('settings.groupDataLog')} hint={t('settings.groupDataLogHint')}>
           <Flex gap={8}>
             <Button style={{ flex: 1 }} onClick={() => handleExportLog('har')} disabled={logs.length === 0}>
               {t('log.exportFormatHar')}
