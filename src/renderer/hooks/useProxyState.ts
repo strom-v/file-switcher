@@ -12,7 +12,17 @@ function getLogBuffer(): ProxyLogEvent[] {
   return window.__fileSwitcherLogBuffer
 }
 
-/** Подписывается на статус и лог прокси через IPC; в памяти хранится не больше maxLogEntries последних записей */
+// лимит применяется отдельно к каждой категории (matched/passed), не к общему потоку —
+// иначе большой объём обычного трафика вытесняет из буфера все записи о сработавших подменах
+function trimByCategory(entries: ProxyLogEvent[], maxPerCategory: number): ProxyLogEvent[] {
+  const matched = entries.filter((e) => e.event === 'matched')
+  const passed = entries.filter((e) => e.event === 'passed')
+  const trimmedMatched = matched.length > maxPerCategory ? matched.slice(matched.length - maxPerCategory) : matched
+  const trimmedPassed = passed.length > maxPerCategory ? passed.slice(passed.length - maxPerCategory) : passed
+  return [...trimmedMatched, ...trimmedPassed].sort((a, b) => a.ts - b.ts)
+}
+
+/** Подписывается на статус и лог прокси через IPC; в памяти хранится не больше maxLogEntries последних записей на каждую категорию (сработавшие подмены / остальной трафик) */
 export function useProxyState(
   maxLogEntries: LogLimit,
   onStderr?: (text: string) => void
@@ -38,7 +48,7 @@ export function useProxyState(
 
   // при уменьшении лимита обрезаем уже накопленные записи сразу, не дожидаясь следующего события лога
   useEffect(() => {
-    updateLogs((prev) => (prev.length > maxLogEntries ? prev.slice(prev.length - maxLogEntries) : prev))
+    updateLogs((prev) => trimByCategory(prev, maxLogEntries))
   }, [maxLogEntries])
 
   useEffect(() => {
@@ -53,11 +63,7 @@ export function useProxyState(
     })
 
     const offLog = window.api.proxy.onLog((event) => {
-      updateLogs((prev) => {
-        const next = [...prev, event]
-        const max = maxLogEntriesRef.current
-        return next.length > max ? next.slice(next.length - max) : next
-      })
+      updateLogs((prev) => trimByCategory([...prev, event], maxLogEntriesRef.current))
     })
 
     const offStderr = window.api.proxy.onStderr((text) => {

@@ -24,7 +24,8 @@ interface LogPanelProps {
 }
 
 /** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL и фильтром по событию.
- * logLimit ограничивает не только отображение, но и сколько записей вообще хранится в памяти (см. useProxyState). */
+ * logLimit ограничивает, сколько записей хранится в памяти отдельно для каждой категории — "подмена" и
+ * "без подмены" не вытесняют друг друга (см. useProxyState). */
 export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
@@ -40,8 +41,8 @@ export default function LogPanel({ logs, onClear, logLimit, onLogLimitChange }: 
     })
   }, [logs, search, eventFilter])
 
-  // счётчик рядом с лимитом отражает выбранную категорию: при фильтре "подмена" считаем только
-  // matched-записи в общем буфере, а не logs.length целиком — иначе цифра не соответствует списку
+  // счётчик и лимит относятся к текущей выбранной категории — у "подмена" и "без подмены"
+  // свой независимый буфер (см. useProxyState), поэтому общий logs.length тут не подходит
   const shownCount = eventFilter === EVENT_FILTER_ALL ? logs.length : logs.filter((l) => l.event === eventFilter).length
 
   return (
