@@ -27,14 +27,20 @@ class ResponseSwitcher:
             self.rules = []
             self.last_mtime = None
             if self.rules_path:
-                self._reload()
+                try:
+                    self._reload()
+                except (OSError, json.JSONDecodeError, KeyError) as e:
+                    ctx.log.warn(f"не удалось прочитать rules_file при старте: {e}")
 
         if "trace_settings_file" in updated:
             self.trace_settings_path = ctx.options.trace_settings_file
             self.trace_settings = {}
             self.trace_last_mtime = None
             if self.trace_settings_path:
-                self._reload_trace_settings()
+                try:
+                    self._reload_trace_settings()
+                except (OSError, json.JSONDecodeError) as e:
+                    ctx.log.warn(f"не удалось прочитать trace_settings_file при старте: {e}")
 
     def _reload(self):
         with open(self.rules_path, encoding="utf-8") as f:
