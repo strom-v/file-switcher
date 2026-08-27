@@ -39,7 +39,18 @@ function extractRepo(localFilePath: string | undefined): string | null {
   return match ? match[1] : null
 }
 
-type GroupedRow = ({ __group: true; key: string; label: string } | (Rule & { __group?: false }))[]
+interface GroupHeaderRow {
+  __group: true
+  key: string
+  label: string
+  isFirst: boolean
+}
+type GroupedRow = (GroupHeaderRow | (Rule & { __group?: false }))[]
+
+/** Различает строку-заголовок группы от обычного правила */
+function isGroupRow(row: GroupedRow[number]): row is GroupHeaderRow {
+  return '__group' in row && row.__group === true
+}
 
 /** Группирует правила по репозиторию из localFilePath; группы и правила внутри них отсортированы по алфавиту, правила без распознанного репозитория — в "остальные" */
 function groupRulesByRepo(rules: Rule[], otherLabel: string): GroupedRow {
@@ -55,15 +66,16 @@ function groupRulesByRepo(rules: Rule[], otherLabel: string): GroupedRow {
   }
 
   const sortedRepos = [...groups.keys()].sort((a, b) => a.localeCompare(b))
+  const showGroups = groups.size > 1
 
   const rows: GroupedRow = []
-  for (const repo of sortedRepos) {
+  sortedRepos.forEach((repo, i) => {
     const groupRules = groups.get(repo)!.sort((a, b) => a.urlPattern.localeCompare(b.urlPattern))
-    if (groups.size > 1) {
-      rows.push({ __group: true, key: `group:${repo}`, label: repo })
+    if (showGroups) {
+      rows.push({ __group: true, key: `group:${repo}`, label: repo, isFirst: i === 0 })
     }
     rows.push(...groupRules)
-  }
+  })
   return rows
 }
 
@@ -84,20 +96,18 @@ export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesT
     {
       dataIndex: 'enabled',
       width: 36,
-      onCell: (row) => ('__group' in row && row.__group ? { colSpan: 0 } : {}),
+      onCell: (row) => (isGroupRow(row) ? { colSpan: 0 } : {}),
       render: (_, row) =>
-        '__group' in row && row.__group ? null : (
-          <Checkbox checked={row.enabled} onChange={(e) => onToggle(row, e.target.checked)} />
-        )
+        isGroupRow(row) ? null : <Checkbox checked={row.enabled} onChange={(e) => onToggle(row, e.target.checked)} />
     },
     {
       title: '',
       dataIndex: 'urlPattern',
-      onCell: (row) => ('__group' in row && row.__group ? { colSpan: 3 } : {}),
-      render: (urlPattern: string, row, index) => {
-        if ('__group' in row && row.__group) {
+      onCell: (row) => (isGroupRow(row) ? { colSpan: 3 } : {}),
+      render: (urlPattern: string, row) => {
+        if (isGroupRow(row)) {
           return (
-            <div style={{ marginTop: index === 0 ? 0 : 14 }}>
+            <div style={{ marginTop: row.isFirst ? 0 : 14 }}>
               <Typography.Text
                 type="secondary"
                 strong
@@ -149,9 +159,9 @@ export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesT
       title: '',
       width: 44,
       align: 'right',
-      onCell: (row) => ('__group' in row && row.__group ? { colSpan: 0 } : {}),
+      onCell: (row) => (isGroupRow(row) ? { colSpan: 0 } : {}),
       render: (_, row) =>
-        '__group' in row && row.__group ? null : (
+        isGroupRow(row) ? null : (
           <Space size={8}>
             <Tooltip title={t('rules.table.edit')}>
               <EditOutlined style={actionIconStyle} onClick={() => onEdit(row)} />
@@ -169,7 +179,7 @@ export default function RulesTable({ rules, onToggle, onEdit, onDelete }: RulesT
   return (
     <ConfigProvider theme={RULES_TABLE_THEME}>
       <Table<GroupedRow[number]>
-        rowKey={(row) => ('__group' in row && row.__group ? row.key : row.id)}
+        rowKey={(row) => (isGroupRow(row) ? row.key : row.id)}
         columns={columns}
         dataSource={groupedRows}
         pagination={false}
