@@ -1,9 +1,7 @@
 {
   "app": {
     "settingsButton": "settings",
-    "settingsDrawerTitle": "settings",
-    "vpnActive": "VPN",
-    "vpnActiveHint": "VPN is active. by default its traffic bypasses the proxy — allow tracking for a specific VPN in Settings."
+    "settingsDrawerTitle": "settings"
   },
   "rules": {
     "addButton": "add rule",
@@ -80,19 +78,14 @@
     "groupData": "data",
     "groupDataRules": "rules",
     "groupDataLog": "log",
+    "logStorageLimitLabel": "entries kept in memory (per category)",
+    "logStorageLimitHint": "how many recent log entries are kept separately for \"matched\" and \"passed\" — doesn't affect how many are shown in the list (see the limit selector above the log)",
     "portLabel": "proxy port:",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
     "sudoersInstallButton": "set up passwordless",
     "sudoersInstallSuccess": "done: starting/stopping the proxy will no longer ask for a password",
     "sudoersInstallError": "setup failed: {{message}}",
-    "vpnTitle": "VPN",
-    "vpnHint": "the proxy leaves VPN tunnels alone by default — an active VPN often breaks if the system proxy is configured on it too. allow tracking selectively, only for a VPN where it's safe (e.g. a work VPN reaching internal services).",
-    "vpnAllowedHint": "proxy is configured on this VPN — its traffic is tracked",
-    "vpnNotAllowedHint": "proxy leaves this VPN alone — its traffic bypasses it",
-    "vpnUnnamed": "VPN without a network service (WireGuard etc.)",
-    "vpnUnnamedHint": "not registered as a network service — the proxy can't be configured on it individually, indication only",
-    "vpnUnnamedIgnoredHint": "not registered as a network service — the proxy still doesn't work over it, but the header indicator is hidden for it per your request",
     "certTitle": "HTTPS certificate",
     "certStatus": "status",
     "certListHint": "mitmproxy CA certificates (CN=mitmproxy) in the current user's keychain. several can accumulate if mitmproxy was reinstalled.",

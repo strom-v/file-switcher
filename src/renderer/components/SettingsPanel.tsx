@@ -10,7 +10,6 @@ import {
   Select,
   Slider,
   Space,
-  Switch,
   Tag,
   Tooltip,
   Typography,
@@ -23,9 +22,10 @@ import SettingsGroup from './SettingsGroup'
 import { buildCsv } from '../csvExport'
 import { buildHar } from '../harExport'
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../hooks/useFontSize'
+import { LOG_STORAGE_LIMIT_MAX, LOG_STORAGE_LIMIT_MIN } from '../hooks/useLogStorageLimit'
 import type { ThemeMode } from '../hooks/useThemeMode'
 import type { SupportedLanguage } from '../i18n'
-import type { CertInfo, CertStatus, ProxyLogEvent, ProxyState, Rule, VpnService } from '../../shared/types'
+import type { CertInfo, CertStatus, ProxyLogEvent, ProxyState, Rule } from '../../shared/types'
 
 interface SettingsPanelProps {
   status: ProxyState
@@ -41,6 +41,8 @@ interface SettingsPanelProps {
   onThemeModeChange: (mode: ThemeMode) => void
   fontSize: number
   onFontSizeChange: (size: number) => void
+  logStorageLimit: number
+  onLogStorageLimitChange: (limit: number) => void
 }
 
 /** Проверяет, что распарсенный JSON похож на массив Rule — минимально, без строгой валидации формы каждого поля */
@@ -51,7 +53,7 @@ function isRuleArray(value: unknown): value is Rule[] {
   )
 }
 
-/** Панель настроек: язык/тема, порт, статус сертификата, VPN-исключения, экспорт лога и правил */
+/** Панель настроек: язык/тема, порт, статус сертификата, экспорт лога и правил */
 export default function SettingsPanel({
   status,
   port,
@@ -65,14 +67,15 @@ export default function SettingsPanel({
   themeMode,
   onThemeModeChange,
   fontSize,
-  onFontSizeChange
+  onFontSizeChange,
+  logStorageLimit,
+  onLogStorageLimitChange
 }: SettingsPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [certStatus, setCertStatus] = useState<CertStatus>('not-generated')
   const [certs, setCerts] = useState<CertInfo[]>([])
   const [installing, setInstalling] = useState(false)
   const [removing, setRemoving] = useState(false)
-  const [vpnServices, setVpnServices] = useState<VpnService[]>([])
   const [sudoersInstalled, setSudoersInstalled] = useState(true)
   const [installingSudoers, setInstallingSudoers] = useState(false)
   const [refreshingRules, setRefreshingRules] = useState(false)
@@ -83,20 +86,10 @@ export default function SettingsPanel({
     setCerts(list)
   }
 
-  const refreshVpnServices = async (): Promise<void> => {
-    setVpnServices(await window.api.system.vpnServices())
-  }
-
   useEffect(() => {
     refreshCertStatus()
-    refreshVpnServices()
     window.api.system.sudoersInstalled().then(setSudoersInstalled)
   }, [status.status])
-
-  const handleToggleVpnAllowed = async (name: string, allowed: boolean): Promise<void> => {
-    await window.api.system.setVpnServiceAllowed(name, allowed)
-    await refreshVpnServices()
-  }
 
   const handleInstallSudoersRule = async (): Promise<void> => {
     setInstallingSudoers(true)
@@ -247,45 +240,6 @@ export default function SettingsPanel({
           </SectionHeader>
         )}
 
-        {vpnServices.length > 0 && (
-          <SectionHeader title={t('settings.vpnTitle')} hint={t('settings.vpnHint')}>
-            <List
-              bordered
-              size="small"
-              dataSource={vpnServices}
-              renderItem={(vpn) => (
-                <List.Item
-                  className="log-item--compact"
-                  actions={
-                    vpn.name
-                      ? [
-                          <Switch
-                            key="allowed"
-                            checked={vpn.allowed}
-                            onChange={(checked) => handleToggleVpnAllowed(vpn.name as string, checked)}
-                          />
-                        ]
-                      : undefined
-                  }
-                >
-                  <Space direction="vertical" size={0}>
-                    <Typography.Text>{vpn.name ?? vpn.detectedClientName ?? t('settings.vpnUnnamed')}</Typography.Text>
-                    <Typography.Text type="secondary">
-                      {vpn.name
-                        ? vpn.allowed
-                          ? t('settings.vpnAllowedHint')
-                          : t('settings.vpnNotAllowedHint')
-                        : vpn.allowed
-                          ? t('settings.vpnUnnamedIgnoredHint')
-                          : t('settings.vpnUnnamedHint')}
-                    </Typography.Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
-          </SectionHeader>
-        )}
-
         <SectionHeader title={t('settings.certTitle')} hint={t('settings.certListHint')}>
           {certs.length === 0 ? (
             <Descriptions bordered column={1} size="small">
@@ -372,6 +326,17 @@ export default function SettingsPanel({
               {t('log.exportFormatCsv')}
             </Button>
           </Flex>
+        </SectionHeader>
+
+        <SectionHeader title={t('settings.logStorageLimitLabel')} hint={t('settings.logStorageLimitHint')}>
+          <InputNumber
+            min={LOG_STORAGE_LIMIT_MIN}
+            max={LOG_STORAGE_LIMIT_MAX}
+            step={100}
+            value={logStorageLimit}
+            onChange={(value) => onLogStorageLimitChange(value ?? logStorageLimit)}
+            style={{ width: '100%' }}
+          />
         </SectionHeader>
       </SettingsGroup>
     </Space>

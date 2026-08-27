@@ -3,13 +3,7 @@ import { dialog, ipcMain, BrowserWindow } from 'electron'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
-import {
-  getVpnServices,
-  installSudoersRule,
-  isSudoersRuleInstalled,
-  isVpnActive,
-  setVpnServiceAllowed
-} from './proxySystemConfig'
+import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
 
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
 export function registerIpcHandlers(): void {
@@ -28,28 +22,6 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('proxy:status', () => proxyController.getState())
-
-  ipcMain.handle('system:vpnActive', async () => {
-    if (process.platform !== 'darwin') return false
-    try {
-      return await isVpnActive()
-    } catch {
-      return false
-    }
-  })
-
-  ipcMain.handle('system:vpnServices', async () => {
-    if (process.platform !== 'darwin') return []
-    try {
-      return await getVpnServices()
-    } catch {
-      return []
-    }
-  })
-
-  ipcMain.handle('system:setVpnServiceAllowed', (_event, name: string, allowed: boolean) => {
-    setVpnServiceAllowed(name, allowed)
-  })
 
   ipcMain.handle('system:sudoersInstalled', () => isSudoersRuleInstalled())
 

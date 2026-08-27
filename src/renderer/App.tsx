@@ -1,17 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  ConfigProvider,
-  Drawer,
-  Flex,
-  Layout,
-  Space,
-  Splitter,
-  Tag,
-  Tooltip,
-  theme as antdTheme,
-  Typography,
-  message
-} from 'antd'
+import { ConfigProvider, Drawer, Flex, Layout, Space, Splitter, theme as antdTheme, Typography, message } from 'antd'
 import { PlayCircleOutlined, PlusOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons'
 import ruRU from 'antd/locale/ru_RU'
 import enUS from 'antd/locale/en_US'
@@ -23,8 +11,8 @@ import SettingsPanel from './components/SettingsPanel'
 import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
 import { LOG_LIMIT_OPTIONS, type LogLimit, useProxyState } from './hooks/useProxyState'
+import { useLogStorageLimit } from './hooks/useLogStorageLimit'
 import { useThemeMode } from './hooks/useThemeMode'
-import { useVpnStatus } from './hooks/useVpnStatus'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
@@ -58,7 +46,6 @@ export default function App(): React.ReactElement {
   const { t, i18n } = useTranslation()
   const { mode, isDark, setMode } = useThemeMode()
   const { fontSize, setFontSize } = useFontSize()
-  const vpnStatus = useVpnStatus()
   const [rules, setRules] = useState<Rule[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<Rule | null>(null)
@@ -67,7 +54,8 @@ export default function App(): React.ReactElement {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [splitterSize] = useState(readStoredSplitterSize)
   const [logLimit, setLogLimit] = useState<LogLimit>(LOG_LIMIT_OPTIONS[0])
-  const { status, logs, clearLogs } = useProxyState(logLimit, (text) => {
+  const { logStorageLimit, setLogStorageLimit } = useLogStorageLimit()
+  const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
     message.warning(text)
   })
 
@@ -180,11 +168,6 @@ export default function App(): React.ReactElement {
             <Typography.Title level={4} style={{ margin: 0 }}>
               FileSwitcher
             </Typography.Title>
-            {vpnStatus.active && (
-              <Tooltip title={t('app.vpnActiveHint')}>
-                <Tag color="error">{vpnStatus.name ?? t('app.vpnActive')}</Tag>
-              </Tooltip>
-            )}
           </Space>
           <Space>
             <IconButton
@@ -256,6 +239,8 @@ export default function App(): React.ReactElement {
             onThemeModeChange={setMode}
             fontSize={fontSize}
             onFontSizeChange={setFontSize}
+            logStorageLimit={logStorageLimit}
+            onLogStorageLimitChange={setLogStorageLimit}
           />
         </Drawer>
       </Layout>

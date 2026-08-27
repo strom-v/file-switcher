@@ -12,7 +12,7 @@ function getLogBuffer(): ProxyLogEvent[] {
   return window.__fileSwitcherLogBuffer
 }
 
-// лимит применяется отдельно к каждой категории (matched/passed), не к общему потоку —
+// лимит хранения применяется отдельно к каждой категории (matched/passed), не к общему потоку —
 // иначе большой объём обычного трафика вытесняет из буфера все записи о сработавших подменах
 function trimByCategory(entries: ProxyLogEvent[], maxPerCategory: number): ProxyLogEvent[] {
   const matched = entries.filter((e) => e.event === 'matched')
@@ -22,9 +22,9 @@ function trimByCategory(entries: ProxyLogEvent[], maxPerCategory: number): Proxy
   return [...trimmedMatched, ...trimmedPassed].sort((a, b) => a.ts - b.ts)
 }
 
-/** Подписывается на статус и лог прокси через IPC; в памяти хранится не больше maxLogEntries последних записей на каждую категорию (сработавшие подмены / остальной трафик) */
+/** Подписывается на статус и лог прокси через IPC; в памяти хранится не больше storageLimit записей на каждую категорию (сработавшие подмены / остальной трафик) — независимо от того, что выбрано для отображения в LogPanel */
 export function useProxyState(
-  maxLogEntries: LogLimit,
+  storageLimit: number,
   onStderr?: (text: string) => void
 ): {
   status: ProxyState
@@ -36,8 +36,8 @@ export function useProxyState(
   const mounted = useRef(true)
   const onStderrRef = useRef(onStderr)
   onStderrRef.current = onStderr
-  const maxLogEntriesRef = useRef(maxLogEntries)
-  maxLogEntriesRef.current = maxLogEntries
+  const storageLimitRef = useRef(storageLimit)
+  storageLimitRef.current = storageLimit
 
   // пишет и в window-буфер (переживает HMR), и в React state (вызывает ре-рендер)
   const updateLogs = (updater: (prev: ProxyLogEvent[]) => ProxyLogEvent[]): void => {
@@ -48,8 +48,8 @@ export function useProxyState(
 
   // при уменьшении лимита обрезаем уже накопленные записи сразу, не дожидаясь следующего события лога
   useEffect(() => {
-    updateLogs((prev) => trimByCategory(prev, maxLogEntries))
-  }, [maxLogEntries])
+    updateLogs((prev) => trimByCategory(prev, storageLimit))
+  }, [storageLimit])
 
   useEffect(() => {
     mounted.current = true
@@ -63,7 +63,7 @@ export function useProxyState(
     })
 
     const offLog = window.api.proxy.onLog((event) => {
-      updateLogs((prev) => trimByCategory([...prev, event], maxLogEntriesRef.current))
+      updateLogs((prev) => trimByCategory([...prev, event], storageLimitRef.current))
     })
 
     const offStderr = window.api.proxy.onStderr((text) => {

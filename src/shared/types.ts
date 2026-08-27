@@ -46,14 +46,6 @@ export interface ProxyLogEvent {
   ts: number
 }
 
-/** Активный VPN, обнаруженный на машине. named — зарегистрированный network service (управляем прокси на нём через networksetup); безымянные (WireGuard и т.п., видны только как utun-интерфейс) управлению не поддаются, только индикация. */
-export interface VpnService {
-  name: string | null
-  allowed: boolean
-  /** Best-effort имя клиента для безымянного (name: null) VPN, определённое по активности известных процессов (см. proxySystemConfig.ts) */
-  detectedClientName?: string | null
-}
-
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'
 
 export interface CertInfo {

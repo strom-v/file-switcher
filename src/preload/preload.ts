@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, VpnService } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo } from '../shared/types'
 
 const api = {
   rules: {
@@ -40,10 +40,6 @@ const api = {
       ipcRenderer.invoke('dialog:openTextFile', extensions)
   },
   system: {
-    vpnActive: (): Promise<boolean> => ipcRenderer.invoke('system:vpnActive'),
-    vpnServices: (): Promise<VpnService[]> => ipcRenderer.invoke('system:vpnServices'),
-    setVpnServiceAllowed: (name: string, allowed: boolean): Promise<void> =>
-      ipcRenderer.invoke('system:setVpnServiceAllowed', name, allowed),
     sudoersInstalled: (): Promise<boolean> => ipcRenderer.invoke('system:sudoersInstalled'),
     installSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:installSudoersRule')
   }

@@ -52,7 +52,18 @@ function isGroupRow(row: GroupedRow[number]): row is GroupHeaderRow {
   return '__group' in row && row.__group === true
 }
 
-/** Группирует правила по репозиторию из localFilePath; группы и правила внутри них отсортированы по алфавиту, правила без распознанного репозитория — в "остальные" */
+const CYRILLIC_RE = /[а-яё]/i
+
+/** Сравнивает названия групп: латинские идут перед кириллическими, внутри каждой части — по алфавиту */
+function compareGroupNames(a: string, b: string): number {
+  const aIsCyrillic = CYRILLIC_RE.test(a)
+  const bIsCyrillic = CYRILLIC_RE.test(b)
+  if (aIsCyrillic !== bIsCyrillic) return aIsCyrillic ? 1 : -1
+  return a.localeCompare(b)
+}
+
+/** Группирует правила по репозиторию из localFilePath; группы и правила внутри них отсортированы по алфавиту
+ * (латинские названия групп впереди кириллических), правила без распознанного репозитория — в "остальные" */
 function groupRulesByRepo(rules: Rule[], otherLabel: string): GroupedRow {
   const groups = new Map<string, Rule[]>()
   for (const rule of rules) {
@@ -65,7 +76,7 @@ function groupRulesByRepo(rules: Rule[], otherLabel: string): GroupedRow {
     }
   }
 
-  const sortedRepos = [...groups.keys()].sort((a, b) => a.localeCompare(b))
+  const sortedRepos = [...groups.keys()].sort(compareGroupNames)
   const showGroups = groups.size > 1
 
   const rows: GroupedRow = []
