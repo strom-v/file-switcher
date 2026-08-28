@@ -186,12 +186,6 @@ export default function App(): React.ReactElement {
   const someRulesEnabled = enabledRulesCount > 0 && enabledRulesCount < rules.length
 
   const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
-  const statusLabels: Record<string, string> = {
-    stopped: t('settings.statusLabels.stopped'),
-    starting: t('settings.statusLabels.starting'),
-    running: t('settings.statusLabels.running'),
-    crashed: t('settings.statusLabels.crashed')
-  }
 
   // мемоизация обязательна: без неё новый объект темы на каждый рендер (например, на каждое событие лога)
   // заставляет ConfigProvider пересчитывать CSS-in-JS всего дерева — заметно тормозит перетаскивание Splitter
@@ -232,11 +226,7 @@ export default function App(): React.ReactElement {
               onClick={() => setSettingsOpen(true)}
             />
             <IconButton
-              tooltip={
-                status.error
-                  ? `${statusLabels[status.status]}: ${status.error}`
-                  : `${statusLabels[status.status]}. ${t('app.vpnWarning')}`
-              }
+              tooltip={status.error ?? t('app.vpnWarning')}
               icon={status.status === 'running' ? <StopOutlined /> : <PlayCircleOutlined />}
               onClick={status.status === 'running' ? handleStop : handleStart}
               disabled={status.status === 'starting'}
