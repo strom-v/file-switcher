@@ -137,11 +137,17 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
 
-/* без этого мой div занимает только высоту своего контента (paddings/height строки идут от
-   design-токенов Listy на родительской .ant-listy-item), и клик по строке вне текста — в пустых
-   промежутках сверху/снизу — не попадал бы на onClick, повешенный на этот div */
+/* Listy кладёт padding прямо на .ant-listy-item (design-токены itemPaddingBlock/itemPaddingInline),
+   а не передаёт его моему itemRender-контенту — клик по этому паддингу (края строки сверху/снизу/
+   по бокам) физически приходится на родителя, у которого нет моего onClick, и не долетает до
+   дочернего .log-item--compact. LogPanel.tsx обнуляет паддинг Listy декларативно через
+   styles={{ item: { padding: 0 } }}, здесь переносим тот же отступ (itemPaddingBlock=paddingSM=12px,
+   itemPaddingInline=6px — см. кастомную тему padding:6 в App.tsx) на сам div, чтобы кликабельная
+   область совпадала с видимой строкой один в один */
 .log-item--compact {
   height: 100%;
+  box-sizing: border-box;
+  padding: 12px 6px;
   display: flex;
   align-items: center;
 }

@@ -161,6 +161,11 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
               virtual
               height={listHeight}
               rowKey={(item) => `${item.ts}-${item.url}`}
+              // Listy кладёт padding на саму строку-обёртку (design-токены), а не на itemRender-контент —
+              // клик по этому паддингу (края строки) не долетал бы до onClick на моём внутреннем div,
+              // потому что там физически нет элемента. Обнуляем паддинг здесь и переносим тот же
+              // отступ на .log-item--compact (global.css) — кликабельная область совпадает с видимой
+              styles={{ item: { padding: 0 } }}
               itemRender={(item) => {
                 const isMatched = item.event === 'matched'
                 // одна строка на запись — Listy вычисляет высоту строки из design-токенов и не
