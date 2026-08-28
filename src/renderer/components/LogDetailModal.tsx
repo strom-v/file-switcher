@@ -12,14 +12,17 @@ interface LogDetailModalProps {
 interface BodySectionProps {
   title: React.ReactNode
   body: string
+  isBinary: boolean
+  size: number
 }
 
-/** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой ручного форматирования под JSON */
-function BodySection({ title, body }: BodySectionProps): React.ReactElement {
+/** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой ручного форматирования под JSON;
+ * для бинарных данных (картинка, шрифт и т.п.) — явная пометка вместо нечитаемой каши символов */
+function BodySection({ title, body, isBinary, size }: BodySectionProps): React.ReactElement {
   const { t } = useTranslation()
   const [formatted, setFormatted] = useState(false)
 
-  const pretty = formatted ? tryFormatJson(body) : null
+  const pretty = !isBinary && formatted ? tryFormatJson(body) : null
   const displayed = pretty ?? body
   // кнопка нажата, но текст не изменился — либо это не JSON, либо тело слишком большое для
   // форматирования (см. FORMAT_JSON_MAX_LENGTH); пользователю нужно явное объяснение, а не молчание
@@ -27,20 +30,28 @@ function BodySection({ title, body }: BodySectionProps): React.ReactElement {
 
   return (
     <>
-      <Typography.Text strong copyable={{ text: displayed }} className="text-sm">
+      <Typography.Text strong copyable={!isBinary && { text: displayed }} className="text-sm">
         {title}
       </Typography.Text>{' '}
-      <Button size="small" type="link" onClick={() => setFormatted((prev) => !prev)}>
-        {t(formatted ? 'log.formatRawButton' : 'log.formatButton')}
-      </Button>
-      {formatDidNothing && (
+      {!isBinary && (
+        <Button size="small" type="link" onClick={() => setFormatted((prev) => !prev)}>
+          {t(formatted ? 'log.formatRawButton' : 'log.formatButton')}
+        </Button>
+      )}
+      {!isBinary && formatDidNothing && (
         <Typography.Text type="secondary" className="text-sm">
           {' '}
           {t('log.formatNotApplicable')}
         </Typography.Text>
       )}
       <div className="headers-panel">
-        <Typography.Paragraph className="pre-wrap text-sm">{displayed || '—'}</Typography.Paragraph>
+        {isBinary ? (
+          <Typography.Text type="secondary" className="text-sm">
+            {t('log.bodyIsBinary', { size: formatSize(size) })}
+          </Typography.Text>
+        ) : (
+          <Typography.Paragraph className="pre-wrap text-sm">{displayed || '—'}</Typography.Paragraph>
+        )}
       </div>
     </>
   )
@@ -100,8 +111,18 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             </Typography.Paragraph>
           </div>
 
-          <BodySection title={t('log.detailRequestBody')} body={event.requestBody} />
-          <BodySection title={t('log.detailResponseBody')} body={event.responseBody} />
+          <BodySection
+            title={t('log.detailRequestBody')}
+            body={event.requestBody}
+            isBinary={event.requestBodyIsBinary}
+            size={event.requestBodySize}
+          />
+          <BodySection
+            title={t('log.detailResponseBody')}
+            body={event.responseBody}
+            isBinary={event.responseBodyIsBinary}
+            size={event.responseSize}
+          />
         </>
       )}
     </Modal>

@@ -59,7 +59,8 @@
     "detailResponseBody": "тело ответа",
     "formatButton": "форматировать",
     "formatRawButton": "исходный вид",
-    "formatNotApplicable": "(не удалось: это не JSON или тело слишком большое)"
+    "formatNotApplicable": "(не удалось: это не JSON или тело слишком большое)",
+    "bodyIsBinary": "бинарный файл, {{size}}"
   },
   "settings": {
     "error": "ошибка",

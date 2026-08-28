@@ -46,8 +46,14 @@ export interface ProxyLogEvent {
   ts: number
   /** тело запроса, декодировано как текст (errors=replace для бинарных данных) */
   requestBody: string
+  /** true, если requestBody не является валидным UTF-8-текстом (картинка, шрифт и т.п.) */
+  requestBodyIsBinary: boolean
+  /** размер тела запроса в байтах (точный, в отличие от .length декодированной строки) */
+  requestBodySize: number
   /** тело ответа, декодировано как текст (errors=replace для бинарных данных) */
   responseBody: string
+  /** true, если responseBody не является валидным UTF-8-текстом (картинка, шрифт и т.п.) */
+  responseBodyIsBinary: boolean
 }
 
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'

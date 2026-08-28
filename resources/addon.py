@@ -37,12 +37,16 @@ class ResponseSwitcher:
         self.last_mtime = os.path.getmtime(self.rules_path)
 
     @staticmethod
-    def _decode_body(raw: bytes | None) -> str | None:
-        # тело показывается пользователю как текст; для бинарных данных (картинки, шрифты)
-        # errors="replace" не падает, просто получится нечитаемая строка вместо исключения
+    def _decode_body(raw: bytes | None) -> tuple[str, bool]:
+        # сначала пробуем честную строгую декодировку — если она падает, тело бинарное
+        # (картинка, шрифт, видео и т.п.), и незачем показывать пользователю нечитаемую кашу:
+        # UI должен получить явный флаг вместо угадывания по мусорным символам замены
         if not raw:
-            return ""
-        return raw.decode("utf-8", errors="replace")
+            return "", False
+        try:
+            return raw.decode("utf-8", errors="strict"), False
+        except UnicodeDecodeError:
+            return raw.decode("utf-8", errors="replace"), True
 
     @staticmethod
     def _substitute_groups(path: str, matched: "re.Match") -> str:
@@ -169,6 +173,12 @@ class ResponseSwitcher:
             if status_override:
                 flow.response.status_code = status_override
 
+        request_body, request_body_is_binary = self._decode_body(flow.request.raw_content)
+
+        response_body, response_body_is_binary = (
+            self._decode_body(flow.response.raw_content) if flow.response else ("", False)
+        )
+
         log_entry = {
             "event": event,
             "url": flow.request.pretty_url,
@@ -179,8 +189,11 @@ class ResponseSwitcher:
             "responseHeaders": dict(flow.response.headers) if flow.response else {},
             "responseSize": len(flow.response.raw_content) if flow.response and flow.response.raw_content else 0,
             "ts": time.time(),
-            "requestBody": self._decode_body(flow.request.raw_content),
-            "responseBody": self._decode_body(flow.response.raw_content) if flow.response else "",
+            "requestBody": request_body,
+            "requestBodyIsBinary": request_body_is_binary,
+            "requestBodySize": len(flow.request.raw_content) if flow.request.raw_content else 0,
+            "responseBody": response_body,
+            "responseBodyIsBinary": response_body_is_binary,
         }
 
         print(

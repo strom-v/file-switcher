@@ -59,7 +59,8 @@
     "detailResponseBody": "response body",
     "formatButton": "format",
     "formatRawButton": "raw view",
-    "formatNotApplicable": "(couldn't format: not JSON, or the body is too large)"
+    "formatNotApplicable": "(couldn't format: not JSON, or the body is too large)",
+    "bodyIsBinary": "binary file, {{size}}"
   },
   "settings": {
     "error": "error",
