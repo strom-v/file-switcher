@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
+  Checkbox,
   ConfigProvider,
   Drawer,
   Flex,
@@ -110,6 +111,10 @@ export default function App(): React.ReactElement {
     persist(updateRuleById(rule.id, { enabled }))
   }
 
+  const handleToggleAll = (enabled: boolean): void => {
+    persist(rules.map((r) => ({ ...r, enabled })))
+  }
+
   const handleEdit = (rule: Rule): void => {
     setEditingRule(rule)
     setModalOpen(true)
@@ -165,6 +170,10 @@ export default function App(): React.ReactElement {
     if (total <= 0) return
     setSplitterSize(Math.round((left / total) * 100))
   }
+
+  const enabledRulesCount = rules.filter((r) => r.enabled).length
+  const allRulesEnabled = rules.length > 0 && enabledRulesCount === rules.length
+  const someRulesEnabled = enabledRulesCount > 0 && enabledRulesCount < rules.length
 
   const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
   const statusLabels: Record<string, string> = {
@@ -224,20 +233,11 @@ export default function App(): React.ReactElement {
               <QuestionCircleOutlined className="hint-icon" />
             </Tooltip>
           </Space>
-          <Space>
-            <IconButton
-              tooltip={t('rules.addButton')}
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAdd}
-              style={{ backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
-            />
-            <IconButton
-              tooltip={t('app.settingsButton')}
-              icon={<SettingOutlined />}
-              onClick={() => setSettingsOpen(true)}
-            />
-          </Space>
+          <IconButton
+            tooltip={t('app.settingsButton')}
+            icon={<SettingOutlined />}
+            onClick={() => setSettingsOpen(true)}
+          />
         </Flex>
 
         <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
@@ -248,6 +248,25 @@ export default function App(): React.ReactElement {
           </Splitter.Panel>
           <Splitter.Panel>
             <div className="panel-column" style={{ paddingLeft: 8 }}>
+              <Flex justify="space-between" align="center" className="panel-toolbar">
+                <Tooltip title={t(allRulesEnabled ? 'rules.disableAll' : 'rules.enableAll')}>
+                  <Flex align="center" justify="center" style={{ width: 24, height: 24 }}>
+                    <Checkbox
+                      checked={allRulesEnabled}
+                      indeterminate={someRulesEnabled}
+                      disabled={rules.length === 0}
+                      onChange={(e) => handleToggleAll(e.target.checked)}
+                    />
+                  </Flex>
+                </Tooltip>
+                <IconButton
+                  tooltip={t('rules.addButton')}
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleAdd}
+                  style={{ backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
+                />
+              </Flex>
               <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
                 <RulesTable rules={rules} onToggle={handleToggle} onEdit={handleEdit} />
               </div>

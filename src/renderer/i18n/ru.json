@@ -5,6 +5,8 @@
   },
   "rules": {
     "addButton": "добавить правило",
+    "enableAll": "включить все правила",
+    "disableAll": "выключить все правила",
     "refreshButton": "обновить",
     "table": {
       "otherGroup": "остальные",

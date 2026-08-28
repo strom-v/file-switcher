@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react'
-import { ConfigProvider, Empty, Flex, Input, List, Popconfirm, Space, Tooltip, Typography } from 'antd'
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Empty, Flex, Input, Listy, Popconfirm, Space, Tooltip, Typography } from 'antd'
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
@@ -16,10 +16,6 @@ import { tsToDate } from '../formatters'
 import { EVENT_FILTER_ALL, useLogFilters } from '../hooks/useLogFilters'
 import type { ProxyLogEvent } from '../../shared/types'
 
-// вынесено из компонента: список логов рендерится на каждое новое событие трафика,
-// пересоздание объекта темы на каждый такой рендер лишний раз нагружает ConfigProvider
-const LOG_LIST_THEME = { components: { List: { itemPaddingSM: '0 4px' } } }
-
 interface LogPanelProps {
   logs: ProxyLogEvent[]
   onClear: () => void
@@ -33,6 +29,22 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
   const [search, setSearch] = useState('')
   const { eventFilter, setEventFilter, bodyFilter, toggleBodyFilter } = useLogFilters()
+
+  // Listy требует высоту контейнера в пикселях (не проценты) для виртуализации — измеряем
+  // фактическую высоту обёртки через ResizeObserver, а не жёстко фиксируем в CSS, так как
+  // панель растягивается вместе со Splitter/окном
+  const scrollPanelRef = useRef<HTMLDivElement>(null)
+  const [listHeight, setListHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = scrollPanelRef.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      setListHeight(entries[0].contentRect.height)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // фильтруем сначала (обычно отсекает большую часть буфера), разворачиваем уже отфильтрованный
   // результат — дешевле, чем сначала копировать и разворачивать весь буфер (до 10000 записей),
@@ -106,81 +118,75 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           />
         </Popconfirm>
       </Flex>
-      <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
+      <div ref={scrollPanelRef} className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
         {visible.length === 0 ? (
           <Flex justify="center" align="center" style={{ height: '100%' }}>
             <Empty description={t(logs.length === 0 ? 'log.empty' : 'log.noMatches')} />
           </Flex>
         ) : (
-          <ConfigProvider theme={LOG_LIST_THEME}>
-            <List
-              size="small"
-              dataSource={visible}
+          listHeight > 0 && (
+            <Listy<ProxyLogEvent>
+              items={visible}
+              virtual
+              height={listHeight}
               rowKey={(item) => `${item.ts}-${item.url}`}
-              renderItem={(item) => {
+              itemRender={(item) => {
                 const isMatched = item.event === 'matched'
+                // одна строка на запись — Listy вычисляет высоту строки из design-токенов и не
+                // поддерживает произвольную многострочную высоту; для matched URL и путь к файлу
+                // сведены в одну строку через разделитель, а не выведены отдельной строкой под URL
+                const urlText = isMatched ? item.url + ' • ' + item.file : item.url
                 return (
-                  <List.Item className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}>
-                    <Flex vertical gap={0} style={{ width: '100%', minWidth: 0 }}>
-                      <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
-                        <Space size={2} style={{ flexShrink: 0, width: 28 }}>
-                          {item.requestBody ? (
-                            <ArrowUpOutlined style={{ color: COLOR_INFO }} title={t('log.detailRequestBody')} />
-                          ) : null}
-                          {item.responseBody ? (
-                            <ArrowDownOutlined style={{ color: COLOR_SUCCESS }} title={t('log.detailResponseBody')} />
-                          ) : null}
-                        </Space>
-                        <Typography.Text
-                          strong
-                          className="text-sm"
-                          style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
-                        >
-                          {item.method}
-                        </Typography.Text>
-                        <Typography.Text
-                          strong
-                          className="text-sm"
-                          style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
-                        >
-                          {item.statusCode ?? '—'}
-                        </Typography.Text>
-                        <Typography.Text
-                          type="secondary"
-                          className="text-sm"
-                          style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-                        >
-                          {tsToDate(item.ts).toLocaleTimeString()}
-                        </Typography.Text>
-                        <Typography.Text
-                          className="ellipsis-text text-sm"
-                          ellipsis={{ tooltip: item.url }}
-                          style={{ flex: 1, minWidth: 0 }}
-                        >
-                          {item.url}
-                        </Typography.Text>
-                        <Tooltip title={t('log.detailButton')}>
-                          <InfoCircleOutlined
-                            style={{ flexShrink: 0, cursor: 'pointer' }}
-                            onClick={() => setSelected(item)}
-                          />
-                        </Tooltip>
-                      </Flex>
-                      {isMatched && (
-                        <Typography.Text
-                          className="ellipsis-text text-sm"
-                          type="secondary"
-                          ellipsis={{ tooltip: item.file }}
-                        >
-                          {item.file}
-                        </Typography.Text>
-                      )}
+                  <div className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}>
+                    <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
+                      <Space size={2} style={{ flexShrink: 0, width: 28 }}>
+                        {item.requestBody ? (
+                          <ArrowUpOutlined style={{ color: COLOR_INFO }} title={t('log.detailRequestBody')} />
+                        ) : null}
+                        {item.responseBody ? (
+                          <ArrowDownOutlined style={{ color: COLOR_SUCCESS }} title={t('log.detailResponseBody')} />
+                        ) : null}
+                      </Space>
+                      <Typography.Text
+                        strong
+                        className="text-sm"
+                        style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
+                      >
+                        {item.method}
+                      </Typography.Text>
+                      <Typography.Text
+                        strong
+                        className="text-sm"
+                        style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
+                      >
+                        {item.statusCode ?? '—'}
+                      </Typography.Text>
+                      <Typography.Text
+                        type="secondary"
+                        className="text-sm"
+                        style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                      >
+                        {tsToDate(item.ts).toLocaleTimeString()}
+                      </Typography.Text>
+                      <Typography.Text
+                        className="ellipsis-text text-sm"
+                        ellipsis={{ tooltip: urlText }}
+                        style={{ flex: 1, minWidth: 0 }}
+                      >
+                        {urlText}
+                      </Typography.Text>
+                      <Tooltip title={t('log.detailButton')}>
+                        <InfoCircleOutlined
+                          style={{ flexShrink: 0, cursor: 'pointer' }}
+                          onClick={() => setSelected(item)}
+                        />
+                      </Tooltip>
                     </Flex>
-                  </List.Item>
+                  </div>
                 )
               }}
             />
-          </ConfigProvider>
+          )
         )}
       </div>
       <LogDetailModal event={selected} onClose={() => setSelected(null)} />

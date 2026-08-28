@@ -5,6 +5,8 @@
   },
   "rules": {
     "addButton": "add rule",
+    "enableAll": "enable all rules",
+    "disableAll": "disable all rules",
     "refreshButton": "refresh",
     "table": {
       "otherGroup": "other",

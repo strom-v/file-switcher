@@ -108,29 +108,25 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
   margin: 0;
 }
 
-/* компактная строка лога и таблицы правил: единая высота, без собственного фона —
-   фон теперь на подложке .scroll-panel--panel-bg, растянутой на всю высоту колонки */
-.log-item--compact.ant-list-item,
+/* компактная строка таблицы правил: единая высота, без собственного фона —
+   фон теперь на подложке .scroll-panel--panel-bg, растянутой на всю высоту колонки.
+   Лог трафика — Listy, не antd List: у него padding/border-bottom строки уже приходят
+   из design-токенов самого компонента, .log-item--compact там задаёт только фон (см. ниже) */
 .rules-table--compact .ant-table-tbody > tr > td {
   padding: 0 4px;
   background-color: transparent;
 }
 
+/* Listy оборачивает itemRender-контент в .ant-listy-item — мой класс log-item--compact/--matched
+   висит на дочернем div внутри этой обёртки, поэтому красим именно её (:has), а не сам div,
+   чтобы фон растягивался на всю строку, а не только на отрисованный контент */
+.ant-listy-item:has(> .log-item--compact) {
+  background-color: transparent;
+}
+
 /* запись в логе о сработавшей подмене выделяется зелёным фоном среди остального трафика */
-.log-item--matched.ant-list-item {
+.ant-listy-item:has(> .log-item--matched) {
   background-color: rgba(82, 196, 26, 0.15);
-}
-
-/* горизонтальный разделитель между строками лога и таблицы правил (вертикальные линии между
-   колонками правил остаются выключены темой Table.borderColor: transparent) */
-.log-item--compact.ant-list-item:not(:last-child),
-.rules-table--compact .ant-table-tbody > tr:not(:last-child) > td {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-html.dark-scrollbars .log-item--compact.ant-list-item:not(:last-child),
-html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr:not(:last-child) > td {
-  border-bottom-color: rgba(255, 255, 255, 0.12);
 }
 
 /* компактные заголовки коллапса в формах — меньше внутренних отступов, чем в дефолте antd */
