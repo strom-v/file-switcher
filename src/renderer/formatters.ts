@@ -18,17 +18,19 @@ export function formatSize(bytes: number): string {
 }
 
 // тело запроса/ответа логируется без лимита размера (см. AGENTS.md, "Известные ограничения") — но
-// JSON.parse + JSON.stringify(..., null, 2) на многомегабайтном тексте синхронно блокирует UI-поток
-// на заметное время, а результат всё равно нечитаем для человека при такой длине
+// JSON.parse на многомегабайтном тексте синхронно блокирует UI-поток на заметное время, а результат
+// всё равно нечитаем для человека при такой длине (что в плоском виде с отступами, что деревом)
 const FORMAT_JSON_MAX_LENGTH = 2 * 1024 * 1024 // 2 МБ
 
-/** Пытается разобрать текст как JSON и вернуть его в читаемом виде с отступами; если это не JSON
- * или текст длиннее лимита — null (для лимита форматирование просто не делается, а не молча режется) */
-export function tryFormatJson(text: string): string | null {
-  if (text.length > FORMAT_JSON_MAX_LENGTH) return null
+/** Пытается разобрать текст как JSON; ok:false означает "не JSON или текст длиннее лимита"
+ * (для лимита разбор просто не делается, а не молча режется на середине структуры). Отдельное
+ * поле ok, а не просто null при неудаче — валидный JSON-текст "null" тоже парсится в null,
+ * и его нельзя было бы отличить от ошибки парсинга. */
+export function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false } {
+  if (text.length > FORMAT_JSON_MAX_LENGTH) return { ok: false }
   try {
-    return JSON.stringify(JSON.parse(text), null, 2)
+    return { ok: true, value: JSON.parse(text) }
   } catch {
-    return null
+    return { ok: false }
   }
 }

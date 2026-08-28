@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Button, Descriptions, message, Modal, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { formatHeaders, formatSize, tryFormatJson, tsToDate } from '../formatters'
+import JsonTree from './JsonTree'
+import { formatHeaders, formatSize, tryParseJson, tsToDate } from '../formatters'
 import { httpStatusColor } from '../theme'
 import type { ProxyLogEvent, ReplayResult } from '../../shared/types'
 
@@ -17,21 +18,21 @@ interface BodySectionProps {
   size: number
 }
 
-/** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой ручного форматирования под JSON;
- * для бинарных данных (картинка, шрифт и т.п.) — явная пометка вместо нечитаемой каши символов */
+/** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой переключения на сворачиваемое
+ * JSON-дерево (как jsonview в SBIS LOGS) под валидный JSON; для бинарных данных (картинка, шрифт
+ * и т.п.) — явная пометка вместо нечитаемой каши символов */
 function BodySection({ title, body, isBinary, size }: BodySectionProps): React.ReactElement {
   const { t } = useTranslation()
   const [formatted, setFormatted] = useState(false)
 
-  const pretty = !isBinary && formatted ? tryFormatJson(body) : null
-  const displayed = pretty ?? body
-  // кнопка нажата, но текст не изменился — либо это не JSON, либо тело слишком большое для
-  // форматирования (см. FORMAT_JSON_MAX_LENGTH); пользователю нужно явное объяснение, а не молчание
-  const formatDidNothing = formatted && pretty === null
+  const parsed = !isBinary && formatted ? tryParseJson(body) : null
+  // кнопка нажата, но дерево не показывается — либо это не JSON, либо тело слишком большое для
+  // разбора (см. FORMAT_JSON_MAX_LENGTH); пользователю нужно явное объяснение, а не молчание
+  const formatDidNothing = formatted && parsed?.ok === false
 
   return (
     <>
-      <Typography.Text strong copyable={!isBinary && { text: displayed }} className="text-sm">
+      <Typography.Text strong copyable={!isBinary && { text: body }} className="text-sm">
         {title}
       </Typography.Text>{' '}
       {!isBinary && (
@@ -50,8 +51,10 @@ function BodySection({ title, body, isBinary, size }: BodySectionProps): React.R
           <Typography.Text type="secondary" className="text-sm">
             {t('log.bodyIsBinary', { size: formatSize(size) })}
           </Typography.Text>
+        ) : parsed?.ok === true ? (
+          <JsonTree value={parsed.value} />
         ) : (
-          <Typography.Paragraph className="pre-wrap text-sm">{displayed || '—'}</Typography.Paragraph>
+          <Typography.Paragraph className="pre-wrap text-sm">{body || '—'}</Typography.Paragraph>
         )}
       </div>
     </>
