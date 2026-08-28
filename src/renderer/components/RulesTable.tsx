@@ -127,10 +127,13 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
         const rule = row
         return (
           <Flex vertical gap={0} style={{ width: '100%' }}>
+            {/* без width:fit-content Typography.Text (блочный по умолчанию) занял бы всю ширину
+                родителя — hover-зона copy-иконки растягивалась бы на всю строку, а не на текст */}
             <Typography.Text
               className="ellipsis-text text-sm"
               ellipsis={{ tooltip: urlPattern }}
               copyable={!!urlPattern}
+              style={{ width: 'fit-content' }}
             >
               {urlPattern}
             </Typography.Text>
