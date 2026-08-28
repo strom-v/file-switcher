@@ -13,7 +13,9 @@ function readStoredPort(): number {
 }
 
 function readStoredAutoStart(): boolean {
-  return localStorage.getItem(AUTO_START_STORAGE_KEY) === 'true'
+  const stored = localStorage.getItem(AUTO_START_STORAGE_KEY)
+  // по умолчанию (ничего не сохранено — первый запуск) автозапуск включён
+  return stored === null ? true : stored === 'true'
 }
 
 /** Порт прокси и признак автозапуска при старте приложения — оба с персистентностью */

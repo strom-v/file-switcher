@@ -1,7 +1,7 @@
 {
   "app": {
     "settingsButton": "settings",
-    "titleClickHint": "click the title to start or stop the proxy. title color shows status: green — stopped, yellow — starting, red — running. with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app"
+    "vpnWarning": "with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app"
   },
   "rules": {
     "addButton": "add rule",
