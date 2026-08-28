@@ -15,7 +15,8 @@
       "hasAdvancedHint": "rule changes headers, delay, or response status",
       "edit": "edit",
       "delete": "delete",
-      "deleteConfirm": "delete this rule?"
+      "deleteConfirm": "delete this rule?",
+      "duplicate": "duplicate"
     },
     "form": {
       "save": "save",

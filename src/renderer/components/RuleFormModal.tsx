@@ -1,15 +1,17 @@
 import React, { useEffect } from 'react'
 import { Button, Flex, Form, Input, Modal, Popconfirm } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { COLOR_DANGER } from '../theme'
+import { COLOR_DANGER, COLOR_INFO, COLOR_SUCCESS, COLOR_WARNING } from '../theme'
 import type { Rule } from '../../shared/types'
 
 interface RuleFormModalProps {
   open: boolean
-  initialValue: Rule | null
+  // без id — черновик для создания (в т.ч. дубликат существующего правила без сохранённого id)
+  initialValue: Rule | Omit<Rule, 'id'> | null
   onCancel: () => void
   onSubmit: (rule: Omit<Rule, 'id'> & { id?: string }) => void
   onDelete: (rule: Rule) => void
+  onDuplicate: (rule: Rule) => void
 }
 
 interface FormValues {
@@ -25,7 +27,8 @@ export default function RuleFormModal({
   initialValue,
   onCancel,
   onSubmit,
-  onDelete
+  onDelete,
+  onDuplicate
 }: RuleFormModalProps): React.ReactElement {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
@@ -43,10 +46,17 @@ export default function RuleFormModal({
     // сработать только при открытии/смене редактируемого правила, не на каждое изменение поля
   }, [open, initialValue, form])
 
+  // существующее правило (редактирование) имеет id; черновик создания — и новый, и дубликат
+  // существующего правила без сохранённого id — его не имеет
+  const existingRule = initialValue && 'id' in initialValue ? initialValue : null
+
+  // блокировка "нечего сохранять" осмысленна только при редактировании существующего правила —
+  // черновик создания (в т.ч. дубликат) можно сохранить сразу, даже если поля ещё не тронуты
   const isUnchanged =
-    !currentValues ||
-    (currentValues.urlPattern === initialFormValues.urlPattern &&
-      currentValues.localFilePath === initialFormValues.localFilePath)
+    !!existingRule &&
+    (!currentValues ||
+      (currentValues.urlPattern === initialFormValues.urlPattern &&
+        currentValues.localFilePath === initialFormValues.localFilePath))
   const isUrlPatternEmpty = !currentValues?.urlPattern?.trim()
 
   const handleOk = async (): Promise<void> => {
@@ -54,12 +64,16 @@ export default function RuleFormModal({
     onSubmit({
       ...(initialValue ?? { enabled: true, isRegex: true }),
       ...values,
-      id: initialValue?.id
+      id: existingRule?.id
     })
   }
 
   const handleDelete = (): void => {
-    if (initialValue) onDelete(initialValue)
+    if (existingRule) onDelete(existingRule)
+  }
+
+  const handleDuplicate = (): void => {
+    if (existingRule) onDuplicate(existingRule)
   }
 
   return (
@@ -71,16 +85,29 @@ export default function RuleFormModal({
       centered
       footer={
         <Flex justify="space-between">
-          {initialValue ? (
-            <Popconfirm title={t('rules.table.deleteConfirm')} onConfirm={handleDelete}>
-              <Button danger>{t('rules.table.delete')}</Button>
-            </Popconfirm>
+          {existingRule ? (
+            <Flex gap={8}>
+              <Popconfirm title={t('rules.table.deleteConfirm')} onConfirm={handleDelete}>
+                <Button danger>{t('rules.table.delete')}</Button>
+              </Popconfirm>
+              <Button onClick={handleDuplicate} style={{ color: COLOR_INFO, borderColor: COLOR_INFO }}>
+                {t('rules.table.duplicate')}
+              </Button>
+            </Flex>
           ) : (
             <span />
           )}
           <Flex gap={8}>
-            <Button onClick={onCancel}>{t('rules.form.cancel')}</Button>
-            <Button type="primary" onClick={handleOk} disabled={isUnchanged || isUrlPatternEmpty}>
+            <Button onClick={onCancel} style={{ color: COLOR_WARNING, borderColor: COLOR_WARNING }}>
+              {t('rules.form.cancel')}
+            </Button>
+            <Button
+              onClick={handleOk}
+              disabled={isUnchanged || isUrlPatternEmpty}
+              style={
+                isUnchanged || isUrlPatternEmpty ? undefined : { color: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }
+              }
+            >
               {t('rules.form.save')}
             </Button>
           </Flex>

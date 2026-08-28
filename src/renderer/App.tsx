@@ -61,7 +61,9 @@ export default function App(): React.ReactElement {
   const { fontSize, setFontSize } = useFontSize()
   const [rules, setRules] = useState<Rule[]>([])
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingRule, setEditingRule] = useState<Rule | null>(null)
+  // при дублировании (handleDuplicate) editingRule — копия без id, чтобы форма/handleSubmit
+  // расценили сохранение как создание нового правила, а не редактирование исходного
+  const [editingRule, setEditingRule] = useState<Rule | Omit<Rule, 'id'> | null>(null)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { splitterSize, setSplitterSize } = useSplitterSize()
@@ -127,6 +129,14 @@ export default function App(): React.ReactElement {
 
   const handleAdd = (): void => {
     setEditingRule(null)
+    setModalOpen(true)
+  }
+
+  // копия без id — RuleFormModal/handleSubmit увидят черновик создания, а не редактирование
+  // исходного правила; пользователь может тут же поправить URL/путь и сохранить как новое
+  const handleDuplicate = (rule: Rule): void => {
+    const { id: _id, ...copy } = rule
+    setEditingRule(copy)
     setModalOpen(true)
   }
 
@@ -280,6 +290,7 @@ export default function App(): React.ReactElement {
           onCancel={() => setModalOpen(false)}
           onSubmit={handleSubmit}
           onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
         />
         <OnboardingModal open={onboardingOpen} onClose={handleOnboardingClose} />
         <Drawer open={settingsOpen} onClose={() => setSettingsOpen(false)} size={460} closeIcon={false} destroyOnHidden>
