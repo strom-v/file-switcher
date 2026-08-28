@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react'
-import { Checkbox, ConfigProvider, Flex, Table, Tag, Tooltip, Typography } from 'antd'
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Button, Checkbox, ConfigProvider, Flex, message, Table, Tag, Tooltip, Typography } from 'antd'
+import { CopyOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 import type { Rule } from '../../shared/types'
@@ -15,6 +16,61 @@ const RULES_TABLE_THEME = {
       cellPaddingInlineSM: 4
     }
   }
+}
+
+interface CopyableEllipsisTextProps {
+  text: string
+  type?: 'secondary'
+}
+
+/** Однострочный ellipsis-текст со своей copy-кнопкой вместо встроенного antd copyable. Ellipsis
+ * у Typography.Text использует CSS line-clamp (-webkit-box), который требует, чтобы сам элемент
+ * был растянут на всю доступную ширину колонки — иначе обрезание длинных строк не работает.
+ * Значит :hover-зона (на всю ширину растянутого текста) неизбежно шире короткого видимого текста,
+ * но саму кнопку нужно визуально ставить сразу после него — измеряем реальную ширину отрисованного
+ * (уже обрезанного) текста через getBoundingClientRect и позиционируем кнопку туда через left. */
+function CopyableEllipsisText({ text, type }: CopyableEllipsisTextProps): React.ReactElement {
+  const { t } = useTranslation()
+  const textRef = useRef<HTMLSpanElement>(null)
+  const [btnLeft, setBtnLeft] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = textRef.current
+    if (!el) return
+    const measure = (): void => setBtnLeft(el.getBoundingClientRect().width)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [text])
+
+  // stopPropagation — иначе клик по кнопке всплыл бы до onRow строки и заодно открыл модалку
+  // редактирования вместе с копированием (строка в RulesTable целиком кликабельна)
+  const handleCopy = async (e: React.MouseEvent): Promise<void> => {
+    e.stopPropagation()
+    try {
+      await navigator.clipboard.writeText(text)
+      message.success(t('rules.table.copied'))
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  return (
+    <span className="copyable-text-wrapper">
+      <Typography.Text ref={textRef} className="ellipsis-text text-sm" type={type} ellipsis={{ tooltip: text }}>
+        {text}
+      </Typography.Text>
+      <Button
+        className="copyable-text-btn"
+        size="small"
+        type="link"
+        icon={<CopyOutlined />}
+        onClick={handleCopy}
+        style={{ left: btnLeft }}
+      />
+    </span>
+  )
 }
 
 /** Есть ли у правила модификации, кроме подмены тела (заголовки/задержка/статус) */
@@ -127,30 +183,10 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
         const rule = row
         return (
           <Flex vertical gap={0} style={{ width: '100%' }}>
-            {/* без width:fit-content Typography.Text (блочный по умолчанию) занял бы всю ширину
-                родителя — hover-зона copy-иконки растягивалась бы на всю строку, а не на текст */}
-            <Typography.Text
-              className="ellipsis-text text-sm"
-              ellipsis={{ tooltip: urlPattern }}
-              copyable={!!urlPattern}
-              style={{ width: 'fit-content' }}
-            >
-              {urlPattern}
-            </Typography.Text>
+            {urlPattern ? <CopyableEllipsisText text={urlPattern} /> : null}
             <Flex gap={4} align="center" style={{ width: '100%' }}>
               {rule.localFilePath ? (
-                // без flex:1 — иначе hover-зона copy-иконки растягивалась бы на всю оставшуюся
-                // ширину строки, а не только на реальный текст (см. .ellipsis-text: max-width: 100%
-                // всё ещё ограничивает текст шириной родителя, если он окажется длиннее)
-                <Typography.Text
-                  className="ellipsis-text text-sm"
-                  type="secondary"
-                  ellipsis={{ tooltip: rule.localFilePath }}
-                  copyable
-                  style={{ minWidth: 0 }}
-                >
-                  {rule.localFilePath}
-                </Typography.Text>
+                <CopyableEllipsisText text={rule.localFilePath} type="secondary" />
               ) : (
                 <Typography.Text type="secondary" className="text-sm">
                   {t('rules.table.noFile')}

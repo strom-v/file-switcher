@@ -25,17 +25,6 @@ body {
   cursor: inherit;
 }
 
-/* иконка копирования (Typography.Text copyable) видна только при наведении на сам текст, а не на
-   всю кликабельную строку правила, целиком реагирующую на hover; по умолчанию antd показывает
-   её всегда — здесь скрываем и включаем через :hover именно на .ant-typography-элементе */
-.rules-table--compact .ant-typography-copy {
-  visibility: hidden;
-}
-
-.rules-table--compact .ant-typography:hover .ant-typography-copy {
-  visibility: visible;
-}
-
 /* иконка-подсказка (обычно под Tooltip) — курсор default, а не унаследованный pointer/text */
 .hint-icon {
   cursor: default;
@@ -44,6 +33,36 @@ body {
 /* текст с ellipsis-подсказкой: не растягивает контейнер (курсор задаёт правило выше) */
 .ellipsis-text {
   max-width: 100%;
+}
+
+/* CopyableEllipsisText (RulesTable): своя copy-кнопка вместо antd copyable. Текст растянут на всю
+   ширину колонки (flex:1) — иначе сломался бы CSS line-clamp ellipsis, которому для обрезания
+   длинных строк нужна собственная растянутая ширина; поэтому :hover-зона (сам wrapper) шире
+   короткого видимого текста. Кнопка при этом стоит не в конце растянутого текста, а сразу после
+   его реальных отрисованных символов — position:absolute, left выставляется через JS-измерение
+   (getBoundingClientRect) в RulesTable.tsx, а не CSS */
+.copyable-text-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.copyable-text-wrapper .ant-typography {
+  flex: 1;
+  min-width: 0;
+}
+
+.copyable-text-btn.ant-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  visibility: hidden;
+}
+
+.copyable-text-wrapper:hover .copyable-text-btn.ant-btn {
+  visibility: visible;
 }
 
 /* панель с прокручиваемым содержимым, занимающая всё доступное пространство колонки */
@@ -201,16 +220,6 @@ html.dark-scrollbars .ant-listy-item:has(> .log-item--compact):hover {
 /* компактный текст списков лога/правил и деталей запроса — масштабируется вместе с настройкой размера шрифта */
 .text-sm {
   font-size: var(--app-font-size-sm, 12px);
-}
-
-/* иконка копирования в таблице правил видна только при наведении на сам текст (URL или путь к файлу),
-   а не на всю строку — иначе наведение на URL показывало copy и у пути к файлу под ним */
-.rules-table--compact .ant-table-tbody .ant-typography-copy {
-  visibility: hidden;
-}
-
-.rules-table--compact .ant-table-tbody .ant-typography:hover .ant-typography-copy {
-  visibility: visible;
 }
 
 html.dark-scrollbars,
