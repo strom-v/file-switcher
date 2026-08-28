@@ -45,6 +45,11 @@ const api = {
   system: {
     sudoersInstalled: (): Promise<boolean> => ipcRenderer.invoke('system:sudoersInstalled'),
     installSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:installSudoersRule')
+  },
+  app: {
+    // останавливает прокси/откатывает системный прокси (через 'before-quit' в main.ts) и
+    // перезапускает приложение целиком — не просто перезагружает окно
+    relaunch: (): Promise<void> => ipcRenderer.invoke('app:relaunch')
   }
 }
 

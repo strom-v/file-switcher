@@ -1,7 +1,9 @@
 {
   "app": {
     "settingsButton": "settings",
-    "vpnWarning": "with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app"
+    "vpnWarning": "with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app",
+    "relaunchButton": "restart the app",
+    "relaunchConfirm": "restart the app? the proxy will be stopped and started again"
   },
   "rules": {
     "addButton": "add rule",

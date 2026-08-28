@@ -5,6 +5,7 @@ import {
   Drawer,
   Flex,
   Layout,
+  Popconfirm,
   Space,
   Splitter,
   theme as antdTheme,
@@ -12,7 +13,7 @@ import {
   Typography,
   message
 } from 'antd'
-import { PlayCircleOutlined, PlusOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons'
+import { PlayCircleOutlined, PlusOutlined, ReloadOutlined, SettingOutlined, StopOutlined } from '@ant-design/icons'
 import ruRU from 'antd/locale/ru_RU'
 import enUS from 'antd/locale/en_US'
 import { useTranslation } from 'react-i18next'
@@ -165,6 +166,10 @@ export default function App(): React.ReactElement {
     await window.api.proxy.stop()
   }
 
+  const handleRelaunch = (): void => {
+    window.api.app.relaunch()
+  }
+
   // сбрасывает язык/тему/шрифт/порт/автостарт/лимит лога к дефолту и перезагружает окно,
   // чтобы все хуки с персистентностью заново прочитали чистое состояние из localStorage
   const handleResetSettings = (): void => {
@@ -231,6 +236,9 @@ export default function App(): React.ReactElement {
               icon={<SettingOutlined />}
               onClick={() => setSettingsOpen(true)}
             />
+            <Popconfirm title={t('app.relaunchConfirm')} onConfirm={handleRelaunch}>
+              <IconButton tooltip={t('app.relaunchButton')} icon={<ReloadOutlined />} />
+            </Popconfirm>
             <IconButton
               tooltip={status.error ?? t('app.vpnWarning')}
               icon={status.status === 'running' ? <StopOutlined /> : <PlayCircleOutlined />}
@@ -266,10 +274,9 @@ export default function App(): React.ReactElement {
                 </Tooltip>
                 <IconButton
                   tooltip={t('rules.addButton')}
-                  type="primary"
                   icon={<PlusOutlined />}
                   onClick={handleAdd}
-                  style={{ backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
+                  style={{ color: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
                 />
               </Flex>
               <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">

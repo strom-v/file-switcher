@@ -1,5 +1,5 @@
 import { readFile, writeFile } from 'fs/promises'
-import { dialog, ipcMain, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, BrowserWindow } from 'electron'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
@@ -47,6 +47,14 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('proxy:replayRequest', (_event, logEvent: ProxyLogEvent) => replayRequest(logEvent))
+
+  // app.relaunch() только планирует перезапуск при следующем выходе — сам app.quit() ниже
+  // проходит через уже существующий 'before-quit' хендлер в main.ts, который останавливает
+  // прокси и откатывает системный прокси-настройки перед реальным завершением процесса
+  ipcMain.handle('app:relaunch', () => {
+    app.relaunch()
+    app.quit()
+  })
 
   ipcMain.handle('dialog:openTextFile', async (_event, extensions?: string[]) => {
     const result = await dialog.showOpenDialog({
