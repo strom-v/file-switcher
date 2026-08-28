@@ -49,6 +49,12 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ReplayResult>
       headers: Object.fromEntries(response.headers.entries()),
       body
     }
+  } catch (err) {
+    // Node fetch (undici) всегда бросает generic "fetch failed" — настоящая причина
+    // (DNS/TLS/ECONNREFUSED и т.п.) лежит в err.cause и без неё сообщение бесполезно для пользователя
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : null
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(cause ? `${message}: ${cause}` : message)
   } finally {
     clearTimeout(timeout)
   }

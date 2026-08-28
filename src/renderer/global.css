@@ -25,6 +25,17 @@ body {
   cursor: inherit;
 }
 
+/* иконка копирования (Typography.Text copyable) видна только при наведении на сам текст, а не на
+   всю кликабельную строку правила, целиком реагирующую на hover; по умолчанию antd показывает
+   её всегда — здесь скрываем и включаем через :hover именно на .ant-typography-элементе */
+.rules-table--compact .ant-typography-copy {
+  visibility: hidden;
+}
+
+.rules-table--compact .ant-typography:hover .ant-typography-copy {
+  visibility: visible;
+}
+
 /* иконка-подсказка (обычно под Tooltip) — курсор default, а не унаследованный pointer/text */
 .hint-icon {
   cursor: default;
