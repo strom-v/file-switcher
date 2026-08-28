@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Descriptions, message, Modal, Typography } from 'antd'
+import { Button, Collapse, Descriptions, message, Modal, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
 import JsonTree from './JsonTree'
 import { formatHeaders, formatSize, tryParseJson, tsToDate } from '../formatters'
@@ -20,7 +20,8 @@ interface BodySectionProps {
 
 /** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой переключения на сворачиваемое
  * JSON-дерево (как jsonview в SBIS LOGS) под валидный JSON; для бинарных данных (картинка, шрифт
- * и т.п.) — явная пометка вместо нечитаемой каши символов */
+ * и т.п.) — явная пометка вместо нечитаемой каши символов. Не рендерится вовсе для пустого тела —
+ * см. вызывающий код (LogDetailModal). */
 function BodySection({ title, body, isBinary, size }: BodySectionProps): React.ReactElement {
   const { t } = useTranslation()
   const [formatted, setFormatted] = useState(false)
@@ -46,7 +47,7 @@ function BodySection({ title, body, isBinary, size }: BodySectionProps): React.R
           {t('log.formatNotApplicable')}
         </Typography.Text>
       )}
-      <div className="headers-panel">
+      <div className="headers-panel headers-panel--tall">
         {isBinary ? (
           <Typography.Text type="secondary" className="text-sm">
             {t('log.bodyIsBinary', { size: formatSize(size) })}
@@ -91,6 +92,16 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
     <Modal
       open={event !== null}
       onCancel={onClose}
+      // бинарное тело запроса в логе уже необратимо испорчено errors="replace" при декодировании
+      // (см. addon.py) — повторная отправка такого тела передаст мусор вместо оригинальных байт,
+      // поэтому кнопка скрыта в заголовке, а не просто предупреждает
+      title={
+        event && !event.requestBodyIsBinary ? (
+          <Button size="small" onClick={handleReplay} loading={replaying}>
+            {t('log.replayButton')}
+          </Button>
+        ) : null
+      }
       footer={null}
       width={640}
       closeIcon={false}
@@ -118,56 +129,69 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             )}
           </Descriptions>
 
-          <Typography.Text strong copyable={{ text: formatHeaders(event.requestHeaders) }} className="text-sm">
-            {t('log.detailRequestHeaders')}
-          </Typography.Text>
-          <div className="headers-panel">
-            <Typography.Paragraph className="pre-wrap text-sm">
-              {formatHeaders(event.requestHeaders)}
-            </Typography.Paragraph>
-          </div>
-
-          <Typography.Text strong copyable={{ text: formatHeaders(event.responseHeaders) }} className="text-sm">
-            {t('log.detailResponseHeaders')}
-          </Typography.Text>
-          <div className="headers-panel">
-            <Typography.Paragraph className="pre-wrap text-sm">
-              {formatHeaders(event.responseHeaders)}
-            </Typography.Paragraph>
-          </div>
-
-          <BodySection
-            title={t('log.detailRequestBody')}
-            body={event.requestBody}
-            isBinary={event.requestBodyIsBinary}
-            size={event.requestBodySize}
-          />
-          <BodySection
-            title={t('log.detailResponseBody')}
-            body={event.responseBody}
-            isBinary={event.responseBodyIsBinary}
-            size={event.responseSize}
-          />
-
-          {/* бинарное тело запроса в логе уже необратимо испорчено errors="replace" при декодировании
-              (см. addon.py) — повторная отправка такого тела передаст мусор вместо оригинальных байт,
-              поэтому кнопка скрыта, а не просто предупреждает */}
-          {!event.requestBodyIsBinary && (
-            <div style={{ marginTop: 8 }}>
-              <Button size="small" onClick={handleReplay} loading={replaying}>
-                {t('log.replayButton')}
-              </Button>
-              {replayResult && (
-                <div className="headers-panel" style={{ marginTop: 8 }}>
-                  <Typography.Text strong style={{ color: httpStatusColor(replayResult.statusCode) }}>
-                    {replayResult.statusCode}
-                  </Typography.Text>
-                  <Typography.Paragraph className="pre-wrap text-sm" style={{ marginTop: 4 }}>
-                    {replayResult.body || '—'}
+          {/* заголовки свёрнуты по умолчанию — обычно интересны реже тела, а места занимают много;
+              defaultActiveKey не задан, значит обе панели стартуют закрытыми, пользователь
+              разворачивает нужную вручную */}
+          <Collapse
+            size="small"
+            style={{ marginBottom: 8 }}
+            items={[
+              {
+                key: 'requestHeaders',
+                label: t('log.detailRequestHeaders'),
+                children: (
+                  <Typography.Paragraph
+                    className="pre-wrap text-sm"
+                    copyable={{ text: formatHeaders(event.requestHeaders) }}
+                    style={{ marginBottom: 0 }}
+                  >
+                    {formatHeaders(event.requestHeaders)}
                   </Typography.Paragraph>
-                </div>
-              )}
-            </div>
+                )
+              },
+              {
+                key: 'responseHeaders',
+                label: t('log.detailResponseHeaders'),
+                children: (
+                  <Typography.Paragraph
+                    className="pre-wrap text-sm"
+                    copyable={{ text: formatHeaders(event.responseHeaders) }}
+                    style={{ marginBottom: 0 }}
+                  >
+                    {formatHeaders(event.responseHeaders)}
+                  </Typography.Paragraph>
+                )
+              }
+            ]}
+          />
+
+          {/* пустое тело нечего показывать — секция не рендерится вовсе, а не показывает "—" */}
+          {event.requestBody && (
+            <BodySection
+              title={t('log.detailRequestBody')}
+              body={event.requestBody}
+              isBinary={event.requestBodyIsBinary}
+              size={event.requestBodySize}
+            />
+          )}
+          {event.responseBody && (
+            <BodySection
+              title={t('log.detailResponseBody')}
+              body={event.responseBody}
+              isBinary={event.responseBodyIsBinary}
+              size={event.responseSize}
+            />
+          )}
+
+          {replayResult && (
+            <>
+              <Typography.Text strong className="text-sm" style={{ color: httpStatusColor(replayResult.statusCode) }}>
+                {t('log.replayResultLabel')} {replayResult.statusCode}
+              </Typography.Text>
+              <div className="headers-panel">
+                <Typography.Paragraph className="pre-wrap text-sm">{replayResult.body || '—'}</Typography.Paragraph>
+              </div>
+            </>
           )}
         </>
       )}

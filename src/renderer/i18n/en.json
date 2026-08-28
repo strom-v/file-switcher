@@ -38,12 +38,12 @@
   "log": {
     "clear": "clear",
     "clearConfirm": "clear the entire log?",
-    "detailButton": "open details",
     "exportButton": "export",
     "exportSuccess": "log saved: {{path}}",
     "empty": "no requests yet",
     "noMatches": "no matches for this filter",
     "searchPlaceholder": "search",
+    "searchInBody": "also search in request and response body",
     "totalCount": "total: {{count}}",
     "matchedCount": "matched: {{count}}",
     "filterAll": "show all requests, including ones without a substitution",
@@ -62,6 +62,7 @@
     "detailResponseBody": "response body",
     "formatButton": "format",
     "replayButton": "replay request",
+    "replayResultLabel": "replay status:",
     "formatRawButton": "raw view",
     "formatNotApplicable": "(couldn't format: not JSON, or the body is too large)",
     "bodyIsBinary": "binary file, {{size}}"

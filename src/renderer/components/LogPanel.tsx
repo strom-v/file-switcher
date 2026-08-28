@@ -5,7 +5,7 @@ import {
   ArrowUpOutlined,
   ClearOutlined,
   ColumnHeightOutlined,
-  InfoCircleOutlined,
+  FileSearchOutlined,
   UnorderedListOutlined
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
@@ -21,14 +21,16 @@ interface LogPanelProps {
   onClear: () => void
 }
 
-/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском (по URL, файлу подмены
- * и телу запроса/ответа), фильтром по событию, фильтром по наличию тела запроса/ответа и счётчиками
- * всего/подмена. Сколько записей на категорию ("подмена" / "без подмены") хранится в памяти —
- * настраивается в панели настроек (см. useLogStorageLimit, useProxyState). */
+/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL/файлу подмены
+ * (опционально и по телу запроса/ответа — переключатель в тулбаре), фильтром по событию, фильтром
+ * по наличию тела запроса/ответа и счётчиками всего/подмена. Клик по всей строке открывает детали
+ * запроса. Сколько записей на категорию хранится в памяти — настраивается в панели настроек
+ * (см. useLogStorageLimit, useProxyState). */
 export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
   const [search, setSearch] = useState('')
+  const [searchInBody, setSearchInBody] = useState(false)
   const { eventFilter, setEventFilter, bodyFilter, toggleBodyFilter } = useLogFilters()
 
   // Listy требует высоту контейнера в пикселях (не проценты) для виртуализации — измеряем
@@ -61,13 +63,14 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           const matchesUrl = item.url.toLowerCase().includes(query)
           const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
           const matchesBody =
-            item.requestBody.toLowerCase().includes(query) || item.responseBody.toLowerCase().includes(query)
+            searchInBody &&
+            (item.requestBody.toLowerCase().includes(query) || item.responseBody.toLowerCase().includes(query))
           if (!matchesUrl && !matchesFile && !matchesBody) return false
         }
         return true
       })
       .reverse()
-  }, [logs, search, eventFilter, bodyFilter])
+  }, [logs, search, searchInBody, eventFilter, bodyFilter])
 
   // счётчик по полному буферу (не по visible) — показывает общую картину трафика независимо
   // от того, что сейчас отфильтровано в списке, как счётчик "matched" в SBIS LOGS
@@ -83,6 +86,13 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{ flex: 1, minWidth: 0 }}
+        />
+        <IconButton
+          tooltip={t('log.searchInBody')}
+          type={searchInBody ? 'primary' : 'default'}
+          icon={<FileSearchOutlined />}
+          onClick={() => setSearchInBody((prev) => !prev)}
+          style={{ flexShrink: 0 }}
         />
         <Space.Compact size="small">
           <IconButton
@@ -158,7 +168,11 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                 // сведены в одну строку через разделитель, а не выведены отдельной строкой под URL
                 const urlText = isMatched ? item.url + ' • ' + item.file : item.url
                 return (
-                  <div className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}>
+                  <div
+                    className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setSelected(item)}
+                  >
                     <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
                       <Space size={2} style={{ flexShrink: 0, width: 28 }}>
                         {item.requestBody ? (
@@ -196,12 +210,6 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                       >
                         {urlText}
                       </Typography.Text>
-                      <Tooltip title={t('log.detailButton')}>
-                        <InfoCircleOutlined
-                          style={{ flexShrink: 0, cursor: 'pointer' }}
-                          onClick={() => setSelected(item)}
-                        />
-                      </Tooltip>
                     </Flex>
                   </div>
                 )

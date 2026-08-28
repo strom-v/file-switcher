@@ -57,6 +57,11 @@ html.dark-scrollbars .scroll-panel--panel-bg {
   border-radius: 4px;
 }
 
+/* блок тела запроса/ответа — крупнее заголовков, там обычно больше данных на просмотр */
+.headers-panel--tall {
+  height: 220px;
+}
+
 html.dark-scrollbars .headers-panel {
   border-color: rgba(255, 255, 255, 0.15);
 }
@@ -127,6 +132,21 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
 /* запись в логе о сработавшей подмене выделяется зелёным фоном среди остального трафика */
 .ant-listy-item:has(> .log-item--matched) {
   background-color: rgba(82, 196, 26, 0.15);
+}
+
+/* строка лога целиком кликабельна (открывает детали запроса) — лёгкая подсветка при наведении
+   как визуальный сигнал; matched-строка уже подсвечена, поэтому оверлей поверх её зелёного фона
+   бледнее (:not(:has(.log-item--matched))), чтобы не перекрашивать значимый зелёный цвет */
+.ant-listy-item:has(> .log-item--compact):hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.ant-listy-item:has(> .log-item--matched):hover {
+  background-color: rgba(82, 196, 26, 0.22);
+}
+
+html.dark-scrollbars .ant-listy-item:has(> .log-item--compact):hover {
+  background-color: rgba(255, 255, 255, 0.06);
 }
 
 /* компактные заголовки коллапса в формах — меньше внутренних отступов, чем в дефолте antd */

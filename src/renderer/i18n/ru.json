@@ -38,12 +38,12 @@
   "log": {
     "clear": "очистить",
     "clearConfirm": "очистить весь лог?",
-    "detailButton": "открыть детали",
     "exportButton": "экспорт",
     "exportSuccess": "лог сохранён: {{path}}",
     "empty": "пока нет запросов",
     "noMatches": "ничего не найдено по фильтру",
     "searchPlaceholder": "поиск",
+    "searchInBody": "искать также в теле запроса и ответа",
     "totalCount": "всего: {{count}}",
     "matchedCount": "подмена: {{count}}",
     "filterAll": "показать все запросы, включая те, где подмена не сработала",
@@ -62,6 +62,7 @@
     "detailResponseBody": "тело ответа",
     "formatButton": "форматировать",
     "replayButton": "повторить запрос",
+    "replayResultLabel": "статус повтора:",
     "formatRawButton": "исходный вид",
     "formatNotApplicable": "(не удалось: это не JSON или тело слишком большое)",
     "bodyIsBinary": "бинарный файл, {{size}}"
