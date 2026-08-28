@@ -137,6 +137,15 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
 
+/* без этого мой div занимает только высоту своего контента (paddings/height строки идут от
+   design-токенов Listy на родительской .ant-listy-item), и клик по строке вне текста — в пустых
+   промежутках сверху/снизу — не попадал бы на onClick, повешенный на этот div */
+.log-item--compact {
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
 /* запись в логе о сработавшей подмене выделяется зелёным фоном среди остального трафика */
 .ant-listy-item:has(> .log-item--matched) {
   background-color: rgba(82, 196, 26, 0.15);

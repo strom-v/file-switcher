@@ -108,7 +108,7 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
     {
       title: '',
       dataIndex: 'urlPattern',
-      onCell: (row) => (isGroupRow(row) ? { colSpan: 3 } : {}),
+      onCell: (row) => (isGroupRow(row) ? { colSpan: 2 } : {}),
       render: (urlPattern: string, row) => {
         if (isGroupRow(row)) {
           return (
