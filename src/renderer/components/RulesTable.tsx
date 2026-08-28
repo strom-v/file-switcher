@@ -136,12 +136,15 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
             </Typography.Text>
             <Flex gap={4} align="center" style={{ width: '100%' }}>
               {rule.localFilePath ? (
+                // без flex:1 — иначе hover-зона copy-иконки растягивалась бы на всю оставшуюся
+                // ширину строки, а не только на реальный текст (см. .ellipsis-text: max-width: 100%
+                // всё ещё ограничивает текст шириной родителя, если он окажется длиннее)
                 <Typography.Text
                   className="ellipsis-text text-sm"
                   type="secondary"
                   ellipsis={{ tooltip: rule.localFilePath }}
                   copyable
-                  style={{ flex: 1, minWidth: 0 }}
+                  style={{ minWidth: 0 }}
                 >
                   {rule.localFilePath}
                 </Typography.Text>
