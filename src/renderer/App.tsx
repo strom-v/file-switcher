@@ -236,9 +236,13 @@ export default function App(): React.ReactElement {
               icon={<SettingOutlined />}
               onClick={() => setSettingsOpen(true)}
             />
-            <Popconfirm title={t('app.relaunchConfirm')} onConfirm={handleRelaunch}>
-              <IconButton tooltip={t('app.relaunchButton')} icon={<ReloadOutlined />} />
-            </Popconfirm>
+            {/* в dev-режиме electron-vite сам следит за пересборкой/HMR — app.relaunch()
+                там не нужен и вдобавок неверно перезапустит dev-инстанс без watch-режима */}
+            {!import.meta.env.DEV && (
+              <Popconfirm title={t('app.relaunchConfirm')} onConfirm={handleRelaunch}>
+                <IconButton tooltip={t('app.relaunchButton')} icon={<ReloadOutlined />} />
+              </Popconfirm>
+            )}
             <IconButton
               tooltip={status.error ?? t('app.vpnWarning')}
               icon={status.status === 'running' ? <StopOutlined /> : <PlayCircleOutlined />}
