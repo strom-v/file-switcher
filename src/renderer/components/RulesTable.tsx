@@ -167,7 +167,11 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
         size="small"
         showHeader={false}
         className="rules-table--compact"
-        onRow={(row) => (isGroupRow(row) ? {} : { onClick: () => onEdit(row), style: { cursor: 'pointer' } })}
+        onRow={(row) =>
+          isGroupRow(row)
+            ? { className: 'rules-table-row--group' }
+            : { onClick: () => onEdit(row), style: { cursor: 'pointer' } }
+        }
       />
     </ConfigProvider>
   )

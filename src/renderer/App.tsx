@@ -193,7 +193,13 @@ export default function App(): React.ReactElement {
     () => ({
       algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
       token: { padding: 6, paddingLG: 10, marginLG: 10, borderRadius: 4, fontSize },
-      components: { Modal: { contentPadding: 12 } }
+      components: {
+        Modal: { contentPadding: 12 },
+        // itemHeight у Listy = fontHeight + itemPaddingBlock*2 (см. antd/es/listy/index.js) — при
+        // дефолтном fontSize (13, fontHeight≈20) даёт ровно 36px строки лога, синхронизировано
+        // с высотой строки правил (RulesTable, см. global.css: .rules-table--compact tr min-height)
+        Listy: { itemPaddingBlock: 8 }
+      }
     }),
     [isDark, fontSize]
   )

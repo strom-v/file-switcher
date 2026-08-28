@@ -130,6 +130,30 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
 
+/* строка правила (2 строки text-sm текста — urlPattern сверху, localFilePath снизу) должна быть
+   36px высотой — той же, что строка лога в LogPanel (см. App.tsx: theme.components.Listy).
+   line-height задан явно (не наследуется из antd токена), чтобы высота была предсказуемой:
+   2 × 16px строки + 2 × 2px вертикальный зазор = 36px. Строки-заголовки групп (className
+   rules-table-row--group, см. RulesTable.tsx onRow) в это правило не входят — у них своя
+   вёрстка (marginTop), не привязанная к высоте обычной строки правила */
+.rules-table--compact .ant-table-tbody > tr:not(.rules-table-row--group) {
+  height: 36px;
+}
+
+/* горизонтальный разделитель между строками правил — на td, не на tr, потому что antd Table
+   рендерит tr без border-collapse, и border-bottom на самой строке не отображается в браузере */
+.rules-table--compact .ant-table-tbody > tr:not(.rules-table-row--group) > td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr:not(.rules-table-row--group) > td {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.rules-table--compact .ant-table-tbody .text-sm {
+  line-height: 16px;
+}
+
 /* Listy оборачивает itemRender-контент в .ant-listy-item — мой класс log-item--compact/--matched
    висит на дочернем div внутри этой обёртки, поэтому красим именно её (:has), а не сам div,
    чтобы фон растягивался на всю строку, а не только на отрисованный контент */
@@ -141,13 +165,14 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
    а не передаёт его моему itemRender-контенту — клик по этому паддингу (края строки сверху/снизу/
    по бокам) физически приходится на родителя, у которого нет моего onClick, и не долетает до
    дочернего .log-item--compact. LogPanel.tsx обнуляет паддинг Listy декларативно через
-   styles={{ item: { padding: 0 } }}, здесь переносим тот же отступ (itemPaddingBlock=paddingSM=12px,
+   styles={{ item: { padding: 0 } }}, здесь переносим тот же отступ (itemPaddingBlock=8 — задан
+   в App.tsx theme.components.Listy, даёт итоговую высоту строки 36px при дефолтном fontSize,
    itemPaddingInline=6px — см. кастомную тему padding:6 в App.tsx) на сам div, чтобы кликабельная
    область совпадала с видимой строкой один в один */
 .log-item--compact {
   height: 100%;
   box-sizing: border-box;
-  padding: 12px 6px;
+  padding: 8px 6px;
   display: flex;
   align-items: center;
 }
