@@ -35,36 +35,6 @@ body {
   max-width: 100%;
 }
 
-/* CopyableEllipsisText (RulesTable): своя copy-кнопка вместо antd copyable. Текст растянут на всю
-   ширину колонки (flex:1) — иначе сломался бы CSS line-clamp ellipsis, которому для обрезания
-   длинных строк нужна собственная растянутая ширина; поэтому :hover-зона (сам wrapper) шире
-   короткого видимого текста. Кнопка при этом стоит не в конце растянутого текста, а сразу после
-   его реальных отрисованных символов — position:absolute, left выставляется через JS-измерение
-   (getBoundingClientRect) в RulesTable.tsx, а не CSS */
-.copyable-text-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-}
-
-.copyable-text-wrapper .ant-typography {
-  flex: 1;
-  min-width: 0;
-}
-
-.copyable-text-btn.ant-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  visibility: hidden;
-}
-
-.copyable-text-wrapper:hover .copyable-text-btn.ant-btn {
-  visibility: visible;
-}
-
 /* панель с прокручиваемым содержимым, занимающая всё доступное пространство колонки */
 .scroll-panel {
   flex: 1;

@@ -16,8 +16,7 @@
       "edit": "edit",
       "delete": "delete",
       "deleteConfirm": "delete this rule?",
-      "duplicate": "duplicate",
-      "copied": "copied"
+      "duplicate": "duplicate"
     },
     "form": {
       "save": "save",
