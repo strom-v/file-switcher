@@ -71,6 +71,7 @@ Electron renderer (React UI)            ▼
 Ниже — находки из `REVIEW.md` (снимок от 2026-08-24), перепроверенные на 2026-08-27 и подтверждённые как всё ещё актуальные в текущем коде. Полные описания и номера — в самом `REVIEW.md`. Пункты про экспорт лога/правил, `delayMs`, подмену статус-кода/заголовков и VPN-индикатор (`useVpnStatus`) из REVIEW.md сюда не перенесены — они либо уже реализованы, либо соответствующий код с тех пор удалён из приложения.
 
 **Баги/риски** (REVIEW.md №4–13, №14) — статус на 2026-08-28:
+
 - ~~Возможная shell-инъекция через нестандартное имя сетевого сервиса~~ — **исправлено**: весь `execAsync` переведён с `child_process.exec` (shell-строка) на `execFile` (массив аргументов) в `execAsync.ts`, `certInstaller.ts`, `proxySystemConfig.ts`. Единственное оставшееся место с shell-строкой — `do shell script` внутри `osascript` (AppleScript API это требует), там аргументы теперь explicitly экранируются через `shellQuote()`. Проверено вживую: имя сервиса со спецсимволами (`"; echo INJECTED; echo "`) передаётся как один аргумент, не исполняется.
 - ~~`port` не валидируется в main-процессе~~ — **исправлено**: `ipc.ts` → `proxy:start` проверяет диапазон 1–65535 перед стартом.
 - ~~`rulesStore.saveAll` не валидирует правила~~ — **исправлено**: `rulesStore.ts` бросает понятную ошибку при пустом `urlPattern` или невалидном regex (когда `isRegex: true`); `App.tsx: persist()` ловит её, откатывает оптимистичный UI-стейт к реальному состоянию на диске и показывает `message.error`.
@@ -84,6 +85,7 @@ Electron renderer (React UI)            ▼
 - ~~`resolveMitmdumpPath()`/`resolveAddonPath()` дублировали магическое число уровней `..`~~ (REVIEW.md №29) — **частично снято**: путь к корню проекта в dev-режиме вынесен в одну константу `devProjectRoot`, плюс добавлена явная проверка существования `addon.py` перед стартом (симметрично уже существовавшей проверке `mitmdump`) — раньше отсутствующий `addon.py` привёл бы к невнятному крашу mitmdump вместо понятной ошибки. Сама привязка к структуре `electron-vite` output осталась (по дизайну, не мелкая правка).
 
 **Нереализованные фичи, всё ещё актуальные** (REVIEW.md №18, №19, №22, №25, №30, №33):
+
 - Диагностика «почему подмена не сработала» на уровне конкретного правила.
 - Счётчик срабатываний правила (hit count) в `RulesTable`.
 - Способ снова показать `OnboardingModal` после первого запуска.
@@ -93,16 +95,16 @@ Electron renderer (React UI)            ▼
 
 ## Куда смотреть за конкретной темой
 
-| Тема | Файлы |
-|---|---|
-| Правила подмены (модель, матчинг, подстановка groups) | `resources/addon.py`, `src/main/rulesStore.ts`, `src/renderer/components/RuleFormModal.tsx` |
-| Формат события лога / что шлёт addon.py | `src/shared/types.ts` (`ProxyLogEvent`), `resources/addon.py: response()` |
-| Системный прокси macOS / VPN-покрытие | `src/main/proxySystemConfig.ts` |
-| IPC-контракт main↔renderer | `src/main/ipc.ts`, `src/preload/preload.ts` |
-| UI лога (поиск/фильтры/детали) | `src/renderer/components/LogPanel.tsx`, `LogDetailModal.tsx` |
-| i18n / добавление языка | `src/renderer/i18n/*.json`, `index.ts`; также `App.tsx` (antd locale), `SettingsPanel.tsx` (селектор) |
-| Сертификаты mitmproxy | `src/main/certInstaller.ts` |
-| Сборка standalone mitmdump | `scripts/build_mitmdump.sh`, `scripts/mitmdump.spec` |
+| Тема                                                  | Файлы                                                                                                 |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Правила подмены (модель, матчинг, подстановка groups) | `resources/addon.py`, `src/main/rulesStore.ts`, `src/renderer/components/RuleFormModal.tsx`           |
+| Формат события лога / что шлёт addon.py               | `src/shared/types.ts` (`ProxyLogEvent`), `resources/addon.py: response()`                             |
+| Системный прокси macOS / VPN-покрытие                 | `src/main/proxySystemConfig.ts`                                                                       |
+| IPC-контракт main↔renderer                            | `src/main/ipc.ts`, `src/preload/preload.ts`                                                           |
+| UI лога (поиск/фильтры/детали)                        | `src/renderer/components/LogPanel.tsx`, `LogDetailModal.tsx`                                          |
+| i18n / добавление языка                               | `src/renderer/i18n/*.json`, `index.ts`; также `App.tsx` (antd locale), `SettingsPanel.tsx` (селектор) |
+| Сертификаты mitmproxy                                 | `src/main/certInstaller.ts`                                                                           |
+| Сборка standalone mitmdump                            | `scripts/build_mitmdump.sh`, `scripts/mitmdump.spec`                                                  |
 
 ## Project overrides (см. `~/.claude/AGENTS.md` для базовых правил)
 
