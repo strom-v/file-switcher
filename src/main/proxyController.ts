@@ -33,11 +33,15 @@ export class ProxyController extends EventEmitter {
     this.emit('status', this.state)
   }
 
+  // electron-vite кладёт скомпилированный main в out/main/proxyController.js — оба уровня '..'
+  // поднимаются к корню проекта именно оттуда; если output-структура electron-vite изменится,
+  // менять нужно только эту константу, а не искать все места с магическим числом '..'
+  private readonly devProjectRoot = join(__dirname, '..', '..')
+
   /** Путь к standalone-бинарнику mitmdump (PyInstaller) либо к системному в dev-режиме */
   private resolveMitmdumpPath(): string {
     if (is.dev) {
-      // out/main/proxyController.js -> корень проекта, два уровня вверх
-      return join(__dirname, '..', '..', '.venv', 'bin', 'mitmdump')
+      return join(this.devProjectRoot, '.venv', 'bin', 'mitmdump')
     }
     const platformDir = process.platform === 'darwin' ? 'mac' : process.platform
     return join(process.resourcesPath, 'bin', platformDir, 'mitmdump')
@@ -45,7 +49,7 @@ export class ProxyController extends EventEmitter {
 
   private resolveAddonPath(): string {
     if (is.dev) {
-      return join(__dirname, '..', '..', 'resources', 'addon.py')
+      return join(this.devProjectRoot, 'resources', 'addon.py')
     }
     return join(process.resourcesPath, 'addon.py')
   }
@@ -61,12 +65,18 @@ export class ProxyController extends EventEmitter {
       return
     }
 
+    const addonPath = this.resolveAddonPath()
+    if (!existsSync(addonPath)) {
+      this.setState({ status: 'crashed', port, error: `addon.py не найден: ${addonPath}` })
+      return
+    }
+
     this.setState({ status: 'starting', port })
     this.lastStderr = ''
 
     const args = [
       '-s',
-      this.resolveAddonPath(),
+      addonPath,
       '--set',
       `rules_file=${rulesFilePath}`,
       '--listen-host',

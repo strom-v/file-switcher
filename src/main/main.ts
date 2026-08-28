@@ -52,7 +52,7 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
-    electronApp.setAppUserModelId('com.filewitcher.app')
+    electronApp.setAppUserModelId('com.fileswitcher.app')
 
     // в dev-режиме macOS показывает в Dock стандартную иконку Electron —
     // собственная иконка приложения подхватывается только из собранного .app

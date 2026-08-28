@@ -1,4 +1,4 @@
-appId: com.filewitcher.app
+appId: com.fileswitcher.app
 productName: FileSwitcher
 directories:
   buildResources: build

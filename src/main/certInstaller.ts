@@ -8,7 +8,6 @@ import type { CertInfo, CertStatus } from '../shared/types'
 export type { CertInfo, CertStatus } from '../shared/types'
 
 const CA_CERT_PATH = join(homedir(), '.mitmproxy', 'mitmproxy-ca-cert.pem')
-const LOGIN_KEYCHAIN = join(homedir(), 'Library', 'Keychains', 'login.keychain-db')
 
 /** Бросает, если CA-сертификат mitmproxy ещё не сгенерирован */
 function assertCertExists(hint: string): void {
@@ -53,19 +52,21 @@ export async function removeCertTrust(): Promise<void> {
 }
 
 /**
- * Перечисляет все сертификаты с CN=mitmproxy в user keychain (их может накопиться
- * несколько после переустановок mitmproxy) с сроком действия и статусом доверия каждого.
+ * Перечисляет все сертификаты с CN=mitmproxy (их может накопиться несколько после
+ * переустановок mitmproxy) с сроком действия и статусом доверия каждого. Ищет по тому же
+ * default search list keychain'ов, что getCertStatus/installCert/removeCertTrust (без явного
+ * пути к keychain) — иначе при нестандартном search list список расходился бы со статусом.
  */
 export async function listCerts(): Promise<CertInfo[]> {
   let output: string
   try {
-    output = await execAsync('security', ['find-certificate', '-a', '-c', 'mitmproxy', '-Z', '-p', LOGIN_KEYCHAIN])
+    output = await execAsync('security', ['find-certificate', '-a', '-c', 'mitmproxy', '-Z', '-p'])
   } catch {
     return []
   }
 
   const blocks = output.split(/(?=SHA-1 hash: )/).filter((b) => b.trim())
-  const tmpDir = mkdtempSync(join(tmpdir(), 'filewitcher-certs-'))
+  const tmpDir = mkdtempSync(join(tmpdir(), 'fileswitcher-certs-'))
 
   try {
     const parsedBlocks = blocks
