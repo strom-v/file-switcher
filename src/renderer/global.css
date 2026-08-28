@@ -17,6 +17,14 @@ body {
   cursor: default;
 }
 
+/* исключение из правила выше: текст внутри кликабельной строки лога/правила наследует pointer
+   от строки-родителя — иначе .ant-typography перебивал бы его обратно на default на каждом
+   Typography.Text (метод, статус, время, URL внутри строки) */
+.log-item--compact .ant-typography,
+.rules-table--compact .ant-table-tbody > tr .ant-typography {
+  cursor: inherit;
+}
+
 /* иконка-подсказка (обычно под Tooltip) — курсор default, а не унаследованный pointer/text */
 .hint-icon {
   cursor: default;

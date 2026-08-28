@@ -1,11 +1,8 @@
 import React, { useMemo } from 'react'
 import { Checkbox, ConfigProvider, Flex, Table, Tag, Tooltip, Typography } from 'antd'
-import { InfoCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
 import type { Rule } from '../../shared/types'
-
-const actionIconStyle: React.CSSProperties = { cursor: 'pointer' }
 
 // вынесено из компонента: не зависит от пропсов/state, пересоздание на каждый рендер
 // заставляет ConfigProvider зря пересчитывать CSS-in-JS таблицы (заметно при частых ре-рендерах во время drag)
@@ -92,8 +89,9 @@ interface RulesTableProps {
   onEdit: (rule: Rule) => void
 }
 
-/** Таблица правил подмены, сгруппированных по репозиторию из пути подмены, с чекбоксом и действиями.
- * Редактирование и удаление правила — через модалку (иконка "?"), открываемую по onEdit. */
+/** Таблица правил подмены, сгруппированных по репозиторию из пути подмены, с чекбоксом.
+ * Клик по строке открывает модалку редактирования/удаления (onEdit); клик по чекбоксу enabled
+ * не всплывает до строки (onCell.onClick: stopPropagation), чтобы не открывать модалку заодно. */
 export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps): React.ReactElement {
   const { t } = useTranslation()
 
@@ -103,7 +101,7 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
     {
       dataIndex: 'enabled',
       width: 36,
-      onCell: (row) => (isGroupRow(row) ? { colSpan: 0 } : {}),
+      onCell: (row) => (isGroupRow(row) ? { colSpan: 0 } : { onClick: (e: React.MouseEvent) => e.stopPropagation() }),
       render: (_, row) =>
         isGroupRow(row) ? null : <Checkbox checked={row.enabled} onChange={(e) => onToggle(row, e.target.checked)} />
     },
@@ -161,18 +159,6 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
           </Flex>
         )
       }
-    },
-    {
-      title: '',
-      width: 28,
-      align: 'right',
-      onCell: (row) => (isGroupRow(row) ? { colSpan: 0 } : {}),
-      render: (_, row) =>
-        isGroupRow(row) ? null : (
-          <Tooltip title={t('rules.table.edit')}>
-            <InfoCircleOutlined style={actionIconStyle} onClick={() => onEdit(row)} />
-          </Tooltip>
-        )
     }
   ]
 
@@ -186,6 +172,7 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
         size="small"
         showHeader={false}
         className="rules-table--compact"
+        onRow={(row) => (isGroupRow(row) ? {} : { onClick: () => onEdit(row), style: { cursor: 'pointer' } })}
       />
     </ConfigProvider>
   )
