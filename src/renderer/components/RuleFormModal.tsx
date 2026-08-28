@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
-import { Button, Flex, Form, Input, Modal, Popconfirm } from 'antd'
+import { Button, Flex, Form, Input, message, Modal, Popconfirm, Tooltip } from 'antd'
+import { CopyOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { COLOR_DANGER, COLOR_INFO, COLOR_SUCCESS, COLOR_WARNING } from '../theme'
 import type { Rule } from '../../shared/types'
@@ -72,6 +73,16 @@ export default function RuleFormModal({
     if (existingRule) onDelete(existingRule)
   }
 
+  const handleCopy = async (value: string | undefined): Promise<void> => {
+    if (!value) return
+    try {
+      await navigator.clipboard.writeText(value)
+      message.success(t('rules.form.copied'))
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const handleDuplicate = (): void => {
     if (existingRule) onDuplicate(existingRule)
   }
@@ -129,10 +140,24 @@ export default function RuleFormModal({
           label={t('rules.form.urlPattern')}
           rules={[{ required: true, message: t('rules.form.urlPatternRequired') }]}
         >
-          <Input placeholder={t('rules.form.urlPatternPlaceholder')} />
+          <Input
+            placeholder={t('rules.form.urlPatternPlaceholder')}
+            suffix={
+              <Tooltip title={t('rules.form.copyButton')}>
+                <CopyOutlined onClick={() => handleCopy(currentValues?.urlPattern)} style={{ cursor: 'pointer' }} />
+              </Tooltip>
+            }
+          />
         </Form.Item>
         <Form.Item name="localFilePath" label={t('rules.form.localFile')}>
-          <Input placeholder={t('rules.form.localFilePlaceholder')} />
+          <Input
+            placeholder={t('rules.form.localFilePlaceholder')}
+            suffix={
+              <Tooltip title={t('rules.form.copyButton')}>
+                <CopyOutlined onClick={() => handleCopy(currentValues?.localFilePath)} style={{ cursor: 'pointer' }} />
+              </Tooltip>
+            }
+          />
         </Form.Item>
       </Form>
     </Modal>

@@ -127,11 +127,7 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
         const rule = row
         return (
           <Flex vertical gap={0} style={{ width: '100%' }}>
-            <Typography.Text
-              className="ellipsis-text text-sm"
-              ellipsis={{ tooltip: urlPattern }}
-              copyable={!!urlPattern}
-            >
+            <Typography.Text className="ellipsis-text text-sm" ellipsis={{ tooltip: urlPattern }}>
               {urlPattern}
             </Typography.Text>
             <Flex gap={4} align="center" style={{ width: '100%' }}>
@@ -140,7 +136,6 @@ export default function RulesTable({ rules, onToggle, onEdit }: RulesTableProps)
                   className="ellipsis-text text-sm"
                   type="secondary"
                   ellipsis={{ tooltip: rule.localFilePath }}
-                  copyable
                   style={{ flex: 1, minWidth: 0 }}
                 >
                   {rule.localFilePath}

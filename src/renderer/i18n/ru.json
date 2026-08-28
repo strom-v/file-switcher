@@ -25,7 +25,9 @@
       "urlPatternPlaceholder": "https://example.com/app.js",
       "urlPatternRequired": "укажите URL или regex",
       "localFile": "локальный файл",
-      "localFilePlaceholder": "/path/to/file или /path/to/$2.$3"
+      "localFilePlaceholder": "/path/to/file или /path/to/$2.$3",
+      "copyButton": "копировать",
+      "copied": "скопировано"
     },
     "exportButton": "экспорт",
     "importButton": "импорт",

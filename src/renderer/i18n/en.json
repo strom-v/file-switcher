@@ -25,7 +25,9 @@
       "urlPatternPlaceholder": "https://example.com/app.js",
       "urlPatternRequired": "enter a URL or regex",
       "localFile": "local file",
-      "localFilePlaceholder": "/path/to/file or /path/to/$2.$3"
+      "localFilePlaceholder": "/path/to/file or /path/to/$2.$3",
+      "copyButton": "copy",
+      "copied": "copied"
     },
     "exportButton": "export",
     "importButton": "import",
