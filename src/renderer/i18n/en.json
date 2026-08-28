@@ -44,6 +44,8 @@
     "empty": "no requests yet",
     "noMatches": "no matches for this filter",
     "searchPlaceholder": "search",
+    "totalCount": "total: {{count}}",
+    "matchedCount": "matched: {{count}}",
     "filterAll": "show all requests, including ones without a substitution",
     "matched": "show only requests where the file substitution fired",
     "filterHasRequestBody": "show only requests that had a body in the outgoing (sent) request",
@@ -59,6 +61,7 @@
     "detailRequestBody": "request body",
     "detailResponseBody": "response body",
     "formatButton": "format",
+    "replayButton": "replay request",
     "formatRawButton": "raw view",
     "formatNotApplicable": "(couldn't format: not JSON, or the body is too large)",
     "bodyIsBinary": "binary file, {{size}}"

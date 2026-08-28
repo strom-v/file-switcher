@@ -4,6 +4,8 @@ import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
 import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
+import { replayRequest } from './replayRequest'
+import type { ProxyLogEvent } from '../shared/types'
 
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
 export function registerIpcHandlers(): void {
@@ -43,6 +45,8 @@ export function registerIpcHandlers(): void {
     await removeCertTrust()
     return getCertStatus()
   })
+
+  ipcMain.handle('proxy:replayRequest', (_event, logEvent: ProxyLogEvent) => replayRequest(logEvent))
 
   ipcMain.handle('dialog:openTextFile', async (_event, extensions?: string[]) => {
     const result = await dialog.showOpenDialog({

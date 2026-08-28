@@ -44,6 +44,8 @@
     "empty": "пока нет запросов",
     "noMatches": "ничего не найдено по фильтру",
     "searchPlaceholder": "поиск",
+    "totalCount": "всего: {{count}}",
+    "matchedCount": "подмена: {{count}}",
     "filterAll": "показать все запросы, включая те, где подмена не сработала",
     "matched": "показать только запросы, для которых сработала подмена файла",
     "filterHasRequestBody": "показать только запросы, у которых было тело в отправленном (исходящем) запросе",
@@ -59,6 +61,7 @@
     "detailRequestBody": "тело запроса",
     "detailResponseBody": "тело ответа",
     "formatButton": "форматировать",
+    "replayButton": "повторить запрос",
     "formatRawButton": "исходный вид",
     "formatNotApplicable": "(не удалось: это не JSON или тело слишком большое)",
     "bodyIsBinary": "бинарный файл, {{size}}"

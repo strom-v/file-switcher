@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, ReplayResult } from '../shared/types'
 
 const api = {
   rules: {
@@ -26,7 +26,9 @@ const api = {
       const listener = (_event: Electron.IpcRendererEvent, text: string): void => callback(text)
       ipcRenderer.on('proxy:stderr', listener)
       return () => ipcRenderer.removeListener('proxy:stderr', listener)
-    }
+    },
+    // отправляет запрос из лога заново напрямую на реальный сервер (не через локальный прокси)
+    replayRequest: (event: ProxyLogEvent): Promise<ReplayResult> => ipcRenderer.invoke('proxy:replayRequest', event)
   },
   cert: {
     status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),

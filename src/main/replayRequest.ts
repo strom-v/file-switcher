@@ -1,0 +1,55 @@
+import type { ProxyLogEvent, ReplayResult } from '../shared/types'
+
+const REPLAY_TIMEOUT_MS = 15_000
+
+// заголовки, которые либо запрещено выставлять вручную через fetch (forbidden request headers),
+// либо описывают исходное соединение/кодирование и приведут к рассинхрону при повторной отправке
+// (например Content-Length будет неверным, если тело перекодировалось; Host мешает fetch самому
+// резолвить хост по URL)
+const SKIPPED_REPLAY_HEADERS = new Set([
+  'host',
+  'content-length',
+  'connection',
+  'accept-encoding',
+  'cookie',
+  'origin',
+  'referer'
+])
+
+/** Повторяет запрос из лога напрямую на реальный сервер (не через локальный прокси — иначе
+ * запрос снова попал бы в addon.py и, если правило матчит, снова получил бы подмену вместо
+ * повторения оригинального запроса). Тело запроса в логе уже декодировано как текст, поэтому
+ * повторная отправка бинарных тел исказит байты — вызывающий код обязан не звать эту функцию
+ * для requestBodyIsBinary: true (проверяется и здесь на всякий случай). */
+export async function replayRequest(event: ProxyLogEvent): Promise<ReplayResult> {
+  if (event.requestBodyIsBinary) {
+    throw new Error('Тело запроса бинарное — повторная отправка исказит данные')
+  }
+
+  const headers = new Headers()
+  for (const [name, value] of Object.entries(event.requestHeaders)) {
+    if (SKIPPED_REPLAY_HEADERS.has(name.toLowerCase())) continue
+    headers.set(name, value)
+  }
+
+  const hasBody = !['GET', 'HEAD'].includes(event.method.toUpperCase()) && event.requestBody
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS)
+  try {
+    const response = await fetch(event.url, {
+      method: event.method,
+      headers,
+      body: hasBody ? event.requestBody : undefined,
+      signal: controller.signal
+    })
+    const body = await response.text()
+    return {
+      statusCode: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
+      body
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}

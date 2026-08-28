@@ -56,6 +56,13 @@ export interface ProxyLogEvent {
   responseBodyIsBinary: boolean
 }
 
+/** Результат повторной отправки запроса из лога (см. main/replayRequest.ts) */
+export interface ReplayResult {
+  statusCode: number
+  headers: Record<string, string>
+  body: string
+}
+
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'
 
 export interface CertInfo {

@@ -21,9 +21,10 @@ interface LogPanelProps {
   onClear: () => void
 }
 
-/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL, фильтром по событию
- * и фильтром по наличию тела запроса/ответа. Сколько записей на категорию ("подмена" / "без подмены")
- * хранится в памяти — настраивается в панели настроек (см. useLogStorageLimit, useProxyState). */
+/** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском (по URL, файлу подмены
+ * и телу запроса/ответа), фильтром по событию, фильтром по наличию тела запроса/ответа и счётчиками
+ * всего/подмена. Сколько записей на категорию ("подмена" / "без подмены") хранится в памяти —
+ * настраивается в панели настроек (см. useLogStorageLimit, useProxyState). */
 export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
@@ -59,12 +60,18 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
         if (query) {
           const matchesUrl = item.url.toLowerCase().includes(query)
           const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
-          if (!matchesUrl && !matchesFile) return false
+          const matchesBody =
+            item.requestBody.toLowerCase().includes(query) || item.responseBody.toLowerCase().includes(query)
+          if (!matchesUrl && !matchesFile && !matchesBody) return false
         }
         return true
       })
       .reverse()
   }, [logs, search, eventFilter, bodyFilter])
+
+  // счётчик по полному буферу (не по visible) — показывает общую картину трафика независимо
+  // от того, что сейчас отфильтровано в списке, как счётчик "matched" в SBIS LOGS
+  const matchedCount = useMemo(() => logs.filter((item) => item.event === 'matched').length, [logs])
 
   return (
     <div className="panel-column">
@@ -109,6 +116,20 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
             }
           />
         </Space.Compact>
+        <Space size={10} style={{ flexShrink: 0 }} className="text-sm">
+          <Tooltip title={t('log.totalCount', { count: logs.length })}>
+            <Space size={3}>
+              <UnorderedListOutlined />
+              <Typography.Text type="secondary">{logs.length}</Typography.Text>
+            </Space>
+          </Tooltip>
+          <Tooltip title={t('log.matchedCount', { count: matchedCount })}>
+            <Space size={3}>
+              <ColumnHeightOutlined style={{ color: COLOR_SUCCESS }} />
+              <Typography.Text style={{ color: COLOR_SUCCESS }}>{matchedCount}</Typography.Text>
+            </Space>
+          </Tooltip>
+        </Space>
         <Popconfirm title={t('log.clearConfirm')} onConfirm={onClear} disabled={logs.length === 0}>
           <IconButton
             tooltip={t('log.clear')}

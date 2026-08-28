@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
-import { Button, Descriptions, Modal, Typography } from 'antd'
+import React, { useEffect, useState } from 'react'
+import { Button, Descriptions, message, Modal, Typography } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { formatHeaders, formatSize, tryFormatJson, tsToDate } from '../formatters'
-import type { ProxyLogEvent } from '../../shared/types'
+import { httpStatusColor } from '../theme'
+import type { ProxyLogEvent, ReplayResult } from '../../shared/types'
 
 interface LogDetailModalProps {
   event: ProxyLogEvent | null
@@ -61,6 +62,27 @@ function BodySection({ title, body, isBinary, size }: BodySectionProps): React.R
 export default function LogDetailModal({ event, onClose }: LogDetailModalProps): React.ReactElement {
   const { t } = useTranslation()
   const formattedTime = event ? tsToDate(event.ts).toLocaleString() : ''
+  const [replaying, setReplaying] = useState(false)
+  const [replayResult, setReplayResult] = useState<ReplayResult | null>(null)
+
+  // сбрасываем результат предыдущего replay при открытии другой записи лога — иначе пользователь
+  // увидит результат повтора чужого запроса, приняв его за результат текущего
+  useEffect(() => {
+    setReplayResult(null)
+  }, [event])
+
+  const handleReplay = async (): Promise<void> => {
+    if (!event) return
+    setReplaying(true)
+    setReplayResult(null)
+    try {
+      setReplayResult(await window.api.proxy.replayRequest(event))
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setReplaying(false)
+    }
+  }
 
   return (
     <Modal
@@ -123,6 +145,27 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             isBinary={event.responseBodyIsBinary}
             size={event.responseSize}
           />
+
+          {/* бинарное тело запроса в логе уже необратимо испорчено errors="replace" при декодировании
+              (см. addon.py) — повторная отправка такого тела передаст мусор вместо оригинальных байт,
+              поэтому кнопка скрыта, а не просто предупреждает */}
+          {!event.requestBodyIsBinary && (
+            <div style={{ marginTop: 8 }}>
+              <Button size="small" onClick={handleReplay} loading={replaying}>
+                {t('log.replayButton')}
+              </Button>
+              {replayResult && (
+                <div className="headers-panel" style={{ marginTop: 8 }}>
+                  <Typography.Text strong style={{ color: httpStatusColor(replayResult.statusCode) }}>
+                    {replayResult.statusCode}
+                  </Typography.Text>
+                  <Typography.Paragraph className="pre-wrap text-sm" style={{ marginTop: 4 }}>
+                    {replayResult.body || '—'}
+                  </Typography.Paragraph>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </Modal>
