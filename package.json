@@ -13,7 +13,9 @@
     "start": "electron-vite preview",
     "build:mac": "electron-vite build && electron-builder --mac",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "build:win": "electron-vite build && electron-builder --win",
+    "build:linux": "electron-vite build && electron-builder --linux"
   },
   "dependencies": {
     "antd": "^6.6.1",
