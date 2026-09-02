@@ -5,7 +5,7 @@
       "enabled": true,
       "urlPattern": "https://example\\.com/app\\.js",
       "isRegex": true,
-      "localFilePath": "/Users/vitaly/Desktop/projects/my projects/file-switcher/test/fixture.js",
+      "localFilePath": "/Users/vitaly/Desktop/projects/my projects/electron/file-switcher/test/fixture.js",
       "contentType": "application/javascript"
     }
   ]
