@@ -122,6 +122,14 @@ class ResponseSwitcher:
 
         flow.metadata[MATCH_RULE_KEY] = rule
 
+        # инлайн-тело в самом правиле имеет приоритет над файлом на диске
+        inline_body = rule.get("responseBody")
+        if inline_body:
+            content_type = rule.get("contentType") or "application/json; charset=utf-8"
+            flow.response = self._make_swap_response(flow, inline_body.encode("utf-8"), content_type)
+            flow.metadata[MATCH_FILE_KEY] = "<inline>"
+            return
+
         path = rule.get("localFilePath")
         if not path:
             # правило только меняет заголовки/задержку/статус — тело идёт с реального сервера
@@ -144,7 +152,12 @@ class ResponseSwitcher:
             return
 
         content_type = rule.get("contentType") or mimetypes.guess_type(path)[0] or "application/octet-stream"
-        flow.response = http.Response.make(
+        flow.response = self._make_swap_response(flow, body, content_type)
+        flow.metadata[MATCH_FILE_KEY] = path
+
+    @staticmethod
+    def _make_swap_response(flow: http.HTTPFlow, body: bytes, content_type: str) -> http.Response:
+        return http.Response.make(
             200,
             body,
             {
@@ -157,7 +170,6 @@ class ResponseSwitcher:
                 "Access-Control-Allow-Origin": flow.request.headers.get("Origin", "*"),
             },
         )
-        flow.metadata[MATCH_FILE_KEY] = path
 
     def response(self, flow: http.HTTPFlow):
         if not self.rules_path:

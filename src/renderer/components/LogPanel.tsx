@@ -1,17 +1,10 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Empty, Flex, Input, Listy, Popconfirm, Space, Tooltip, Typography } from 'antd'
-import {
-  ArrowDownOutlined,
-  ArrowUpOutlined,
-  ClearOutlined,
-  ColumnHeightOutlined,
-  FileSearchOutlined,
-  UnorderedListOutlined
-} from '@ant-design/icons'
+import { ClearOutlined, ColumnHeightOutlined, FileSearchOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import LogDetailModal from './LogDetailModal'
 import IconButton from './IconButton'
-import { COLOR_INFO, COLOR_SUCCESS, httpStatusColor } from '../theme'
+import { COLOR_SUCCESS, httpStatusColor } from '../theme'
 import { tsToDate } from '../formatters'
 import { EVENT_FILTER_ALL, useLogFilters } from '../hooks/useLogFilters'
 import type { ProxyLogEvent } from '../../shared/types'
@@ -22,16 +15,15 @@ interface LogPanelProps {
 }
 
 /** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL/файлу подмены
- * (опционально и по телу запроса/ответа — переключатель в тулбаре), фильтром по событию, фильтром
- * по наличию тела запроса/ответа и счётчиками всего/подмена. Клик по всей строке открывает детали
- * запроса. Сколько записей на категорию хранится в памяти — настраивается в панели настроек
- * (см. useLogStorageLimit, useProxyState). */
+ * (опционально и по телу запроса/ответа — переключатель в тулбаре), фильтром по событию и счётчиками
+ * всего/подмена. Клик по всей строке открывает детали запроса. Сколько записей на категорию хранится
+ * в памяти — настраивается в панели настроек (см. useLogStorageLimit, useProxyState). */
 export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
   const [search, setSearch] = useState('')
   const [searchInBody, setSearchInBody] = useState(false)
-  const { eventFilter, setEventFilter, bodyFilter, toggleBodyFilter } = useLogFilters()
+  const { eventFilter, setEventFilter } = useLogFilters()
 
   // Listy требует высоту контейнера в пикселях (не проценты) для виртуализации — измеряем
   // фактическую высоту обёртки через ResizeObserver, а не жёстко фиксируем в CSS, так как
@@ -57,8 +49,6 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
     return logs
       .filter((item) => {
         if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter) return false
-        if (bodyFilter === 'request' && !item.requestBody) return false
-        if (bodyFilter === 'response' && !item.responseBody) return false
         if (query) {
           const matchesUrl = item.url.toLowerCase().includes(query)
           const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
@@ -70,7 +60,7 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
         return true
       })
       .reverse()
-  }, [logs, search, searchInBody, eventFilter, bodyFilter])
+  }, [logs, search, searchInBody, eventFilter])
 
   // счётчик по полному буферу (не по visible) — показывает общую картину трафика независимо
   // от того, что сейчас отфильтровано в списке, как счётчик "matched" в SBIS LOGS
@@ -106,24 +96,6 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
             type={eventFilter === 'matched' ? 'primary' : 'default'}
             icon={<ColumnHeightOutlined />}
             onClick={() => setEventFilter('matched')}
-          />
-        </Space.Compact>
-        <Space.Compact size="small" style={{ flexShrink: 0 }}>
-          <IconButton
-            tooltip={t('log.filterHasRequestBody')}
-            type={bodyFilter === 'request' ? 'primary' : 'default'}
-            icon={<ArrowUpOutlined />}
-            onClick={() => toggleBodyFilter('request')}
-            style={bodyFilter === 'request' ? { backgroundColor: COLOR_INFO, borderColor: COLOR_INFO } : undefined}
-          />
-          <IconButton
-            tooltip={t('log.filterHasResponseBody')}
-            type={bodyFilter === 'response' ? 'primary' : 'default'}
-            icon={<ArrowDownOutlined />}
-            onClick={() => toggleBodyFilter('response')}
-            style={
-              bodyFilter === 'response' ? { backgroundColor: COLOR_SUCCESS, borderColor: COLOR_SUCCESS } : undefined
-            }
           />
         </Space.Compact>
         <Space size={10} style={{ flexShrink: 0 }} className="text-sm">
@@ -179,14 +151,6 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                     onClick={() => setSelected(item)}
                   >
                     <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
-                      <Space size={2} style={{ flexShrink: 0, width: 28 }}>
-                        {item.requestBody ? (
-                          <ArrowUpOutlined style={{ color: COLOR_INFO }} title={t('log.detailRequestBody')} />
-                        ) : null}
-                        {item.responseBody ? (
-                          <ArrowDownOutlined style={{ color: COLOR_SUCCESS }} title={t('log.detailResponseBody')} />
-                        ) : null}
-                      </Space>
                       <Typography.Text
                         strong
                         className="text-sm"

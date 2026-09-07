@@ -75,6 +75,7 @@ export default function SettingsPanel({
   const [installingSudoers, setInstallingSudoers] = useState(false)
   const [refreshingRules, setRefreshingRules] = useState(false)
   const [logExportFormat, setLogExportFormat] = useState<keyof typeof LOG_EXPORT_BUILDERS>('har')
+  const [devToolsOpened, setDevToolsOpened] = useState(false)
 
   const refreshCertStatus = async (): Promise<void> => {
     setCertStatus(await window.api.cert.status())
@@ -84,6 +85,13 @@ export default function SettingsPanel({
     refreshCertStatus()
     window.api.system.sudoersInstalled().then(setSudoersInstalled)
   }, [status.status])
+
+  // текст кнопки devtools зависит от их состояния; синхронизируем и при открытии панели,
+  // и по событию (пользователь мог закрыть devtools горячей клавишей, минуя кнопку)
+  useEffect(() => {
+    window.api.window.isDevToolsOpened().then(setDevToolsOpened)
+    return window.api.window.onDevToolsChanged(setDevToolsOpened)
+  }, [])
 
   const handleInstallSudoersRule = async (): Promise<void> => {
     setInstallingSudoers(true)
@@ -324,6 +332,12 @@ export default function SettingsPanel({
               style={{ width: '100%' }}
             />
           </SectionHeader>
+        </SettingsGroup>
+
+        <SettingsGroup title={t('settings.groupDeveloper')}>
+          <Button onClick={() => window.api.window.toggleDevTools()}>
+            {t(devToolsOpened ? 'settings.devToolsCloseButton' : 'settings.devToolsButton')}
+          </Button>
         </SettingsGroup>
       </Space>
 

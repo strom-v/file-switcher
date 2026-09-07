@@ -48,6 +48,12 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('proxy:replayRequest', (_event, logEvent: ProxyLogEvent) => replayRequest(logEvent))
 
+  ipcMain.handle('window:toggleDevTools', (event) => {
+    event.sender.toggleDevTools()
+  })
+
+  ipcMain.handle('window:isDevToolsOpened', (event) => event.sender.isDevToolsOpened())
+
   // app.relaunch() только планирует перезапуск при следующем выходе — сам app.quit() ниже
   // проходит через уже существующий 'before-quit' хендлер в main.ts, который останавливает
   // прокси и откатывает системный прокси-настройки перед реальным завершением процесса

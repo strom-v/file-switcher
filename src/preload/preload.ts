@@ -1,7 +1,11 @@
+import { homedir } from 'os'
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, ReplayResult } from '../shared/types'
 
 const api = {
+  // домашняя папка текущего пользователя — renderer сам её получить не может (contextIsolation);
+  // нужна только для сокращённого показа путей подмены в списке правил
+  homeDir: homedir(),
   rules: {
     get: (): Promise<Rule[]> => ipcRenderer.invoke('rules:get'),
     save: (rules: Rule[]): Promise<Rule[]> => ipcRenderer.invoke('rules:save', rules)
@@ -50,6 +54,16 @@ const api = {
     // останавливает прокси/откатывает системный прокси (через 'before-quit' в main.ts) и
     // перезапускает приложение целиком — не просто перезагружает окно
     relaunch: (): Promise<void> => ipcRenderer.invoke('app:relaunch')
+  },
+  window: {
+    // открывает/закрывает инструменты разработчика текущего окна
+    toggleDevTools: (): Promise<void> => ipcRenderer.invoke('window:toggleDevTools'),
+    isDevToolsOpened: (): Promise<boolean> => ipcRenderer.invoke('window:isDevToolsOpened'),
+    onDevToolsChanged: (callback: (opened: boolean) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, opened: boolean): void => callback(opened)
+      ipcRenderer.on('window:devToolsChanged', listener)
+      return () => ipcRenderer.removeListener('window:devToolsChanged', listener)
+    }
   }
 }
 

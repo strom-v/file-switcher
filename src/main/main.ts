@@ -24,8 +24,15 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
-    if (is.dev) mainWindow?.webContents.openDevTools()
   })
+
+  // renderer держит стейт "devtools открыты?" для текста кнопки в настройках — уведомляем его об
+  // открытии/закрытии, в т.ч. когда пользователь закрыл панель горячей клавишей, а не кнопкой
+  const sendDevToolsState = (opened: boolean): void => {
+    mainWindow?.webContents.send('window:devToolsChanged', opened)
+  }
+  mainWindow.webContents.on('devtools-opened', () => sendDevToolsState(true))
+  mainWindow.webContents.on('devtools-closed', () => sendDevToolsState(false))
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)

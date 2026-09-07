@@ -5,6 +5,8 @@ import { COLOR_DANGER, COLOR_INFO, COLOR_SUCCESS } from '../theme'
 
 interface JsonTreeProps {
   value: unknown
+  /** до какой глубины узлы развёрнуты изначально; не задано — развёрнуты все */
+  defaultExpandDepth?: number
 }
 
 // подсветка по типу значения — та же палитра, что у jsonview (строки зелёным, числа/bool синим,
@@ -73,19 +75,37 @@ function buildTreeNodes(value: unknown, keyPrefix: string): TreeDataNode[] {
   return [{ key: keyPrefix, title: renderPrimitive(value) }]
 }
 
+/** Собирает ключи узлов до заданной глубины включительно — для стартового набора развёрнутых веток */
+function collectKeysToDepth(nodes: TreeDataNode[], depth: number): React.Key[] {
+  if (depth < 1) return []
+  const keys: React.Key[] = []
+  for (const node of nodes) {
+    if (node.children?.length) {
+      keys.push(node.key)
+      keys.push(...collectKeysToDepth(node.children, depth - 1))
+    }
+  }
+  return keys
+}
+
 /** Сворачиваемое JSON-дерево (как jsonview) для просмотра тела запроса/ответа вместо плоского
  * текста с отступами — подсветка по типу значения, узлы объектов/массивов сворачиваются */
-export default function JsonTree({ value }: JsonTreeProps): React.ReactElement {
+export default function JsonTree({ value, defaultExpandDepth }: JsonTreeProps): React.ReactElement {
   // ключи узлов должны быть стабильны между рендерами одного и того же дерева (иначе antd Tree
   // теряет состояние развёрнутости), но уникальны между разными открытыми деревьями на странице —
   // префикс на основе счётчика, посчитанного один раз при монтировании через useMemo
   const rootPrefix = useMemo(() => `json-${nodeKeySeq++}`, [])
   const treeData = useMemo(() => buildTreeNodes(value, rootPrefix), [value, rootPrefix])
+  const defaultExpandedKeys = useMemo(
+    () => (defaultExpandDepth === undefined ? undefined : collectKeysToDepth(treeData, defaultExpandDepth)),
+    [treeData, defaultExpandDepth]
+  )
 
   return (
     <Tree
       treeData={treeData}
-      defaultExpandAll
+      defaultExpandAll={defaultExpandDepth === undefined}
+      defaultExpandedKeys={defaultExpandedKeys}
       showLine
       selectable={false}
       className="text-sm"

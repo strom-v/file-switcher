@@ -130,6 +130,40 @@ html.dark-scrollbars .scroll-panel--visible::-webkit-scrollbar-thumb {
   background-color: transparent;
 }
 
+/* tableLayout="fixed" + max-width:0 на ячейке не дают колонке urlPattern растягиваться под
+   длинный текст — иначе у списка появляется горизонтальный скролл вместо обрезки строк.
+   Сама обрезка многоточием и tooltip с полным текстом — на Typography.Text ellipsis prop */
+.rules-table--compact {
+  width: 100%;
+  table-layout: fixed;
+}
+.rules-table--compact .ant-table-tbody > tr > td {
+  max-width: 0;
+}
+
+/* фон строки различает вид подмены тела: инлайн-тело в правиле vs локальный файл на диске.
+   красим td (не tr) — так фон растягивается на всю строку, как и border-bottom ниже */
+.rules-table--compact .ant-table-tbody > tr.rules-table-row--body > td {
+  background-color: rgba(114, 46, 209, 0.1);
+}
+.rules-table--compact .ant-table-tbody > tr.rules-table-row--file > td {
+  background-color: rgba(24, 144, 255, 0.08);
+}
+
+/* строка правила перетаскивается в другую группу (dnd-kit) */
+.rules-table--compact .ant-table-tbody > tr:not(.rules-table-row--group) {
+  cursor: grab;
+}
+
+/* превью перетаскиваемой строки под курсором */
+.rules-table-drag-overlay {
+  padding: 4px 8px;
+  border-radius: 4px;
+  background-color: var(--ant-color-bg-elevated, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
+}
+
 /* строка правила (2 строки text-sm текста — urlPattern сверху, localFilePath снизу) должна быть
    36px высотой — той же, что строка лога в LogPanel (см. App.tsx: theme.components.Listy).
    line-height задан явно (не наследуется из antd токена), чтобы высота была предсказуемой:

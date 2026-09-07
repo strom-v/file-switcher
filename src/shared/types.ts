@@ -13,8 +13,13 @@ export interface Rule {
   enabled: boolean
   urlPattern: string
   isRegex: boolean
+  /** группа в списке правил. undefined — ещё не мигрировано (группа определится из пути при загрузке);
+   * пустая строка — явно отнесено к группе "остальные" */
+  group?: string
   /** пусто — запрос идёт на реальный сервер без подмены тела, применяются только остальные модификации ниже */
   localFilePath?: string
+  /** тело ответа прямо в правиле (без файла на диске); имеет приоритет над localFilePath */
+  responseBody?: string
   contentType?: string
   requestHeaderOverrides?: HeaderOverride[]
   responseHeaderOverrides?: HeaderOverride[]

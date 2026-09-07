@@ -31,6 +31,7 @@ import { useThemeMode } from './hooks/useThemeMode'
 import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
+import { compareGroupNames } from '../shared/ruleGroups'
 import type { Rule } from '../shared/types'
 
 const ANTD_LOCALES = { ru: ruRU, en: enUS }
@@ -113,6 +114,16 @@ export default function App(): React.ReactElement {
   const handleToggle = (rule: Rule, enabled: boolean): void => {
     persist(updateRuleById(rule.id, { enabled }))
   }
+
+  const handleMoveToGroup = (ruleId: string, targetGroup: string): void => {
+    persist(updateRuleById(ruleId, { group: targetGroup }))
+  }
+
+  // непустые группы из текущих правил — подсказки в форме правила (порядок как в списке)
+  const knownGroups = useMemo(
+    () => [...new Set(rules.map((r) => r.group).filter((g): g is string => !!g))].sort(compareGroupNames),
+    [rules]
+  )
 
   const handleToggleAll = (enabled: boolean): void => {
     persist(rules.map((r) => ({ ...r, enabled })))
@@ -284,7 +295,12 @@ export default function App(): React.ReactElement {
                 />
               </Flex>
               <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
-                <RulesTable rules={rules} onToggle={handleToggle} onEdit={handleEdit} />
+                <RulesTable
+                  rules={rules}
+                  onToggle={handleToggle}
+                  onEdit={handleEdit}
+                  onMoveToGroup={handleMoveToGroup}
+                />
               </div>
             </div>
           </Splitter.Panel>
@@ -293,6 +309,7 @@ export default function App(): React.ReactElement {
         <RuleFormModal
           open={modalOpen}
           initialValue={editingRule}
+          knownGroups={knownGroups}
           onCancel={() => setModalOpen(false)}
           onSubmit={handleSubmit}
           onDelete={handleDelete}
