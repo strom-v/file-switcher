@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import {
+  Alert,
   Checkbox,
   ConfigProvider,
   Drawer,
@@ -24,6 +25,7 @@ import SettingsPanel from './components/SettingsPanel'
 import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
 import { useProxyState } from './hooks/useProxyState'
+import { useVpnStatus } from './hooks/useVpnStatus'
 import { useLogStorageLimit } from './hooks/useLogStorageLimit'
 import { useProxySettings } from './hooks/useProxySettings'
 import { useSplitterSize } from './hooks/useSplitterSize'
@@ -74,6 +76,7 @@ export default function App(): React.ReactElement {
   const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
     message.warning(text)
   })
+  const { vpn, check: checkVpn } = useVpnStatus()
 
   useEffect(() => {
     window.api.rules.get().then(setRules)
@@ -167,6 +170,12 @@ export default function App(): React.ReactElement {
   }
 
   const handleStart = async (): Promise<void> => {
+    // проверяем VPN прямо перед запуском: full-tunnel (blocksProxy) точно ломает перехват —
+    // предупреждаем явно; просто активный VPN обычно не мешает — не отвлекаем
+    const vpnNow = await checkVpn()
+    if (vpnNow.blocksProxy) {
+      message.warning(t('app.vpnBlocksWarning'))
+    }
     const state = await window.api.proxy.start(port)
     if (state.status === 'crashed') {
       message.error(state.error ?? t('proxyErrors.startFailed'))
@@ -255,7 +264,14 @@ export default function App(): React.ReactElement {
               </Popconfirm>
             )}
             <IconButton
-              tooltip={status.error ?? t('app.vpnWarning')}
+              tooltip={
+                status.error ??
+                (vpn.blocksProxy
+                  ? t('app.vpnBlocksWarning')
+                  : vpn.active
+                    ? t('app.vpnWarning')
+                    : t(status.status === 'running' ? 'app.stopProxyButton' : 'app.startProxyButton'))
+              }
               icon={status.status === 'running' ? <StopOutlined /> : <PlayCircleOutlined />}
               onClick={status.status === 'running' ? handleStop : handleStart}
               disabled={status.status === 'starting'}
@@ -267,6 +283,12 @@ export default function App(): React.ReactElement {
             />
           </Space>
         </Flex>
+
+        {/* full-tunnel VPN точно ломает перехват — заметный алерт, висит пока такой VPN активен
+            и сам исчезает при его отключении (закрыть вручную нельзя, иначе потерялось бы) */}
+        {vpn.blocksProxy && (
+          <Alert type="error" showIcon message={t('app.vpnBlocksWarning')} style={{ marginBottom: 8 }} />
+        )}
 
         <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
           <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">

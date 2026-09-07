@@ -2,6 +2,9 @@
   "app": {
     "settingsButton": "settings",
     "vpnWarning": "with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app",
+    "vpnBlocksWarning": "all traffic is routed through a VPN — interception and substitution don't work; turn off the VPN or switch it to split tunneling",
+    "startProxyButton": "start proxy",
+    "stopProxyButton": "stop proxy",
     "relaunchButton": "restart the app",
     "relaunchConfirm": "restart the app? the proxy will be stopped and started again"
   },
@@ -116,7 +119,7 @@
     "removeCertSuccess": "certificate trust removed",
     "removeCertError": "failed to remove trust: {{message}}",
     "firefoxWarningTitle": "Firefox is not supported in the MVP",
-    "firefoxWarningDescription": "Firefox uses its own certificate store (NSS), not the system Keychain. import the certificate manually via about:preferences#privacy → Certificates.",
+    "firefoxWarningDescription": "Firefox uses its own certificate store (NSS), not the system one. import the certificate manually via about:preferences#privacy → Certificates.",
     "statusLabels": {
       "stopped": "stopped",
       "starting": "starting",
@@ -142,11 +145,11 @@
       },
       "downloadCert": {
         "title": "download the certificate",
-        "description": "download the certificate for your OS (macOS)"
+        "description": "download the certificate for your OS"
       },
       "trustCert": {
         "title": "trust the certificate",
-        "description": "in Settings, click «Install automatically», or trust it manually via Keychain Access"
+        "description": "in Settings, click «Install automatically», or trust it manually in the system certificate store"
       }
     }
   },

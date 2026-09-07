@@ -4,6 +4,7 @@ import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
 import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
 import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
+import { platform } from './platform'
 import { replayRequest } from './replayRequest'
 import type { ProxyLogEvent } from '../shared/types'
 
@@ -31,6 +32,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('system:sudoersInstalled', () => isSudoersRuleInstalled())
 
   ipcMain.handle('system:installSudoersRule', () => installSudoersRule())
+
+  ipcMain.handle('system:vpnStatus', () => platform.systemProxy.getVpnStatus())
 
   ipcMain.handle('cert:status', () => getCertStatus())
 

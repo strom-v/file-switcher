@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Собирает standalone-бинарник mitmdump для macOS (resources/bin/mac/).
+# PyInstaller НЕ кросс-компилирует: бинарник для Windows нужно собрать на Windows-машине тем же
+# scripts/mitmdump.spec — `pyinstaller scripts/mitmdump.spec --distpath resources/bin/win --workpath build`
+# (в venv с requirements-build.txt), PyInstaller сам добавит .exe. Аналогично для Linux → resources/bin/linux.
+
 cd "$(dirname "$0")/.."
 
 if [ ! -d .venv ]; then

@@ -3,7 +3,7 @@ import { EventEmitter } from 'events'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
-import { disableSystemProxy, enableSystemProxy } from './proxySystemConfig'
+import { platform } from './platform'
 import type { ProxyState, ProxyLogEvent } from '../shared/types'
 
 export type { ProxyStatus, ProxyState, ProxyLogEvent } from '../shared/types'
@@ -38,13 +38,14 @@ export class ProxyController extends EventEmitter {
   // менять нужно только эту константу, а не искать все места с магическим числом '..'
   private readonly devProjectRoot = join(__dirname, '..', '..')
 
-  /** Путь к standalone-бинарнику mitmdump (PyInstaller) либо к системному в dev-режиме */
+  /** Путь к standalone-бинарнику mitmdump (PyInstaller) либо к venv-бинарнику в dev-режиме */
   private resolveMitmdumpPath(): string {
     if (is.dev) {
-      return join(this.devProjectRoot, '.venv', 'bin', 'mitmdump')
+      // venv кладёт исполняемые в bin/ (POSIX) либо Scripts/ (Windows)
+      const venvBinDir = process.platform === 'win32' ? 'Scripts' : 'bin'
+      return join(this.devProjectRoot, '.venv', venvBinDir, platform.paths.mitmdumpBinName)
     }
-    const platformDir = process.platform === 'darwin' ? 'mac' : process.platform
-    return join(process.resourcesPath, 'bin', platformDir, 'mitmdump')
+    return join(process.resourcesPath, 'bin', platform.paths.mitmdumpBinDir, platform.paths.mitmdumpBinName)
   }
 
   private resolveAddonPath(): string {
@@ -152,24 +153,22 @@ export class ProxyController extends EventEmitter {
     await this.revertSystemProxy()
   }
 
-  /** Включает системный HTTP/HTTPS-прокси macOS на активных сетевых интерфейсах, как это делает Fiddler на Windows */
+  /** Включает системный HTTP/HTTPS-прокси ОС на активных интерфейсах (реализация зависит от платформы) */
   private async applySystemProxy(port: number): Promise<void> {
-    if (process.platform !== 'darwin') return
     try {
-      await enableSystemProxy('127.0.0.1', port)
+      await platform.systemProxy.enable('127.0.0.1', port)
     } catch (err) {
-      // пользователь мог отменить системный диалог авторизации — прокси-сервер всё равно
-      // работает, просто трафик нужно будет направить через него вручную
+      // пользователь мог отменить системный диалог авторизации, либо платформа не поддерживает
+      // авто-настройку — прокси-сервер всё равно работает, трафик нужно направить вручную
       const message = err instanceof Error ? err.message : String(err)
       this.emit('stderr', `Не удалось включить системный прокси автоматически: ${message}`)
     }
   }
 
-  /** Возвращает системный прокси macOS в состояние до запуска */
+  /** Возвращает системный прокси ОС в состояние до запуска */
   private async revertSystemProxy(): Promise<void> {
-    if (process.platform !== 'darwin') return
     try {
-      await disableSystemProxy()
+      await platform.systemProxy.disable()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       this.emit('stderr', `Не удалось восстановить системный прокси: ${message}`)

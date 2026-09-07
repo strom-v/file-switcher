@@ -2,6 +2,9 @@
   "app": {
     "settingsButton": "настройки",
     "vpnWarning": "при некоторых VPN перехват и подмена трафика могут не работать — рекомендуется отключить VPN перед работой с программой",
+    "vpnBlocksWarning": "весь трафик идёт через VPN — перехват и подмена не работают, отключите VPN или переведите его в режим раздельного туннелирования",
+    "startProxyButton": "запустить прокси",
+    "stopProxyButton": "остановить прокси",
     "relaunchButton": "перезапустить программу",
     "relaunchConfirm": "перезапустить программу? прокси будет остановлен и запущен заново"
   },
@@ -116,7 +119,7 @@
     "removeCertSuccess": "доверие к сертификату удалено",
     "removeCertError": "не удалось удалить доверие: {{message}}",
     "firefoxWarningTitle": "Firefox не поддерживается в MVP",
-    "firefoxWarningDescription": "Firefox использует собственное хранилище сертификатов (NSS), а не системный Keychain. импортируйте сертификат вручную через about:preferences#privacy → Certificates.",
+    "firefoxWarningDescription": "Firefox использует собственное хранилище сертификатов (NSS), а не системное. импортируйте сертификат вручную через about:preferences#privacy → Certificates.",
     "statusLabels": {
       "stopped": "остановлен",
       "starting": "запускается",
@@ -140,10 +143,10 @@
         "title": "откройте mitm.it",
         "description": "в браузере с активным прокси перейдите на http://mitm.it"
       },
-      "downloadCert": { "title": "скачайте сертификат", "description": "скачайте сертификат для вашей ОС (macOS)" },
+      "downloadCert": { "title": "скачайте сертификат", "description": "скачайте сертификат для вашей ОС" },
       "trustCert": {
         "title": "доверьтесь сертификату",
-        "description": "в «настройках» нажмите «установить автоматически», либо доверьтесь вручную через Keychain Access"
+        "description": "в «настройках» нажмите «установить автоматически», либо доверьтесь вручную в системном хранилище"
       }
     }
   },

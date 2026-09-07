@@ -75,3 +75,11 @@ export interface CertInfo {
   expiresAt: string
   trusted: boolean
 }
+
+export interface VpnStatus {
+  /** есть признаки VPN: подключённый VPN-сервис ОС или активный туннельный интерфейс */
+  active: boolean
+  /** дефолтный сетевой маршрут идёт через туннельный интерфейс — full-tunnel VPN, при котором
+   * системный прокси не перехватывает трафик (split-tunnel не мешает и сюда не попадает) */
+  blocksProxy: boolean
+}

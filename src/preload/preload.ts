@@ -1,6 +1,6 @@
 import { homedir } from 'os'
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, ReplayResult } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, ReplayResult, VpnStatus } from '../shared/types'
 
 const api = {
   // домашняя папка текущего пользователя — renderer сам её получить не может (contextIsolation);
@@ -48,7 +48,8 @@ const api = {
   },
   system: {
     sudoersInstalled: (): Promise<boolean> => ipcRenderer.invoke('system:sudoersInstalled'),
-    installSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:installSudoersRule')
+    installSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:installSudoersRule'),
+    vpnStatus: (): Promise<VpnStatus> => ipcRenderer.invoke('system:vpnStatus')
   },
   app: {
     // останавливает прокси/откатывает системный прокси (через 'before-quit' в main.ts) и
