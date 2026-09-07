@@ -122,12 +122,13 @@ class ResponseSwitcher:
 
         flow.metadata[MATCH_RULE_KEY] = rule
 
-        # инлайн-тело в самом правиле имеет приоритет над файлом на диске
+        # инлайн-тело в самом правиле имеет приоритет над файлом на диске; в лог как "файл подмены"
+        # писать нечего — тело задано прямо в правиле, поэтому пустая строка (событие всё равно matched)
         inline_body = rule.get("responseBody")
         if inline_body:
             content_type = rule.get("contentType") or "application/json; charset=utf-8"
             flow.response = self._make_swap_response(flow, inline_body.encode("utf-8"), content_type)
-            flow.metadata[MATCH_FILE_KEY] = "<inline>"
+            flow.metadata[MATCH_FILE_KEY] = ""
             return
 
         path = rule.get("localFilePath")

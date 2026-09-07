@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
-import { Button, Collapse, Descriptions, message, Modal, Typography } from 'antd'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Button, Collapse, Descriptions, Flex, message, Modal, Segmented, Typography } from 'antd'
+import { CopyOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import JsonTree from './JsonTree'
 import { formatHeaders, formatSize, tryParseJson, tsToDate } from '../formatters'
@@ -11,58 +12,84 @@ interface LogDetailModalProps {
   onClose: () => void
 }
 
-interface BodySectionProps {
-  title: React.ReactNode
-  body: string
-  isBinary: boolean
-  size: number
+type DetailView = 'text' | 'tree'
+
+interface DetailSectionBodyProps {
+  /** плоский текст для режима "текст" и для копирования */
+  text: string
+  /** значение для дерева (заголовки — объект, тело — разобранный JSON); undefined — дерева нет */
+  tree?: unknown
+  /** бинарное тело — ни текст, ни дерево не показываем, только пометку */
+  binaryNote?: string
 }
 
-/** Секция тела запроса/ответа: сырой текст по умолчанию, с кнопкой переключения на сворачиваемое
- * JSON-дерево (как jsonview в SBIS LOGS) под валидный JSON; для бинарных данных (картинка, шрифт
- * и т.п.) — явная пометка вместо нечитаемой каши символов. Не рендерится вовсе для пустого тела —
- * см. вызывающий код (LogDetailModal). */
-function BodySection({ title, body, isBinary, size }: BodySectionProps): React.ReactElement {
+/** Тело одной сворачиваемой панели (заголовки или тело запроса/ответа): переключатель текст/дерево
+ * и кнопка копирования в одну строку, блок с растущей до потолка высотой и внутренним скроллом —
+ * единый вид для всех секций. Стартует в режиме "текст"; вызывающий пересоздаёт компонент через
+ * key при смене записи. */
+function DetailSectionBody({ text, tree, binaryNote }: DetailSectionBodyProps): React.ReactElement {
   const { t } = useTranslation()
-  const [formatted, setFormatted] = useState(false)
+  const treeAvailable = tree !== undefined
+  const [view, setView] = useState<DetailView>('text')
+  const showTree = view === 'tree' && treeAvailable
 
-  const parsed = !isBinary && formatted ? tryParseJson(body) : null
-  // кнопка нажата, но дерево не показывается — либо это не JSON, либо тело слишком большое для
-  // разбора (см. FORMAT_JSON_MAX_LENGTH); пользователю нужно явное объяснение, а не молчание
-  const formatDidNothing = formatted && parsed?.ok === false
+  if (binaryNote) {
+    return (
+      <div className="headers-panel headers-panel--tall">
+        <Typography.Text type="secondary" className="text-sm">
+          {binaryNote}
+        </Typography.Text>
+      </div>
+    )
+  }
+
+  const handleCopy = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text)
+      message.success(t('log.copied'))
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   return (
     <>
-      <Typography.Text strong copyable={!isBinary && { text: body }} className="text-sm">
-        {title}
-      </Typography.Text>{' '}
-      {!isBinary && (
-        <Button size="small" type="link" onClick={() => setFormatted((prev) => !prev)}>
-          {t(formatted ? 'log.formatRawButton' : 'log.formatButton')}
-        </Button>
-      )}
-      {!isBinary && formatDidNothing && (
-        <Typography.Text type="secondary" className="text-sm">
-          {' '}
-          {t('log.formatNotApplicable')}
-        </Typography.Text>
-      )}
+      <Flex gap={4} justify="flex-end" align="center" style={{ marginBottom: 6 }}>
+        {treeAvailable && (
+          <Segmented<DetailView>
+            size="small"
+            value={view}
+            onChange={setView}
+            options={[
+              { label: t('log.viewText'), value: 'text' },
+              { label: t('log.viewTree'), value: 'tree' }
+            ]}
+          />
+        )}
+        <Button size="small" type="text" icon={<CopyOutlined />} onClick={handleCopy} title={t('log.copyAll')} />
+      </Flex>
       <div className="headers-panel headers-panel--tall">
-        {isBinary ? (
-          <Typography.Text type="secondary" className="text-sm">
-            {t('log.bodyIsBinary', { size: formatSize(size) })}
-          </Typography.Text>
-        ) : parsed?.ok === true ? (
-          <JsonTree value={parsed.value} />
+        {showTree ? (
+          <JsonTree value={tree} defaultExpandDepth={2} />
         ) : (
-          <Typography.Paragraph className="pre-wrap text-sm">{body || '—'}</Typography.Paragraph>
+          <Typography.Paragraph className="pre-wrap text-sm" style={{ marginBottom: 0 }}>
+            {text || '—'}
+          </Typography.Paragraph>
         )}
       </div>
     </>
   )
 }
 
-/** Детальный просмотр одного запроса из лога: метод, статус, заголовки запроса и ответа */
+/** Разбирает тело в значение для дерева: undefined — бинарное или не JSON (дерево недоступно) */
+function bodyTree(body: string, isBinary: boolean): unknown {
+  if (isBinary) return undefined
+  const parsed = tryParseJson(body)
+  return parsed.ok ? parsed.value : undefined
+}
+
+/** Детальный просмотр одного запроса из лога: метод, статус, заголовки и тела запроса/ответа —
+ * каждая секция сворачивается (Collapse) и умеет показывать данные плоским текстом или деревом */
 export default function LogDetailModal({ event, onClose }: LogDetailModalProps): React.ReactElement {
   const { t } = useTranslation()
   const formattedTime = event ? tsToDate(event.ts).toLocaleString() : ''
@@ -87,6 +114,49 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
       setReplaying(false)
     }
   }
+
+  // key на DetailSectionBody завязан на ts записи — при выборе другой строки лога компонент
+  // пересоздаётся и режим просмотра (текст/дерево) сбрасывается на "текст"
+  const sections = useMemo(() => {
+    if (!event) return []
+
+    // заголовки — всегда; тела — только непустые
+    const specs: { key: string; label: string; text: string; tree?: unknown; binaryNote?: string }[] = [
+      {
+        key: 'requestHeaders',
+        label: t('log.detailRequestHeaders'),
+        text: formatHeaders(event.requestHeaders),
+        tree: event.requestHeaders
+      },
+      {
+        key: 'responseHeaders',
+        label: t('log.detailResponseHeaders'),
+        text: formatHeaders(event.responseHeaders),
+        tree: event.responseHeaders
+      }
+    ]
+
+    for (const [key, label, body, isBinary, size] of [
+      ['requestBody', t('log.detailRequestBody'), event.requestBody, event.requestBodyIsBinary, event.requestBodySize],
+      ['responseBody', t('log.detailResponseBody'), event.responseBody, event.responseBodyIsBinary, event.responseSize]
+    ] as const) {
+      if (body) {
+        specs.push({
+          key,
+          label,
+          text: body,
+          tree: bodyTree(body, isBinary),
+          binaryNote: isBinary ? t('log.bodyIsBinary', { size: formatSize(size) }) : undefined
+        })
+      }
+    }
+
+    return specs.map((spec) => ({
+      key: spec.key,
+      label: spec.label,
+      children: <DetailSectionBody key={event.ts} text={spec.text} tree={spec.tree} binaryNote={spec.binaryNote} />
+    }))
+  }, [event, t])
 
   return (
     <Modal
@@ -120,77 +190,21 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             <Descriptions.Item label={t('log.detailStatus')}>{event.statusCode ?? '—'}</Descriptions.Item>
             <Descriptions.Item label={t('log.detailTime')}>{formattedTime}</Descriptions.Item>
             <Descriptions.Item label={t('log.detailSize')}>{formatSize(event.responseSize)}</Descriptions.Item>
-            {event.event === 'matched' && (
-              <Descriptions.Item label={t('log.detailFile')}>
-                <Typography.Text copyable className="break-all text-sm">
-                  {event.file}
-                </Typography.Text>
-              </Descriptions.Item>
-            )}
           </Descriptions>
 
-          {/* заголовки свёрнуты по умолчанию — обычно интересны реже тела, а места занимают много;
-              defaultActiveKey не задан, значит обе панели стартуют закрытыми, пользователь
-              разворачивает нужную вручную */}
-          <Collapse
-            size="small"
-            style={{ marginBottom: 8 }}
-            items={[
-              {
-                key: 'requestHeaders',
-                label: t('log.detailRequestHeaders'),
-                children: (
-                  <Typography.Paragraph
-                    className="pre-wrap text-sm"
-                    copyable={{ text: formatHeaders(event.requestHeaders) }}
-                    style={{ marginBottom: 0 }}
-                  >
-                    {formatHeaders(event.requestHeaders)}
-                  </Typography.Paragraph>
-                )
-              },
-              {
-                key: 'responseHeaders',
-                label: t('log.detailResponseHeaders'),
-                children: (
-                  <Typography.Paragraph
-                    className="pre-wrap text-sm"
-                    copyable={{ text: formatHeaders(event.responseHeaders) }}
-                    style={{ marginBottom: 0 }}
-                  >
-                    {formatHeaders(event.responseHeaders)}
-                  </Typography.Paragraph>
-                )
-              }
-            ]}
-          />
-
-          {/* пустое тело нечего показывать — секция не рендерится вовсе, а не показывает "—" */}
-          {event.requestBody && (
-            <BodySection
-              title={t('log.detailRequestBody')}
-              body={event.requestBody}
-              isBinary={event.requestBodyIsBinary}
-              size={event.requestBodySize}
-            />
-          )}
-          {event.responseBody && (
-            <BodySection
-              title={t('log.detailResponseBody')}
-              body={event.responseBody}
-              isBinary={event.responseBodyIsBinary}
-              size={event.responseSize}
-            />
-          )}
+          {/* все секции свёрнуты по умолчанию — defaultActiveKey не задан */}
+          <Collapse size="small" style={{ marginBottom: 8 }} items={sections} />
 
           {replayResult && (
             <>
               <Typography.Text strong className="text-sm" style={{ color: httpStatusColor(replayResult.statusCode) }}>
                 {t('log.replayResultLabel')} {replayResult.statusCode}
               </Typography.Text>
-              <div className="headers-panel">
-                <Typography.Paragraph className="pre-wrap text-sm">{replayResult.body || '—'}</Typography.Paragraph>
-              </div>
+              <DetailSectionBody
+                key={`replay-${event.ts}`}
+                text={replayResult.body}
+                tree={bodyTree(replayResult.body, false)}
+              />
             </>
           )}
         </>

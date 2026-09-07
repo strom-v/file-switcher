@@ -142,8 +142,9 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                 const isMatched = item.event === 'matched'
                 // одна строка на запись — Listy вычисляет высоту строки из design-токенов и не
                 // поддерживает произвольную многострочную высоту; для matched URL и путь к файлу
-                // сведены в одну строку через разделитель, а не выведены отдельной строкой под URL
-                const urlText = isMatched ? item.url + ' • ' + item.file : item.url
+                // сведены в одну строку через разделитель, а не выведены отдельной строкой под URL.
+                // file пустой — подмена инлайновым телом или только заголовками, показываем один URL
+                const urlText = isMatched && item.file ? `${item.url} • ${item.file}` : item.url
                 return (
                   <div
                     className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}

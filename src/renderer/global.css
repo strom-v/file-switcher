@@ -54,9 +54,10 @@ html.dark-scrollbars .scroll-panel--panel-bg {
   border-color: rgba(255, 255, 255, 0.15);
 }
 
-/* блок заголовков запроса/ответа в деталях лога: рамка, фиксированная высота, внутренний скролл */
+/* блок заголовков/тела запроса/ответа в деталях лога: рамка, растёт по контенту до потолка,
+   дальше внутренний скролл — короткие заголовки не оставляют пустого места */
 .headers-panel {
-  height: 100px;
+  max-height: 160px;
   overflow: auto;
   margin-top: 2px;
   margin-bottom: 6px;
@@ -65,9 +66,9 @@ html.dark-scrollbars .scroll-panel--panel-bg {
   border-radius: 4px;
 }
 
-/* блок тела запроса/ответа — крупнее заголовков, там обычно больше данных на просмотр */
+/* блок тела запроса/ответа — выше потолок, там обычно больше данных на просмотр */
 .headers-panel--tall {
-  height: 220px;
+  max-height: 280px;
 }
 
 html.dark-scrollbars .headers-panel {
