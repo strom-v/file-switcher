@@ -4,6 +4,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { platform } from './platform'
+import { logStore } from './logStore'
 import type { ProxyState, ProxyLogEvent } from '../shared/types'
 
 export type { ProxyStatus, ProxyState, ProxyLogEvent } from '../shared/types'
@@ -192,8 +193,9 @@ export class ProxyController extends EventEmitter {
     }
   }
 
-  // копит события в pendingLogs и один раз на интервал эмиттит их пачкой как 'logBatch' —
-  // вместо отдельного 'log'-события (и, соответственно, отдельного IPC-сообщения) на каждый запрос
+  // копит события в pendingLogs и один раз на интервал пишет пачку в файл лога, а в renderer
+  // эмиттит только лёгкие метаданные (тела/заголовки остаются на диске) — это и снижает частоту
+  // IPC-сообщений, и держит память renderer маленькой
   private queueLogEvent(event: ProxyLogEvent): void {
     this.pendingLogs.push(event)
     if (this.logBatchTimer) return
@@ -202,7 +204,7 @@ export class ProxyController extends EventEmitter {
       const batch = this.pendingLogs
       this.pendingLogs = []
       this.logBatchTimer = null
-      this.emit('logBatch', batch)
+      this.emit('logBatch', logStore.appendBatch(batch))
     }, LOG_BATCH_INTERVAL_MS)
   }
 }

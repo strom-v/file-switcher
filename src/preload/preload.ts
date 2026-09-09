@@ -1,6 +1,6 @@
 import { homedir } from 'os'
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, CertStatus, CertInfo, ReplayResult, VpnStatus } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, LogEntryMeta, CertStatus, CertInfo, VpnStatus } from '../shared/types'
 
 const api = {
   // домашняя папка текущего пользователя — renderer сам её получить не может (contextIsolation);
@@ -19,10 +19,10 @@ const api = {
       ipcRenderer.on('proxy:status', listener)
       return () => ipcRenderer.removeListener('proxy:status', listener)
     },
-    // события лога приходят пачками (см. proxyController: LOG_BATCH_INTERVAL_MS), а не по одному —
-    // снижает частоту IPC-сообщений при активном трафике
-    onLogBatch: (callback: (events: ProxyLogEvent[]) => void): (() => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, batch: ProxyLogEvent[]): void => callback(batch)
+    // события лога приходят пачками (см. proxyController: LOG_BATCH_INTERVAL_MS) и только лёгкими
+    // метаданными — тела/заголовки лежат на диске, грузятся через log.getEvent
+    onLogBatch: (callback: (events: LogEntryMeta[]) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, batch: LogEntryMeta[]): void => callback(batch)
       ipcRenderer.on('proxy:logBatch', listener)
       return () => ipcRenderer.removeListener('proxy:logBatch', listener)
     },
@@ -31,8 +31,20 @@ const api = {
       ipcRenderer.on('proxy:stderr', listener)
       return () => ipcRenderer.removeListener('proxy:stderr', listener)
     },
-    // отправляет запрос из лога заново напрямую на реальный сервер (не через локальный прокси)
-    replayRequest: (event: ProxyLogEvent): Promise<ReplayResult> => ipcRenderer.invoke('proxy:replayRequest', event)
+    // повторяет запрос из лога напрямую на реальный сервер (не через прокси); возвращает лёгкую
+    // запись лога event: 'replay', которую renderer добавляет в список
+    replayRequest: (event: ProxyLogEvent): Promise<LogEntryMeta> => ipcRenderer.invoke('proxy:replayRequest', event)
+  },
+  log: {
+    // последние записи лога сессии для первичной отрисовки списка
+    getRecent: (): Promise<LogEntryMeta[]> => ipcRenderer.invoke('log:getRecent'),
+    // полное событие (с телами и заголовками) по ts — для окна деталей
+    getEvent: (ts: number): Promise<ProxyLogEvent | null> => ipcRenderer.invoke('log:getEvent', ts),
+    // поиск по url/файлу подмены; searchInBody — дополнительно по телу запроса/ответа
+    search: (query: string, searchInBody: boolean): Promise<LogEntryMeta[]> =>
+      ipcRenderer.invoke('log:search', query, searchInBody),
+    // весь лог сессии, сериализованный в har/json/csv
+    exportAs: (format: 'har' | 'json' | 'csv'): Promise<string> => ipcRenderer.invoke('log:export', format)
   },
   cert: {
     status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),

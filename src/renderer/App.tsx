@@ -26,7 +26,6 @@ import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
 import { useProxyState } from './hooks/useProxyState'
 import { useVpnStatus } from './hooks/useVpnStatus'
-import { useLogStorageLimit } from './hooks/useLogStorageLimit'
 import { useProxySettings } from './hooks/useProxySettings'
 import { useSplitterSize } from './hooks/useSplitterSize'
 import { useThemeMode } from './hooks/useThemeMode'
@@ -34,7 +33,7 @@ import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
 import { compareGroupNames } from '../shared/ruleGroups'
-import type { Rule } from '../shared/types'
+import type { ProxyLogEvent, Rule } from '../shared/types'
 
 const ANTD_LOCALES = { ru: ruRU, en: enUS }
 
@@ -43,7 +42,6 @@ const RESETTABLE_STORAGE_KEYS = [
   'file-switcher:theme',
   'file-switcher:language',
   'file-switcher:font-size',
-  'file-switcher:log-storage-limit',
   'file-switcher:port',
   'file-switcher:auto-start-proxy',
   'file-switcher:splitter-size'
@@ -71,9 +69,8 @@ export default function App(): React.ReactElement {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { splitterSize, setSplitterSize } = useSplitterSize()
-  const { logStorageLimit, setLogStorageLimit } = useLogStorageLimit()
   const { port, setPort, autoStart, setAutoStart } = useProxySettings()
-  const { status, logs, clearLogs } = useProxyState(logStorageLimit, (text) => {
+  const { status, logs, clearLogs, appendLog } = useProxyState((text) => {
     message.warning(text)
   })
   const { vpn, check: checkVpn } = useVpnStatus()
@@ -144,6 +141,16 @@ export default function App(): React.ReactElement {
 
   const handleAdd = (): void => {
     setEditingRule(null)
+    setModalOpen(true)
+  }
+
+  // черновик правила из строки лога: URL запроса как regex с экранированными спецсимволами
+  // (точное совпадение по умолчанию, пользователь может ослабить в форме), поле подмены пустое,
+  // contentType — тип исходного ответа (используется, если пользователь заполнит инлайн-тело)
+  const handleAddRuleFromLog = (log: ProxyLogEvent): void => {
+    const escaped = log.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const contentType = log.responseHeaders['content-type'] || log.responseHeaders['Content-Type']
+    setEditingRule({ enabled: true, isRegex: true, urlPattern: escaped, group: '', contentType })
     setModalOpen(true)
   }
 
@@ -293,7 +300,7 @@ export default function App(): React.ReactElement {
         <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
           <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">
             <div style={{ height: '100%', paddingRight: 8 }}>
-              <LogPanel logs={logs} onClear={clearLogs} />
+              <LogPanel logs={logs} onClear={clearLogs} onAddRule={handleAddRuleFromLog} onReplayLogged={appendLog} />
             </div>
           </Splitter.Panel>
           <Splitter.Panel>
@@ -345,7 +352,7 @@ export default function App(): React.ReactElement {
             onPortChange={setPort}
             autoStart={autoStart}
             onAutoStartChange={setAutoStart}
-            logs={logs}
+            logCount={logs.length}
             rules={rules}
             onRulesImport={persist}
             onRulesRefresh={handleRefreshRules}
@@ -357,8 +364,6 @@ export default function App(): React.ReactElement {
             onFontSizeChange={setFontSize}
             splitterSize={splitterSize}
             onSplitterSizeChange={setSplitterSize}
-            logStorageLimit={logStorageLimit}
-            onLogStorageLimitChange={setLogStorageLimit}
             onResetSettings={handleResetSettings}
           />
         </Drawer>

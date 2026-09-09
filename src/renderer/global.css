@@ -217,6 +217,16 @@ html.dark-scrollbars .rules-table--compact .ant-table-tbody > tr:not(.rules-tabl
   background-color: rgba(82, 196, 26, 0.15);
 }
 
+/* запись о повторной отправке запроса (replay из контекстного меню) — жёлтый фон, чтобы
+   отличать от оригинального трафика */
+.ant-listy-item:has(> .log-item--replay) {
+  background-color: rgba(250, 219, 20, 0.18);
+}
+
+.ant-listy-item:has(> .log-item--replay):hover {
+  background-color: rgba(250, 219, 20, 0.28);
+}
+
 /* строка лога целиком кликабельна (открывает детали запроса) — лёгкая подсветка при наведении
    как визуальный сигнал; matched-строка уже подсвечена, поэтому оверлей поверх её зелёного фона
    бледнее (:not(:has(.log-item--matched))), чтобы не перекрашивать значимый зелёный цвет */

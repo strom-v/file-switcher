@@ -33,12 +33,9 @@
       "urlPatternRequired": "enter a URL or regex",
       "group": "group",
       "groupPlaceholder": "pick or type a new one",
-      "swapKind": "substitution kind",
-      "swapKindFile": "file",
-      "swapKindBody": "response body",
+      "swapKindHint": "fill in either the file path or the response body below — if the body is set, it is used",
       "localFile": "local file",
       "localFilePlaceholder": "/path/to/file or /path/to/$2.$3",
-      "contentType": "Content-Type",
       "responseBody": "response body",
       "responseBodyPlaceholder": "{\"result\": ...}",
       "bodyViewText": "text",
@@ -58,6 +55,7 @@
   "log": {
     "clear": "clear",
     "clearConfirm": "clear the entire log?",
+    "clearMatchedConfirm": "clear substitution entries?",
     "exportButton": "export",
     "exportSuccess": "log saved: {{path}}",
     "empty": "no requests yet",
@@ -82,8 +80,13 @@
     "copyAll": "copy all",
     "copied": "copied",
     "replayButton": "replay request",
+    "replayInProgress": "replaying request…",
     "replayResultLabel": "replay status:",
-    "bodyIsBinary": "binary file, {{size}}"
+    "contextAddRule": "add to rules",
+    "contextCopyUrl": "copy URL",
+    "contextCopy": "copy",
+    "bodyIsBinary": "binary file, {{size}}",
+    "eventUnavailable": "entry not found in the log file"
   },
   "settings": {
     "error": "error",
@@ -99,12 +102,10 @@
     "groupDataRulesHint": "export — save current rules to a file; import — replace them with a file's contents; refresh — re-read the rules list from disk",
     "groupDataLog": "log",
     "groupDataLogHint": "save the current traffic log to a file in the selected format",
-    "logStorageLimitLabel": "entries kept in memory (per category)",
-    "logStorageLimitHint": "how many recent log entries are kept separately for \"matched\" and \"passed\"",
     "portHint": "the port the local proxy server runs on — point your browser's or system's traffic at it",
     "autoStartLabel": "start the proxy automatically when the app launches",
     "resetButton": "reset all settings",
-    "resetConfirm": "reset language, theme, font size, port, auto-start, and log limit to their defaults?",
+    "resetConfirm": "reset language, theme, font size, port, and auto-start to their defaults?",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
     "sudoersInstallButton": "set up passwordless",
@@ -138,7 +139,10 @@
         "title": "add a rule",
         "description": "in the Rules panel on the right, specify a URL and a local file"
       },
-      "startProxy": { "title": "start the proxy", "description": "open Settings and click «Start proxy»" },
+      "startProxy": {
+        "title": "start the proxy",
+        "description": "open Settings and click «Start proxy»"
+      },
       "openMitm": {
         "title": "open mitm.it",
         "description": "with the proxy active, open http://mitm.it in your browser"

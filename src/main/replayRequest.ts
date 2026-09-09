@@ -1,4 +1,4 @@
-import type { ProxyLogEvent, ReplayResult } from '../shared/types'
+import type { ProxyLogEvent } from '../shared/types'
 
 const REPLAY_TIMEOUT_MS = 15_000
 
@@ -18,10 +18,11 @@ const SKIPPED_REPLAY_HEADERS = new Set([
 
 /** Повторяет запрос из лога напрямую на реальный сервер (не через локальный прокси — иначе
  * запрос снова попал бы в addon.py и, если правило матчит, снова получил бы подмену вместо
- * повторения оригинального запроса). Тело запроса в логе уже декодировано как текст, поэтому
- * повторная отправка бинарных тел исказит байты — вызывающий код обязан не звать эту функцию
- * для requestBodyIsBinary: true (проверяется и здесь на всякий случай). */
-export async function replayRequest(event: ProxyLogEvent): Promise<ReplayResult> {
+ * повторения оригинального запроса). Возвращает готовую запись лога (event: 'replay'), которую
+ * renderer добавляет в список. Тело запроса в логе уже декодировано как текст, поэтому повторная
+ * отправка бинарных тел исказит байты — вызывающий код не должен звать эту функцию для
+ * requestBodyIsBinary: true (проверяется и здесь на всякий случай). */
+export async function replayRequest(event: ProxyLogEvent): Promise<ProxyLogEvent> {
   if (event.requestBodyIsBinary) {
     throw new Error('Тело запроса бинарное — повторная отправка исказит данные')
   }
@@ -43,11 +44,22 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ReplayResult>
       body: hasBody ? event.requestBody : undefined,
       signal: controller.signal
     })
-    const body = await response.text()
+    const responseBody = await response.text()
     return {
+      event: 'replay',
+      url: event.url,
+      file: '',
+      method: event.method,
       statusCode: response.status,
-      headers: Object.fromEntries(response.headers.entries()),
-      body
+      requestHeaders: event.requestHeaders,
+      responseHeaders: Object.fromEntries(response.headers.entries()),
+      responseSize: Buffer.byteLength(responseBody, 'utf-8'),
+      ts: Date.now() / 1000,
+      requestBody: event.requestBody,
+      requestBodyIsBinary: false,
+      requestBodySize: event.requestBodySize,
+      responseBody,
+      responseBodyIsBinary: false
     }
   } catch (err) {
     // Node fetch (undici) всегда бросает generic "fetch failed" — настоящая причина

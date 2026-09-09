@@ -31,18 +31,12 @@ interface RuleFormModalProps {
   onDuplicate: (rule: Rule) => void
 }
 
-/** Вид подмены тела: файл на диске либо текст ответа прямо в правиле */
-type SwapKind = 'file' | 'body'
-
 interface FormValues {
   urlPattern: string
   group: string
   localFilePath: string
   responseBody: string
-  contentType: string
 }
-
-const DEFAULT_CONTENT_TYPE = 'application/json; charset=utf-8'
 
 /** Просмотр тела ответа сворачиваемым JSON-деревом; для невалидного JSON — пояснение вместо дерева */
 function ResponseBodyTree({ body }: { body: string }): React.ReactElement {
@@ -61,10 +55,10 @@ function ResponseBodyTree({ body }: { body: string }): React.ReactElement {
   )
 }
 
-/** Модальная форма добавления/редактирования правила подмены: URL-паттерн и вид подмены
- * (локальный файл или инлайн-тело ответа). Остальные поля правила (enabled/isRegex/заголовки
- * и т.д.) через эту форму не редактируются — при создании берутся дефолты, при редактировании
- * сохраняются как есть. */
+/** Модальная форма добавления/редактирования правила подмены: URL-паттерн, группа и способ подмены —
+ * локальный файл ИЛИ инлайн-тело ответа. Вид подмены не выбирается вручную: при сохранении берётся
+ * тот, чьё поле заполнено (тело важнее файла, если заполнены оба). Остальные поля правила
+ * (enabled/isRegex/заголовки и т.д.) через эту форму не редактируются. */
 export default function RuleFormModal({
   open,
   initialValue,
@@ -76,24 +70,20 @@ export default function RuleFormModal({
 }: RuleFormModalProps): React.ReactElement {
   const { t } = useTranslation()
   const [form] = Form.useForm<FormValues>()
-  const [swapKind, setSwapKind] = useState<SwapKind>('file')
   // просмотр тела ответа: редактируемый текст либо сворачиваемое JSON-дерево
   const [bodyAsTree, setBodyAsTree] = useState(false)
 
-  const initialSwapKind: SwapKind = initialValue?.responseBody ? 'body' : 'file'
   const initialFormValues: FormValues = {
     urlPattern: initialValue?.urlPattern ?? '',
     group: initialValue?.group ?? '',
     localFilePath: initialValue?.localFilePath ?? '',
-    responseBody: initialValue?.responseBody ?? '',
-    contentType: initialValue?.contentType ?? DEFAULT_CONTENT_TYPE
+    responseBody: initialValue?.responseBody ?? ''
   }
   const currentValues = Form.useWatch([], form)
 
   useEffect(() => {
     if (open) {
       form.setFieldsValue(initialFormValues)
-      setSwapKind(initialSwapKind)
       setBodyAsTree(false)
     }
     // initialFormValues пересоздаётся на каждый рендер, поэтому не в deps — эффект должен
@@ -108,22 +98,23 @@ export default function RuleFormModal({
   // черновик создания (в т.ч. дубликат) можно сохранить сразу, даже если поля ещё не тронуты
   const isUnchanged =
     !!existingRule &&
-    swapKind === initialSwapKind &&
     (!currentValues ||
       (currentValues.urlPattern === initialFormValues.urlPattern &&
         currentValues.group === initialFormValues.group &&
         currentValues.localFilePath === initialFormValues.localFilePath &&
-        currentValues.responseBody === initialFormValues.responseBody &&
-        currentValues.contentType === initialFormValues.contentType))
+        currentValues.responseBody === initialFormValues.responseBody))
   const isUrlPatternEmpty = !currentValues?.urlPattern?.trim()
 
   const handleOk = async (): Promise<void> => {
     const values = await form.validateFields()
-    // сохраняем только поле активного вида подмены, второе чистим — чтобы вид оставался однозначным
-    const swapFields =
-      swapKind === 'body'
-        ? { responseBody: values.responseBody, contentType: values.contentType, localFilePath: undefined }
-        : { localFilePath: values.localFilePath, responseBody: undefined }
+    // вид подмены вычисляется автоматически: непустое тело важнее файла; при пустом теле —
+    // подмена файлом. Поле неактивного вида сохраняем пустым, чтобы вид оставался однозначным.
+    // contentType не редактируется — переносится как есть (для правил из лога это тип исходного
+    // ответа; для правил, созданных вручную, его нет, и addon.py ставит application/json)
+    const hasBody = !!values.responseBody?.trim()
+    const swapFields = hasBody
+      ? { responseBody: values.responseBody, localFilePath: undefined }
+      : { localFilePath: values.localFilePath, responseBody: undefined, contentType: undefined }
     onSubmit({
       ...(initialValue ?? { enabled: true, isRegex: true }),
       urlPattern: values.urlPattern,
@@ -223,18 +214,7 @@ export default function RuleFormModal({
           />
         </Form.Item>
 
-        <Form.Item label={t('rules.form.swapKind')}>
-          <Segmented<SwapKind>
-            value={swapKind}
-            onChange={setSwapKind}
-            options={[
-              { label: t('rules.form.swapKindFile'), value: 'file' },
-              { label: t('rules.form.swapKindBody'), value: 'body' }
-            ]}
-          />
-        </Form.Item>
-
-        <Form.Item name="localFilePath" label={t('rules.form.localFile')} hidden={swapKind !== 'file'}>
+        <Form.Item name="localFilePath" label={t('rules.form.localFile')} extra={t('rules.form.swapKindHint')}>
           <Input
             placeholder={t('rules.form.localFilePlaceholder')}
             suffix={
@@ -245,11 +225,7 @@ export default function RuleFormModal({
           />
         </Form.Item>
 
-        <Form.Item name="contentType" label={t('rules.form.contentType')} hidden={swapKind !== 'body'}>
-          <Input placeholder={DEFAULT_CONTENT_TYPE} />
-        </Form.Item>
-
-        <div hidden={swapKind !== 'body'}>
+        <div>
           <Flex justify="space-between" align="center">
             <span>{t('rules.form.responseBody')}</span>
             <Segmented<boolean>

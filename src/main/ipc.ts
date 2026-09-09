@@ -6,6 +6,8 @@ import { getCertStatus, installCert, listCerts, removeCertTrust } from './certIn
 import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
 import { platform } from './platform'
 import { replayRequest } from './replayRequest'
+import { logStore } from './logStore'
+import { buildLogExport, type LogExportFormat } from './logExport'
 import type { ProxyLogEvent } from '../shared/types'
 
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
@@ -49,7 +51,20 @@ export function registerIpcHandlers(): void {
     return getCertStatus()
   })
 
-  ipcMain.handle('proxy:replayRequest', (_event, logEvent: ProxyLogEvent) => replayRequest(logEvent))
+  ipcMain.handle('proxy:replayRequest', async (_event, logEvent: ProxyLogEvent) => {
+    const replayed = await replayRequest(logEvent)
+    // повтор попадает в тот же файл лога отдельной записью event: 'replay'
+    const [meta] = logStore.appendBatch([replayed])
+    return meta
+  })
+
+  ipcMain.handle('log:getRecent', () => logStore.getRecent())
+
+  ipcMain.handle('log:getEvent', (_event, ts: number) => logStore.getEvent(ts))
+
+  ipcMain.handle('log:search', (_event, query: string, searchInBody: boolean) => logStore.search(query, searchInBody))
+
+  ipcMain.handle('log:export', (_event, format: LogExportFormat) => buildLogExport(logStore.readAll(), format))
 
   ipcMain.handle('window:toggleDevTools', (event) => {
     event.sender.toggleDevTools()

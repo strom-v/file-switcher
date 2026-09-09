@@ -37,35 +37,32 @@ export interface ProxyState {
   error?: string
 }
 
-export type ProxyLogEventType = 'matched' | 'passed'
+// matched — сработала подмена; passed — прошёл насквозь; replay — повторная отправка запроса
+// из лога напрямую на сервер (не через прокси), см. LogPanel context menu + replayRequest
+export type ProxyLogEventType = 'matched' | 'passed' | 'replay'
 
-export interface ProxyLogEvent {
+/** Лёгкая запись лога для списка — без тел и заголовков; они лежат на диске и грузятся по ts
+ * при открытии деталей (log:getEvent). Полный набор полей — в ProxyLogEvent. */
+export interface LogEntryMeta {
   event: ProxyLogEventType
   url: string
   file: string
   method: string
   statusCode: number | null
-  requestHeaders: Record<string, string>
-  responseHeaders: Record<string, string>
   responseSize: number
   ts: number
-  /** тело запроса, декодировано как текст (errors=replace для бинарных данных) */
-  requestBody: string
-  /** true, если requestBody не является валидным UTF-8-текстом (картинка, шрифт и т.п.) */
   requestBodyIsBinary: boolean
-  /** размер тела запроса в байтах (точный, в отличие от .length декодированной строки) */
   requestBodySize: number
-  /** тело ответа, декодировано как текст (errors=replace для бинарных данных) */
-  responseBody: string
-  /** true, если responseBody не является валидным UTF-8-текстом (картинка, шрифт и т.п.) */
   responseBodyIsBinary: boolean
 }
 
-/** Результат повторной отправки запроса из лога (см. main/replayRequest.ts) */
-export interface ReplayResult {
-  statusCode: number
-  headers: Record<string, string>
-  body: string
+export interface ProxyLogEvent extends LogEntryMeta {
+  requestHeaders: Record<string, string>
+  responseHeaders: Record<string, string>
+  /** тело запроса, декодировано как текст (errors=replace для бинарных данных) */
+  requestBody: string
+  /** тело ответа, декодировано как текст (errors=replace для бинарных данных) */
+  responseBody: string
 }
 
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'

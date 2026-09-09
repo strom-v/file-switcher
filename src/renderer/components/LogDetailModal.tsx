@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Collapse, Descriptions, Flex, message, Modal, Segmented, Typography } from 'antd'
+import { Button, Collapse, Descriptions, Flex, message, Modal, Segmented, Spin, Typography } from 'antd'
 import { CopyOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import JsonTree from './JsonTree'
 import { formatHeaders, formatSize, tryParseJson, tsToDate } from '../formatters'
-import { httpStatusColor } from '../theme'
-import type { ProxyLogEvent, ReplayResult } from '../../shared/types'
+import type { ProxyLogEvent } from '../../shared/types'
 
 interface LogDetailModalProps {
-  event: ProxyLogEvent | null
+  /** ts выбранной записи лога; null — окно закрыто. Полное событие грузится из файла по ts */
+  ts: number | null
   onClose: () => void
 }
 
@@ -89,31 +89,33 @@ function bodyTree(body: string, isBinary: boolean): unknown {
 }
 
 /** Детальный просмотр одного запроса из лога: метод, статус, заголовки и тела запроса/ответа —
- * каждая секция сворачивается (Collapse) и умеет показывать данные плоским текстом или деревом */
-export default function LogDetailModal({ event, onClose }: LogDetailModalProps): React.ReactElement {
+ * каждая секция сворачивается (Collapse) и умеет показывать данные плоским текстом или деревом.
+ * Полное событие (с телами) грузится из файла лога по ts. Действия над запросом (повтор, добавить
+ * в правила, копировать) — в контекстном меню строки лога. */
+export default function LogDetailModal({ ts, onClose }: LogDetailModalProps): React.ReactElement {
   const { t } = useTranslation()
-  const formattedTime = event ? tsToDate(event.ts).toLocaleString() : ''
-  const [replaying, setReplaying] = useState(false)
-  const [replayResult, setReplayResult] = useState<ReplayResult | null>(null)
+  const [event, setEvent] = useState<ProxyLogEvent | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  // сбрасываем результат предыдущего replay при открытии другой записи лога — иначе пользователь
-  // увидит результат повтора чужого запроса, приняв его за результат текущего
   useEffect(() => {
-    setReplayResult(null)
-  }, [event])
-
-  const handleReplay = async (): Promise<void> => {
-    if (!event) return
-    setReplaying(true)
-    setReplayResult(null)
-    try {
-      setReplayResult(await window.api.proxy.replayRequest(event))
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : String(err))
-    } finally {
-      setReplaying(false)
+    if (ts === null) {
+      setEvent(null)
+      return
     }
-  }
+    setLoading(true)
+    let cancelled = false
+    window.api.log.getEvent(ts).then((full) => {
+      if (cancelled) return
+      setEvent(full)
+      setLoading(false)
+      if (!full) message.error(t('log.eventUnavailable'))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [ts, t])
+
+  const formattedTime = event ? tsToDate(event.ts).toLocaleString() : ''
 
   // key на DetailSectionBody завязан на ts записи — при выборе другой строки лога компонент
   // пересоздаётся и режим просмотра (текст/дерево) сбрасывается на "текст"
@@ -160,25 +162,21 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
 
   return (
     <Modal
-      open={event !== null}
+      open={ts !== null}
       onCancel={onClose}
-      // бинарное тело запроса в логе уже необратимо испорчено errors="replace" при декодировании
-      // (см. addon.py) — повторная отправка такого тела передаст мусор вместо оригинальных байт,
-      // поэтому кнопка скрыта в заголовке, а не просто предупреждает
-      title={
-        event && !event.requestBodyIsBinary ? (
-          <Button size="small" onClick={handleReplay} loading={replaying}>
-            {t('log.replayButton')}
-          </Button>
-        ) : null
-      }
       footer={null}
       width={640}
       closeIcon={false}
       centered
-      styles={{ body: { maxHeight: '80vh', overflowY: 'auto' } }}
+      // без title и его отступа — модалка это просто просмотр, шапка не нужна
+      styles={{ header: { display: 'none' }, body: { maxHeight: '80vh', overflowY: 'auto' } }}
     >
-      {event && (
+      {loading && (
+        <Flex justify="center" style={{ padding: 24 }}>
+          <Spin />
+        </Flex>
+      )}
+      {!loading && event && (
         <>
           <Descriptions bordered column={1} size="small" className="detail-descriptions" style={{ marginBottom: 8 }}>
             <Descriptions.Item label={t('log.detailUrl')}>
@@ -192,21 +190,8 @@ export default function LogDetailModal({ event, onClose }: LogDetailModalProps):
             <Descriptions.Item label={t('log.detailSize')}>{formatSize(event.responseSize)}</Descriptions.Item>
           </Descriptions>
 
-          {/* все секции свёрнуты по умолчанию — defaultActiveKey не задан */}
-          <Collapse size="small" style={{ marginBottom: 8 }} items={sections} />
-
-          {replayResult && (
-            <>
-              <Typography.Text strong className="text-sm" style={{ color: httpStatusColor(replayResult.statusCode) }}>
-                {t('log.replayResultLabel')} {replayResult.statusCode}
-              </Typography.Text>
-              <DetailSectionBody
-                key={`replay-${event.ts}`}
-                text={replayResult.body}
-                tree={bodyTree(replayResult.body, false)}
-              />
-            </>
-          )}
+          {/* key на ts — при выборе другой записи Collapse пересоздаётся, все секции сворачиваются */}
+          <Collapse key={ts ?? undefined} size="small" style={{ marginBottom: 0 }} items={sections} />
         </>
       )}
     </Modal>

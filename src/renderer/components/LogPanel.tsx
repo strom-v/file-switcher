@@ -1,28 +1,47 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Empty, Flex, Input, Listy, Popconfirm, Space, Tooltip, Typography } from 'antd'
-import { ClearOutlined, ColumnHeightOutlined, FileSearchOutlined, UnorderedListOutlined } from '@ant-design/icons'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Dropdown, Empty, Flex, Input, Listy, message, Popconfirm, Space, Tooltip, Typography } from 'antd'
+import type { MenuProps } from 'antd'
+import {
+  ClearOutlined,
+  ColumnHeightOutlined,
+  CopyOutlined,
+  FileSearchOutlined,
+  PlusOutlined,
+  RedoOutlined,
+  UnorderedListOutlined
+} from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import LogDetailModal from './LogDetailModal'
 import IconButton from './IconButton'
 import { COLOR_SUCCESS, httpStatusColor } from '../theme'
 import { tsToDate } from '../formatters'
 import { EVENT_FILTER_ALL, useLogFilters } from '../hooks/useLogFilters'
-import type { ProxyLogEvent } from '../../shared/types'
+import { buildRequest, REQUEST_FORMAT_LABELS, type RequestFormat } from '../requestExport'
+import type { LogEntryMeta, ProxyLogEvent } from '../../shared/types'
+
+const REQUEST_FORMATS: RequestFormat[] = ['curl', 'fetch', 'powershell']
 
 interface LogPanelProps {
-  logs: ProxyLogEvent[]
-  onClear: () => void
+  logs: LogEntryMeta[]
+  /** очищает отображение лога: без аргумента — весь, с keep — оставляет записи, для которых он вернул true */
+  onClear: (keep?: (event: LogEntryMeta) => boolean) => void
+  /** создать черновик правила подмены из полного события лога */
+  onAddRule: (log: ProxyLogEvent) => void
+  /** добавить в отображение запись о повторной отправке запроса (отмечается отдельным фоном) */
+  onReplayLogged: (event: LogEntryMeta) => void
 }
 
 /** Живой лог всего трафика через прокси (сработавшие подмены выделены), с поиском по URL/файлу подмены
- * (опционально и по телу запроса/ответа — переключатель в тулбаре), фильтром по событию и счётчиками
- * всего/подмена. Клик по всей строке открывает детали запроса. Сколько записей на категорию хранится
- * в памяти — настраивается в панели настроек (см. useLogStorageLimit, useProxyState). */
-export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactElement {
+ * (опционально и по телу запроса/ответа), фильтром по событию и счётчиками всего/подмена. Тела и
+ * заголовки событий на диске (см. main/logStore.ts) — грузятся по ts при открытии деталей или
+ * действии из контекстного меню. Клик по строке открывает детали. */
+export default function LogPanel({ logs, onClear, onAddRule, onReplayLogged }: LogPanelProps): React.ReactElement {
   const { t } = useTranslation()
-  const [selected, setSelected] = useState<ProxyLogEvent | null>(null)
+  const [selectedTs, setSelectedTs] = useState<number | null>(null)
   const [search, setSearch] = useState('')
   const [searchInBody, setSearchInBody] = useState(false)
+  // ts записей, найденных поиском по телу (async через IPC); null — поиск по телу не активен
+  const [bodyMatchTs, setBodyMatchTs] = useState<Set<number> | null>(null)
   const { eventFilter, setEventFilter } = useLogFilters()
 
   // Listy требует высоту контейнера в пикселях (не проценты) для виртуализации — измеряем
@@ -41,30 +60,115 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
     return () => observer.disconnect()
   }, [])
 
-  // фильтруем сначала (обычно отсекает большую часть буфера), разворачиваем уже отфильтрованный
-  // результат — дешевле, чем сначала копировать и разворачивать весь буфер (до 10000 записей),
-  // а уже потом фильтровать
+  // поиск по телу идёт в main (тела на диске) — дёргаем IPC при изменении запроса/флага,
+  // с небольшим debounce, чтобы не гонять чтение файла на каждый символ
+  useEffect(() => {
+    if (!searchInBody || !search.trim()) {
+      setBodyMatchTs(null)
+      return
+    }
+    const timer = setTimeout(() => {
+      window.api.log.search(search, true).then((metas) => {
+        setBodyMatchTs(new Set(metas.map((m) => m.ts)))
+      })
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [search, searchInBody])
+
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase()
     return logs
       .filter((item) => {
-        if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter) return false
+        // повтор запроса — результат явного действия пользователя, показываем при любом фильтре события
+        if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter && item.event !== 'replay') return false
         if (query) {
           const matchesUrl = item.url.toLowerCase().includes(query)
           const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
-          const matchesBody =
-            searchInBody &&
-            (item.requestBody.toLowerCase().includes(query) || item.responseBody.toLowerCase().includes(query))
+          const matchesBody = bodyMatchTs?.has(item.ts) ?? false
           if (!matchesUrl && !matchesFile && !matchesBody) return false
         }
         return true
       })
       .reverse()
-  }, [logs, search, searchInBody, eventFilter])
+  }, [logs, search, bodyMatchTs, eventFilter])
 
-  // счётчик по полному буферу (не по visible) — показывает общую картину трафика независимо
-  // от того, что сейчас отфильтровано в списке, как счётчик "matched" в SBIS LOGS
+  // счётчик по всему отображению (не по visible) — общая картина трафика независимо от фильтра
   const matchedCount = useMemo(() => logs.filter((item) => item.event === 'matched').length, [logs])
+
+  // при фильтре "только подмена" кнопка очистки убирает из отображения лишь matched-записи, иначе — весь лог
+  const onlyMatched = eventFilter === 'matched'
+  const clearKeep = onlyMatched ? (event: LogEntryMeta): boolean => event.event !== 'matched' : undefined
+  const clearDisabled = onlyMatched ? matchedCount === 0 : logs.length === 0
+
+  const copyToClipboard = async (text: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text)
+      message.success(t('log.copied'))
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  // грузит полное событие по ts из файла лога — для действий, которым нужны тела/заголовки
+  const loadFull = async (ts: number): Promise<ProxyLogEvent | null> => {
+    const full = await window.api.log.getEvent(ts)
+    if (!full) message.error(t('log.eventUnavailable'))
+    return full
+  }
+
+  const copyAs = async (ts: number, format: RequestFormat): Promise<void> => {
+    const full = await loadFull(ts)
+    if (full) copyToClipboard(buildRequest(full, format))
+  }
+
+  const addRule = async (ts: number): Promise<void> => {
+    const full = await loadFull(ts)
+    if (full) onAddRule(full)
+  }
+
+  // повтор запроса напрямую на реальный сервер (не через прокси); main возвращает лёгкую запись
+  // лога event: 'replay', её LogPanel красит своим фоном, тело смотреть в модалке
+  const replay = async (ts: number): Promise<void> => {
+    const full = await loadFull(ts)
+    if (!full) return
+    const hide = message.loading(t('log.replayInProgress'), 0)
+    try {
+      const logged = await window.api.proxy.replayRequest(full)
+      hide()
+      onReplayLogged(logged)
+      message.info(`${t('log.replayResultLabel')} ${logged.statusCode}`)
+    } catch (err) {
+      hide()
+      message.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  // пункты контекстного меню строки лога — действия над конкретным запросом
+  const rowMenuItems = (item: LogEntryMeta): MenuProps['items'] => [
+    { key: 'add-rule', label: t('log.contextAddRule'), icon: <PlusOutlined />, onClick: () => addRule(item.ts) },
+    {
+      key: 'copy',
+      label: t('log.contextCopy'),
+      icon: <CopyOutlined />,
+      children: [
+        { key: 'copy-url', label: t('log.contextCopyUrl'), onClick: () => copyToClipboard(item.url) },
+        ...REQUEST_FORMATS.map((format) => ({
+          key: `copy-as-${format}`,
+          label: REQUEST_FORMAT_LABELS[format],
+          onClick: () => copyAs(item.ts, format)
+        }))
+      ]
+    },
+    {
+      key: 'replay',
+      label: t('log.replayButton'),
+      icon: <RedoOutlined />,
+      // бинарное тело запроса испорчено errors="replace" при декодировании (см. addon.py) —
+      // повторная отправка передаст мусор, поэтому повтор для таких запросов недоступен
+      disabled: item.requestBodyIsBinary,
+      onClick: () => replay(item.ts)
+    }
+  ]
 
   return (
     <div className="panel-column">
@@ -112,11 +216,15 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
             </Space>
           </Tooltip>
         </Space>
-        <Popconfirm title={t('log.clearConfirm')} onConfirm={onClear} disabled={logs.length === 0}>
+        <Popconfirm
+          title={t(onlyMatched ? 'log.clearMatchedConfirm' : 'log.clearConfirm')}
+          onConfirm={() => onClear(clearKeep)}
+          disabled={clearDisabled}
+        >
           <IconButton
             tooltip={t('log.clear')}
             icon={<ClearOutlined />}
-            disabled={logs.length === 0}
+            disabled={clearDisabled}
             style={{ flexShrink: 0 }}
           />
         </Popconfirm>
@@ -128,7 +236,7 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
           </Flex>
         ) : (
           listHeight > 0 && (
-            <Listy<ProxyLogEvent>
+            <Listy<LogEntryMeta>
               items={visible}
               virtual
               height={listHeight}
@@ -145,50 +253,46 @@ export default function LogPanel({ logs, onClear }: LogPanelProps): React.ReactE
                 // сведены в одну строку через разделитель, а не выведены отдельной строкой под URL.
                 // file пустой — подмена инлайновым телом или только заголовками, показываем один URL
                 const urlText = isMatched && item.file ? `${item.url} • ${item.file}` : item.url
+                // фон строки: зелёный для сработавшей подмены, жёлтый для повторного запроса
+                const rowClass = `log-item--compact log-item--${item.event}`
                 return (
-                  <div
-                    className={isMatched ? 'log-item--matched log-item--compact' : 'log-item--compact'}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setSelected(item)}
-                  >
-                    <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
-                      <Typography.Text
-                        strong
-                        className="text-sm"
-                        style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
-                      >
-                        {item.method}
-                      </Typography.Text>
-                      <Typography.Text
-                        strong
-                        className="text-sm"
-                        style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
-                      >
-                        {item.statusCode ?? '—'}
-                      </Typography.Text>
-                      <Typography.Text
-                        type="secondary"
-                        className="text-sm"
-                        style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
-                      >
-                        {tsToDate(item.ts).toLocaleTimeString()}
-                      </Typography.Text>
-                      <Typography.Text
-                        className="ellipsis-text text-sm"
-                        ellipsis={{ tooltip: urlText }}
-                        style={{ flex: 1, minWidth: 0 }}
-                      >
-                        {urlText}
-                      </Typography.Text>
-                    </Flex>
-                  </div>
+                  <Dropdown menu={{ items: rowMenuItems(item) }} trigger={['contextMenu']}>
+                    <div className={rowClass} style={{ cursor: 'pointer' }} onClick={() => setSelectedTs(item.ts)}>
+                      <Flex gap={4} align="center" style={{ width: '100%', minWidth: 0 }}>
+                        <Typography.Text
+                          strong
+                          className="text-sm"
+                          style={{ width: 48, flexShrink: 0, overflow: 'hidden', whiteSpace: 'nowrap' }}
+                        >
+                          {item.method}
+                        </Typography.Text>
+                        <Typography.Text
+                          strong
+                          className="text-sm"
+                          style={{ color: httpStatusColor(item.statusCode), flexShrink: 0 }}
+                        >
+                          {item.statusCode ?? '—'}
+                        </Typography.Text>
+                        <Typography.Text
+                          type="secondary"
+                          className="text-sm"
+                          style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
+                        >
+                          {tsToDate(item.ts).toLocaleTimeString()}
+                        </Typography.Text>
+                        <Typography.Text className="ellipsis-text text-sm" ellipsis style={{ flex: 1, minWidth: 0 }}>
+                          {urlText}
+                        </Typography.Text>
+                      </Flex>
+                    </div>
+                  </Dropdown>
                 )
               }}
             />
           )
         )}
       </div>
-      <LogDetailModal event={selected} onClose={() => setSelected(null)} />
+      <LogDetailModal ts={selectedTs} onClose={() => setSelectedTs(null)} />
     </div>
   )
 }

@@ -4,14 +4,11 @@ import { QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import SectionHeader from './SectionHeader'
 import SettingsGroup from './SettingsGroup'
-import { buildCsv } from '../csvExport'
-import { buildHar } from '../harExport'
 import { FONT_SIZE_MAX, FONT_SIZE_MIN } from '../hooks/useFontSize'
-import { LOG_STORAGE_LIMIT_MAX, LOG_STORAGE_LIMIT_MIN } from '../hooks/useLogStorageLimit'
 import { SPLITTER_SIZE_MAX, SPLITTER_SIZE_MIN } from '../hooks/useSplitterSize'
 import type { ThemeMode } from '../hooks/useThemeMode'
 import type { SupportedLanguage } from '../i18n'
-import type { CertStatus, ProxyLogEvent, ProxyState, Rule } from '../../shared/types'
+import type { CertStatus, ProxyState, Rule } from '../../shared/types'
 
 interface SettingsPanelProps {
   status: ProxyState
@@ -19,7 +16,8 @@ interface SettingsPanelProps {
   onPortChange: (port: number) => void
   autoStart: boolean
   onAutoStartChange: (autoStart: boolean) => void
-  logs: ProxyLogEvent[]
+  /** число записей в отображении лога — для disabled кнопки экспорта */
+  logCount: number
   rules: Rule[]
   onRulesImport: (rules: Rule[]) => void
   onRulesRefresh: () => Promise<void>
@@ -31,8 +29,6 @@ interface SettingsPanelProps {
   onFontSizeChange: (size: number) => void
   splitterSize: number
   onSplitterSizeChange: (size: number) => void
-  logStorageLimit: number
-  onLogStorageLimitChange: (limit: number) => void
   onResetSettings: () => void
 }
 
@@ -51,7 +47,7 @@ export default function SettingsPanel({
   onPortChange,
   autoStart,
   onAutoStartChange,
-  logs,
+  logCount,
   rules,
   onRulesImport,
   onRulesRefresh,
@@ -63,8 +59,6 @@ export default function SettingsPanel({
   onFontSizeChange,
   splitterSize,
   onSplitterSizeChange,
-  logStorageLimit,
-  onLogStorageLimitChange,
   onResetSettings
 }: SettingsPanelProps): React.ReactElement {
   const { t } = useTranslation()
@@ -74,7 +68,7 @@ export default function SettingsPanel({
   const [sudoersInstalled, setSudoersInstalled] = useState(true)
   const [installingSudoers, setInstallingSudoers] = useState(false)
   const [refreshingRules, setRefreshingRules] = useState(false)
-  const [logExportFormat, setLogExportFormat] = useState<keyof typeof LOG_EXPORT_BUILDERS>('har')
+  const [logExportFormat, setLogExportFormat] = useState<'har' | 'json' | 'csv'>('har')
   const [devToolsOpened, setDevToolsOpened] = useState(false)
 
   const refreshCertStatus = async (): Promise<void> => {
@@ -140,15 +134,10 @@ export default function SettingsPanel({
     if (savedPath) message.success(t(successKey, { path: savedPath }))
   }
 
-  const LOG_EXPORT_BUILDERS: Record<'har' | 'json' | 'csv', { extension: string; build: () => string }> = {
-    har: { extension: 'har', build: () => buildHar(logs) },
-    json: { extension: 'json', build: () => JSON.stringify(logs, null, 2) },
-    csv: { extension: 'csv', build: () => buildCsv(logs) }
-  }
-
-  const handleExportLog = (): Promise<void> => {
-    const { extension, build } = LOG_EXPORT_BUILDERS[logExportFormat]
-    return exportToFile(`file-switcher-log-${Date.now()}.${extension}`, build(), 'log.exportSuccess')
+  const handleExportLog = async (): Promise<void> => {
+    // весь лог сессии сериализует main (тела на диске), renderer только сохраняет результат
+    const content = await window.api.log.exportAs(logExportFormat)
+    return exportToFile(`file-switcher-log-${Date.now()}.${logExportFormat}`, content, 'log.exportSuccess')
   }
 
   const handleExportRules = (): Promise<void> =>
@@ -306,7 +295,7 @@ export default function SettingsPanel({
 
           <SectionHeader title={t('settings.groupDataLog')} hint={t('settings.groupDataLogHint')}>
             <Flex gap={8}>
-              <Select<keyof typeof LOG_EXPORT_BUILDERS>
+              <Select<'har' | 'json' | 'csv'>
                 value={logExportFormat}
                 onChange={setLogExportFormat}
                 style={{ flex: 1 }}
@@ -316,21 +305,10 @@ export default function SettingsPanel({
                   { value: 'csv', label: 'CSV' }
                 ]}
               />
-              <Button style={{ flex: 1 }} onClick={handleExportLog} disabled={logs.length === 0}>
+              <Button style={{ flex: 1 }} onClick={handleExportLog} disabled={logCount === 0}>
                 {t('log.exportButton')}
               </Button>
             </Flex>
-          </SectionHeader>
-
-          <SectionHeader title={t('settings.logStorageLimitLabel')} hint={t('settings.logStorageLimitHint')}>
-            <InputNumber
-              min={LOG_STORAGE_LIMIT_MIN}
-              max={LOG_STORAGE_LIMIT_MAX}
-              step={100}
-              value={logStorageLimit}
-              onChange={(value) => onLogStorageLimitChange(value ?? logStorageLimit)}
-              style={{ width: '100%' }}
-            />
           </SectionHeader>
         </SettingsGroup>
 
