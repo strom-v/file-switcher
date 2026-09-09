@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useId, useMemo } from 'react'
 import { Tree, Typography } from 'antd'
 import type { TreeDataNode } from 'antd'
 import { COLOR_DANGER, COLOR_INFO, COLOR_SUCCESS } from '../theme'
@@ -23,8 +23,6 @@ function renderPrimitive(value: unknown): React.ReactNode {
   }
   return <Typography.Text type="secondary">{String(value)}</Typography.Text>
 }
-
-let nodeKeySeq = 0
 
 /** Строит узлы antd Tree рекурсивно из произвольного JSON-значения; объекты/массивы — сворачиваемые
  * узлы с числом элементов в заголовке, примитивы — лист с подсветкой по типу */
@@ -93,8 +91,8 @@ function collectKeysToDepth(nodes: TreeDataNode[], depth: number): React.Key[] {
 export default function JsonTree({ value, defaultExpandDepth }: JsonTreeProps): React.ReactElement {
   // ключи узлов должны быть стабильны между рендерами одного и того же дерева (иначе antd Tree
   // теряет состояние развёрнутости), но уникальны между разными открытыми деревьями на странице —
-  // префикс на основе счётчика, посчитанного один раз при монтировании через useMemo
-  const rootPrefix = useMemo(() => `json-${nodeKeySeq++}`, [])
+  // useId даёт стабильный на весь жизненный цикл компонента и глобально уникальный префикс
+  const rootPrefix = `json-${useId()}`
   const treeData = useMemo(() => buildTreeNodes(value, rootPrefix), [value, rootPrefix])
   const defaultExpandedKeys = useMemo(
     () => (defaultExpandDepth === undefined ? undefined : collectKeysToDepth(treeData, defaultExpandDepth)),

@@ -1,6 +1,10 @@
 """
 mitmproxy-аддон: подменяет тело/статус/заголовки ответа и заголовки запроса, задерживает ответ —
 для URL, совпавших с правилом из rules.json, и логирует весь проходящий трафик в stdout как JSON.
+
+Контракт правила (какие ключи здесь читаются) — src/shared/rule.schema.json, тот же файл использует
+TS-сторона (src/shared/types.ts, rulesStore). test_rule_schema.py падает, если этот аддон обращается
+к ключу, которого нет в схеме.
 """
 import asyncio
 import json
@@ -15,6 +19,30 @@ from mitmproxy import http, ctx
 MATCH_RULE_KEY = "file_switcher_rule"
 MATCH_FILE_KEY = "file_switcher_file"
 
+# заголовки с секретами (токены, сессии, ключи) — их значения не пишутся в лог: файл сессии
+# лежит на диске без шифрования и целиком уходит в HAR/JSON/CSV-экспорт, который пользователи
+# пересылают в баг-репорты. Имя заголовка сохраняем, значение заменяем на плейсхолдер.
+REDACTED_HEADERS = frozenset(
+    {
+        "authorization",
+        "proxy-authorization",
+        "cookie",
+        "set-cookie",
+        "x-api-key",
+        "x-auth-token",
+        "x-csrf-token",
+        "x-xsrf-token",
+    }
+)
+REDACTED_PLACEHOLDER = "<redacted by FileSwitcher>"
+
+
+def _redact_headers(headers: dict) -> dict:
+    return {
+        name: (REDACTED_PLACEHOLDER if name.lower() in REDACTED_HEADERS else value)
+        for name, value in headers.items()
+    }
+
 
 class ResponseSwitcher:
     def load(self, loader):
@@ -25,11 +53,25 @@ class ResponseSwitcher:
             self.rules_path = ctx.options.rules_file
             self.rules = []
             self.last_mtime = None
+            # текст последней ошибки чтения rules_file — чтобы не спамить одинаковым warning
+            # на каждый запрос, пока файл невалиден (перечитывание пробуется каждый раз)
+            self.last_reload_error = None
             if self.rules_path:
-                try:
-                    self._reload()
-                except (OSError, json.JSONDecodeError, KeyError) as e:
-                    ctx.log.warn(f"не удалось прочитать rules_file при старте: {e}")
+                self._try_reload("не удалось прочитать rules_file при старте")
+
+    def _try_reload(self, context: str) -> bool:
+        try:
+            self._reload()
+            if self.last_reload_error is not None:
+                ctx.log.info("rules_file снова читается, правила обновлены")
+                self.last_reload_error = None
+            return True
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            msg = f"{e}"
+            if msg != self.last_reload_error:
+                ctx.log.warn(f"{context}: {e}. Прежние правила остаются активными, перечитывание повторяется.")
+                self.last_reload_error = msg
+            return False
 
     def _reload(self):
         with open(self.rules_path, encoding="utf-8") as f:
@@ -104,11 +146,9 @@ class ResponseSwitcher:
             return
 
         if mtime != self.last_mtime:
-            try:
-                self._reload()
-            except (OSError, json.JSONDecodeError, KeyError) as e:
-                ctx.log.warn(f"не удалось перечитать rules_file: {e}")
-                return
+            # при неудаче _try_reload оставляет прежние правила и повторит на следующем запросе;
+            # не return — матчим по последнему валидному набору, а не пропускаем запрос вовсе
+            self._try_reload("не удалось перечитать rules_file")
 
         rule, matched = self._find_matching_rule(flow.request.pretty_url)
         if not rule:
@@ -198,8 +238,8 @@ class ResponseSwitcher:
             "file": matched_file or "",
             "method": flow.request.method,
             "statusCode": flow.response.status_code if flow.response else None,
-            "requestHeaders": dict(flow.request.headers),
-            "responseHeaders": dict(flow.response.headers) if flow.response else {},
+            "requestHeaders": _redact_headers(dict(flow.request.headers)),
+            "responseHeaders": _redact_headers(dict(flow.response.headers)) if flow.response else {},
             "responseSize": len(flow.response.raw_content) if flow.response and flow.response.raw_content else 0,
             "ts": time.time(),
             "requestBody": request_body,

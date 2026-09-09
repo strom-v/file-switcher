@@ -77,19 +77,22 @@ export default function LogPanel({ logs, onClear, onAddRule, onReplayLogged }: L
 
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return logs
-      .filter((item) => {
-        // повтор запроса — результат явного действия пользователя, показываем при любом фильтре события
-        if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter && item.event !== 'replay') return false
-        if (query) {
-          const matchesUrl = item.url.toLowerCase().includes(query)
-          const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
-          const matchesBody = bodyMatchTs?.has(item.ts) ?? false
-          if (!matchesUrl && !matchesFile && !matchesBody) return false
-        }
-        return true
-      })
-      .reverse()
+    // новые записи снизу в logs, а в списке нужны сверху — идём с конца, сразу в нужном порядке,
+    // без отдельного .reverse() (лишняя аллокация на каждое нажатие клавиши / приход пачки лога)
+    const result: LogEntryMeta[] = []
+    for (let i = logs.length - 1; i >= 0; i--) {
+      const item = logs[i]
+      // повтор запроса — результат явного действия пользователя, показываем при любом фильтре события
+      if (eventFilter !== EVENT_FILTER_ALL && item.event !== eventFilter && item.event !== 'replay') continue
+      if (query) {
+        const matchesUrl = item.url.toLowerCase().includes(query)
+        const matchesFile = item.event === 'matched' && item.file.toLowerCase().includes(query)
+        const matchesBody = bodyMatchTs?.has(item.ts) ?? false
+        if (!matchesUrl && !matchesFile && !matchesBody) continue
+      }
+      result.push(item)
+    }
+    return result
   }, [logs, search, bodyMatchTs, eventFilter])
 
   // счётчик по всему отображению (не по visible) — общая картина трафика независимо от фильтра

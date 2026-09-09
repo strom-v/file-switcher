@@ -10,12 +10,18 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:py": ".venv/bin/python3 -m pytest resources/ -q",
     "start": "electron-vite preview",
     "build:mac": "electron-vite build && electron-builder --mac",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json}\" \"*.{ts,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\" \"*.{ts,json}\"",
     "build:win": "electron-vite build && electron-builder --win",
     "build:linux": "electron-vite build && electron-builder --linux"
+  },
+  "overrides": {
+    "js-yaml": "^4.3.2"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -39,6 +45,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "^7.0.2",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "vitest": "^5.0.0"
   }
 }

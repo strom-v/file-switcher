@@ -2,10 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
-    />
+    <!-- CSP выставляется заголовком в main.ts (applyCsp) — строгий в проде, с послаблениями для HMR в dev -->
     <title>FileSwitcher</title>
   </head>
   <body>

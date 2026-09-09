@@ -1,22 +1,43 @@
 import { readFile, writeFile } from 'fs/promises'
-import { app, dialog, ipcMain, BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { is } from '@electron-toolkit/utils'
 import { proxyController } from './proxyController'
 import { rulesStore, Rule } from './rulesStore'
-import { getCertStatus, installCert, listCerts, removeCertTrust } from './certInstaller'
-import { installSudoersRule, isSudoersRuleInstalled } from './proxySystemConfig'
+import { getCertStatus, installCert, removeCertTrust } from './certInstaller'
+import { installSudoersRule, isSudoersRuleInstalled, removeSudoersRule } from './proxySystemConfig'
 import { platform } from './platform'
 import { replayRequest } from './replayRequest'
 import { logStore } from './logStore'
 import { buildLogExport, type LogExportFormat } from './logExport'
 import type { ProxyLogEvent } from '../shared/types'
 
+// защита от IPC, пришедшего не из нашего renderer: у приложения одно окно с локальным контентом,
+// setWindowOpenHandler запрещает новые — но если renderer скомпрометирован (XSS в показанном теле,
+// зависимость UI), app:relaunch + dialog:saveTextFile + cert:* становятся удобными примитивами.
+// В dev origin — dev-сервер electron-vite (http://localhost:5173), в проде — file://.
+function isTrustedSender(event: IpcMainInvokeEvent): boolean {
+  const url = event.senderFrame?.url ?? ''
+  if (is.dev) return url.startsWith('http://localhost:') || url.startsWith('file://')
+  return url.startsWith('file://')
+}
+
+/** Обёртка над ipcMain.handle: отклоняет вызовы из недоверенного фрейма до передачи в handler */
+function handle(channel: string, handler: (event: IpcMainInvokeEvent, ...args: never[]) => unknown): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!isTrustedSender(event)) {
+      throw new Error(`IPC ${channel}: запрос из недоверенного источника отклонён`)
+    }
+    return (handler as (event: IpcMainInvokeEvent, ...a: unknown[]) => unknown)(event, ...args)
+  })
+}
+
 /** Регистрирует все ipcMain-обработчики и подписки на события прокси */
 export function registerIpcHandlers(): void {
-  ipcMain.handle('rules:get', () => rulesStore.getAll())
+  handle('rules:get', () => rulesStore.getAll())
 
-  ipcMain.handle('rules:save', (_event, rules: Rule[]) => rulesStore.saveAll(rules))
+  handle('rules:save', (_event, rules: Rule[]) => rulesStore.saveAll(rules))
 
-  ipcMain.handle('proxy:start', (_event, port: number) => {
+  handle('proxy:start', (_event, port: number) => {
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       return { ...proxyController.getState(), status: 'crashed', error: `Некорректный порт: ${port}` }
     }
@@ -24,63 +45,63 @@ export function registerIpcHandlers(): void {
     return proxyController.getState()
   })
 
-  ipcMain.handle('proxy:stop', async () => {
+  handle('proxy:stop', async () => {
     await proxyController.stop()
     return proxyController.getState()
   })
 
-  ipcMain.handle('proxy:status', () => proxyController.getState())
+  handle('proxy:status', () => proxyController.getState())
 
-  ipcMain.handle('system:sudoersInstalled', () => isSudoersRuleInstalled())
+  handle('system:sudoersInstalled', () => isSudoersRuleInstalled())
 
-  ipcMain.handle('system:installSudoersRule', () => installSudoersRule())
+  handle('system:installSudoersRule', () => installSudoersRule())
 
-  ipcMain.handle('system:vpnStatus', () => platform.systemProxy.getVpnStatus())
+  handle('system:removeSudoersRule', () => removeSudoersRule())
 
-  ipcMain.handle('cert:status', () => getCertStatus())
+  handle('system:vpnStatus', () => platform.systemProxy.getVpnStatus())
 
-  ipcMain.handle('cert:list', () => listCerts())
+  handle('cert:status', () => getCertStatus())
 
-  ipcMain.handle('cert:install', async () => {
+  handle('cert:install', async () => {
     await installCert()
     return getCertStatus()
   })
 
-  ipcMain.handle('cert:remove', async () => {
+  handle('cert:remove', async () => {
     await removeCertTrust()
     return getCertStatus()
   })
 
-  ipcMain.handle('proxy:replayRequest', async (_event, logEvent: ProxyLogEvent) => {
+  handle('proxy:replayRequest', async (_event, logEvent: ProxyLogEvent) => {
     const replayed = await replayRequest(logEvent)
     // повтор попадает в тот же файл лога отдельной записью event: 'replay'
     const [meta] = logStore.appendBatch([replayed])
     return meta
   })
 
-  ipcMain.handle('log:getRecent', () => logStore.getRecent())
+  handle('log:getRecent', () => logStore.getRecent())
 
-  ipcMain.handle('log:getEvent', (_event, ts: number) => logStore.getEvent(ts))
+  handle('log:getEvent', (_event, ts: number) => logStore.getEvent(ts))
 
-  ipcMain.handle('log:search', (_event, query: string, searchInBody: boolean) => logStore.search(query, searchInBody))
+  handle('log:search', (_event, query: string, searchInBody: boolean) => logStore.search(query, searchInBody))
 
-  ipcMain.handle('log:export', (_event, format: LogExportFormat) => buildLogExport(logStore.readAll(), format))
+  handle('log:export', (_event, format: LogExportFormat) => buildLogExport(logStore.readAll(), format))
 
-  ipcMain.handle('window:toggleDevTools', (event) => {
+  handle('window:toggleDevTools', (event) => {
     event.sender.toggleDevTools()
   })
 
-  ipcMain.handle('window:isDevToolsOpened', (event) => event.sender.isDevToolsOpened())
+  handle('window:isDevToolsOpened', (event) => event.sender.isDevToolsOpened())
 
   // app.relaunch() только планирует перезапуск при следующем выходе — сам app.quit() ниже
   // проходит через уже существующий 'before-quit' хендлер в main.ts, который останавливает
   // прокси и откатывает системный прокси-настройки перед реальным завершением процесса
-  ipcMain.handle('app:relaunch', () => {
+  handle('app:relaunch', () => {
     app.relaunch()
     app.quit()
   })
 
-  ipcMain.handle('dialog:openTextFile', async (_event, extensions?: string[]) => {
+  handle('dialog:openTextFile', async (_event, extensions?: string[]) => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: extensions ? [{ name: 'Files', extensions }] : undefined
@@ -91,7 +112,7 @@ export function registerIpcHandlers(): void {
     return readFile(result.filePaths[0], 'utf-8')
   })
 
-  ipcMain.handle('dialog:saveTextFile', async (_event, defaultFileName: string, content: string) => {
+  handle('dialog:saveTextFile', async (_event, defaultFileName: string, content: string) => {
     const result = await dialog.showSaveDialog({ defaultPath: defaultFileName })
     if (result.canceled || !result.filePath) {
       return null

@@ -2,7 +2,7 @@ import { homedir } from 'os'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import type { CertManager, SystemProxyManager } from './types'
-import type { CertInfo, CertStatus } from '../../shared/types'
+import type { CertStatus } from '../../shared/types'
 
 const NOT_SUPPORTED = 'Эта платформа не поддерживается — доступен только сам прокси-сервер'
 
@@ -12,6 +12,7 @@ const NOT_SUPPORTED = 'Эта платформа не поддерживаетс
 export const unsupportedSystemProxy: SystemProxyManager = {
   isPasswordlessSetup: () => true,
   setUpPasswordless: async () => {},
+  revokePasswordless: async () => {},
   getVpnStatus: async () => ({ active: false, blocksProxy: false }),
   enable: async () => {
     throw new Error(NOT_SUPPORTED)
@@ -29,6 +30,5 @@ export const unsupportedCert: CertManager = {
   },
   removeTrust: async () => {
     throw new Error(NOT_SUPPORTED)
-  },
-  list: async (): Promise<CertInfo[]> => []
+  }
 }

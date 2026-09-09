@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, session, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
@@ -7,6 +7,27 @@ import { recoverStaleSystemProxy } from './proxySystemConfig'
 import packageJson from '../../package.json'
 
 let mainWindow: BrowserWindow | null = null
+
+// CSP для renderer. В проде — только собственные ресурсы (style-src unsafe-inline нужен antd,
+// который вставляет <style> в рантайме). В dev дополнительно нужен ws: для HMR electron-vite и
+// unsafe-inline/eval для его дев-клиента. Ставим заголовком, а не только meta-тегом в index.html —
+// meta не покрывает dev-URL и не даёт заблокировать connect-src.
+const CSP_PROD =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+const CSP_DEV =
+  "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws:"
+
+function applyCsp(): void {
+  const csp = is.dev ? CSP_DEV : CSP_PROD
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    })
+  })
+}
 
 /** Создаёт главное окно приложения */
 function createWindow(): void {
@@ -17,8 +38,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     icon: join(__dirname, '../../build/icon.png'),
     webPreferences: {
-      preload: join(__dirname, '../preload/preload.js'),
-      sandbox: false
+      preload: join(__dirname, '../preload/preload.js')
     }
   })
 
@@ -60,6 +80,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.fileswitcher.app')
+    applyCsp()
 
     // в dev-режиме macOS показывает в Dock стандартную иконку Electron —
     // собственная иконка приложения подхватывается только из собранного .app

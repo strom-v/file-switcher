@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { DEFAULT_PROXY_PORT } from '../../shared/constants'
 
-export const PORT_DEFAULT = 38765
 const PORT_STORAGE_KEY = 'file-switcher:port'
 
 function readStoredPort(): number {
@@ -8,7 +8,7 @@ function readStoredPort(): number {
   if (Number.isInteger(stored) && stored >= 1 && stored <= 65535) {
     return stored
   }
-  return PORT_DEFAULT
+  return DEFAULT_PROXY_PORT
 }
 
 /** Порт прокси с персистентностью */

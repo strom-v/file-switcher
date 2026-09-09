@@ -54,7 +54,7 @@ async function regQuery(name: string): Promise<string | null> {
   } catch {
     return null
   }
-  // строка вида: "    ProxyServer    REG_SZ    127.0.0.1:8080"
+  // строка вида: "    ProxyServer    REG_SZ    127.0.0.1:38765"
   const match = output.match(new RegExp(`\\b${name}\\s+REG_(?:SZ|DWORD)\\s+(.*)`, 'i'))
   return match ? match[1].trim() : null
 }
@@ -98,6 +98,10 @@ class Win32SystemProxyManager implements SystemProxyManager {
 
   async setUpPasswordless(): Promise<void> {
     // no-op: на Windows нечего настраивать
+  }
+
+  async revokePasswordless(): Promise<void> {
+    // no-op: на Windows нечего отзывать
   }
 
   async getVpnStatus(): Promise<VpnStatus> {

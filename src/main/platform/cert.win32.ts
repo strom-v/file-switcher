@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { execAsync } from '../execAsync'
 import type { CertManager } from './types'
-import type { CertInfo, CertStatus } from '../../shared/types'
+import type { CertStatus } from '../../shared/types'
 
 // certutil бывает заметно медленнее networksetup/security (обращается к CryptoAPI, иногда к сети);
 // 0 = без таймаута для install (там свой диалог подтверждения Windows), 30с для чтения
@@ -78,32 +78,6 @@ class Win32CertManager implements CertManager {
     for (const thumbprint of thumbprints) {
       await execAsync('certutil', ['-delstore', '-user', 'Root', thumbprint], CERTUTIL_READ_TIMEOUT_MS)
     }
-  }
-
-  async list(): Promise<CertInfo[]> {
-    let output: string
-    try {
-      output = await execAsync('certutil', ['-store', '-user', 'Root', 'mitmproxy'], CERTUTIL_READ_TIMEOUT_MS)
-    } catch {
-      return []
-    }
-
-    // certutil разделяет записи строкой "================ Certificate N ================"
-    const blocks = output.split(/=+\s*Certificate\s+\d+\s*=+/i).filter((b) => b.trim())
-    return blocks
-      .map((block) => {
-        const sha1 = block.match(/(?:Cert Hash\(sha1\)|Хэш сертификата\(sha1\)):\s*([0-9a-f ]{40,})/i)?.[1]
-        const notAfter = block.match(/NotAfter:\s*(.+)/i)?.[1]
-        if (!sha1) return null
-        return {
-          sha1: sha1.replace(/\s+/g, '').toUpperCase(),
-          expiresAt: notAfter?.trim() ?? '',
-          // подробную проверку доверия на каждый сертификат не гоняем (дорого) — раз он в
-          // user Root store, считаем доверенным; общий статус даёт status()
-          trusted: true
-        }
-      })
-      .filter((c): c is CertInfo => c !== null)
   }
 }
 

@@ -1,11 +1,14 @@
-import { homedir } from 'os'
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, LogEntryMeta, CertStatus, CertInfo, VpnStatus } from '../shared/types'
+import type { Rule, ProxyState, ProxyLogEvent, LogEntryMeta, CertStatus, VpnStatus } from '../shared/types'
 
 const api = {
   // домашняя папка текущего пользователя — renderer сам её получить не может (contextIsolation);
-  // нужна только для сокращённого показа путей подмены в списке правил
-  homeDir: homedir(),
+  // нужна только для сокращённого показа путей подмены в списке правил. Берём из process.env
+  // (доступен и в sandboxed-preload), а не из os.homedir() — чтобы не тянуть в preload модуль 'os'
+  // и держать sandbox:true у окна
+  homeDir: process.env.HOME || process.env.USERPROFILE || '',
+  // платформа — для UI-веток, которые имеют смысл только на части ОС (напр. sudoers-настройка на macOS)
+  platform: process.platform,
   rules: {
     get: (): Promise<Rule[]> => ipcRenderer.invoke('rules:get'),
     save: (rules: Rule[]): Promise<Rule[]> => ipcRenderer.invoke('rules:save', rules)
@@ -49,8 +52,7 @@ const api = {
   cert: {
     status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),
     install: (): Promise<CertStatus> => ipcRenderer.invoke('cert:install'),
-    remove: (): Promise<CertStatus> => ipcRenderer.invoke('cert:remove'),
-    list: (): Promise<CertInfo[]> => ipcRenderer.invoke('cert:list')
+    remove: (): Promise<CertStatus> => ipcRenderer.invoke('cert:remove')
   },
   dialog: {
     saveTextFile: (defaultFileName: string, content: string): Promise<string | null> =>
@@ -61,6 +63,7 @@ const api = {
   system: {
     sudoersInstalled: (): Promise<boolean> => ipcRenderer.invoke('system:sudoersInstalled'),
     installSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:installSudoersRule'),
+    removeSudoersRule: (): Promise<void> => ipcRenderer.invoke('system:removeSudoersRule'),
     vpnStatus: (): Promise<VpnStatus> => ipcRenderer.invoke('system:vpnStatus')
   },
   app: {

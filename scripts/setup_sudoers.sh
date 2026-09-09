@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Разрешает FileSwitcher менять системный прокси (networksetup) без пароля/Touch ID при
 # каждом старте/остановке — иначе macOS спрашивает подтверждение на каждый вызов.
-# NOPASSWD выдаётся только на бинарник networksetup, не на произвольные команды.
+# NOPASSWD выдаётся только на четыре подкоманды networksetup, которыми приложение
+# включает/выключает системный прокси, а не на весь бинарник.
 set -euo pipefail
 
 SUDOERS_FILE="/etc/sudoers.d/filesswitcher-networksetup"
-RULE="$(whoami) ALL=(root) NOPASSWD: /usr/sbin/networksetup"
+CMDS="/usr/sbin/networksetup -setwebproxy *, /usr/sbin/networksetup -setsecurewebproxy *, /usr/sbin/networksetup -setwebproxystate *, /usr/sbin/networksetup -setsecurewebproxystate *"
+RULE="$(whoami) ALL=(root) NOPASSWD: $CMDS"
 
 TMP_FILE="$(mktemp)"
 trap 'rm -f "$TMP_FILE"' EXIT

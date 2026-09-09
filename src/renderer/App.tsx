@@ -205,9 +205,9 @@ export default function App(): React.ReactElement {
   const theme = useMemo(
     () => ({
       algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+      // paddingLG:10 задаёт и компактные внутренние отступы модалок (antd 6 берёт их из этого токена)
       token: { padding: 6, paddingLG: 10, marginLG: 10, borderRadius: 4, fontSize: BASE_FONT_SIZE },
       components: {
-        Modal: { contentPadding: 12 },
         // itemHeight у Listy = fontHeight + itemPaddingBlock*2 (см. antd/es/listy/index.js) — при
         // fontSize 13 (fontHeight≈20) даёт ровно 36px строки лога, синхронизировано
         // с высотой строки правил (RulesTable, см. global.css: .rules-table--compact tr min-height)

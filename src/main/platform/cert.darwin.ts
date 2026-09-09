@@ -1,9 +1,9 @@
-import { homedir, tmpdir } from 'os'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { homedir } from 'os'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { execAsync } from '../execAsync'
 import type { CertManager } from './types'
-import type { CertInfo, CertStatus } from '../../shared/types'
+import type { CertStatus } from '../../shared/types'
 
 const CA_CERT_PATH = join(homedir(), '.mitmproxy', 'mitmproxy-ca-cert.pem')
 
@@ -47,57 +47,6 @@ class DarwinCertManager implements CertManager {
   async removeTrust(): Promise<void> {
     this.assertCertExists('')
     await execAsync('security', ['remove-trusted-cert', CA_CERT_PATH])
-  }
-
-  /**
-   * Перечисляет все сертификаты с CN=mitmproxy (их может накопиться несколько после
-   * переустановок mitmproxy) со сроком действия и статусом доверия каждого. Ищет по тому же
-   * default search list keychain'ов, что status/install/removeTrust (без явного пути к keychain) —
-   * иначе при нестандартном search list список расходился бы со статусом.
-   */
-  async list(): Promise<CertInfo[]> {
-    let output: string
-    try {
-      output = await execAsync('security', ['find-certificate', '-a', '-c', 'mitmproxy', '-Z', '-p'])
-    } catch {
-      return []
-    }
-
-    const blocks = output.split(/(?=SHA-1 hash: )/).filter((b) => b.trim())
-    const tmpDir = mkdtempSync(join(tmpdir(), 'fileswitcher-certs-'))
-
-    try {
-      const parsedBlocks = blocks
-        .map((block) => ({
-          sha1: block.match(/SHA-1 hash:\s*([0-9A-F]+)/)?.[1],
-          pem: block.match(/-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----/)?.[0]
-        }))
-        .filter((b): b is { sha1: string; pem: string } => !!b.sha1 && !!b.pem)
-
-      const certs = await Promise.all(
-        parsedBlocks.map(async ({ sha1, pem }) => {
-          const certPath = join(tmpDir, `${sha1}.pem`)
-          writeFileSync(certPath, pem)
-
-          const expiresAt = (await execAsync('openssl', ['x509', '-in', certPath, '-noout', '-enddate']))
-            .replace('notAfter=', '')
-            .trim()
-
-          let trusted = false
-          try {
-            await execAsync('security', ['verify-cert', '-c', certPath, '-l'])
-            trusted = true
-          } catch {
-            trusted = false
-          }
-
-          return { sha1, expiresAt, trusted }
-        })
-      )
-      return certs
-    } finally {
-      rmSync(tmpDir, { recursive: true, force: true })
-    }
   }
 }
 

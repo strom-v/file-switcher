@@ -4,6 +4,7 @@ import { EventEmitter } from 'events'
 import { app } from 'electron'
 import { readJsonFile, writeJsonFile } from './jsonFile'
 import { initialGroupForRule } from '../shared/ruleGroups'
+import ruleSchema from '../shared/rule.schema.json'
 import type { Rule } from '../shared/types'
 
 export type { Rule } from '../shared/types'
@@ -12,9 +13,17 @@ interface RulesFile {
   rules: Rule[]
 }
 
-/** Бросает понятную ошибку, если у правила пустой urlPattern или (при isRegex) невалидный regex —
- * иначе такое правило молча не срабатывает, а причина видна только в stdout Python-аддона */
+// допустимые ключи правила — из общей схемы (единый контракт с addon.py, см. rule.schema.json)
+const ALLOWED_RULE_KEYS = new Set(Object.keys(ruleSchema.properties))
+
+/** Бросает понятную ошибку при невалидном правиле (пустой/битый urlPattern, невалидный JSON инлайн-тела,
+ * delayMs/statusCodeOverride вне диапазона, заголовок с пустым именем) — иначе правило молча ведёт себя
+ * не так, как написано, а причина видна только в stdout Python-аддона */
 function assertValidRule(rule: Rule): void {
+  const unknownKeys = Object.keys(rule).filter((key) => !ALLOWED_RULE_KEYS.has(key))
+  if (unknownKeys.length > 0) {
+    throw new Error(`Правило ${rule.id}: неизвестные поля ${unknownKeys.join(', ')} (опечатка?)`)
+  }
   if (!rule.urlPattern?.trim()) {
     throw new Error(`Правило ${rule.id}: пустой URL-паттерн`)
   }
@@ -33,6 +42,24 @@ function assertValidRule(rule: Rule): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       throw new Error(`Правило ${rule.id}: тело ответа не является валидным JSON — ${message}`)
+    }
+  }
+  // поля "расширенных" модификаций правятся только вручную в rules.json / импортом — формы для них нет,
+  // поэтому валидируем здесь: опечатка (delayMs: 60000 вместо 60) иначе молча ломает поведение
+  if (rule.delayMs !== undefined && (!Number.isFinite(rule.delayMs) || rule.delayMs < 0 || rule.delayMs > 60_000)) {
+    throw new Error(`Правило ${rule.id}: delayMs должен быть числом от 0 до 60000 мс`)
+  }
+  if (
+    rule.statusCodeOverride !== undefined &&
+    (!Number.isInteger(rule.statusCodeOverride) || rule.statusCodeOverride < 100 || rule.statusCodeOverride > 599)
+  ) {
+    throw new Error(`Правило ${rule.id}: statusCodeOverride должен быть целым числом от 100 до 599`)
+  }
+  for (const key of ['requestHeaderOverrides', 'responseHeaderOverrides'] as const) {
+    for (const override of rule[key] ?? []) {
+      if (typeof override?.name !== 'string' || !override.name.trim()) {
+        throw new Error(`Правило ${rule.id}: в ${key} есть заголовок с пустым именем`)
+      }
     }
   }
 }

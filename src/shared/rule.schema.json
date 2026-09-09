@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "Канонический контракт правила подмены. Единый источник для TS (src/shared/types.ts, rulesStore) и Python (resources/addon.py). Тесты src/shared/ruleSchema.test.ts и resources/test_rule_schema.py падают, если любая из сторон разошлась со схемой.",
+  "title": "Rule",
+  "type": "object",
+  "required": ["id", "enabled", "urlPattern", "isRegex"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "enabled": { "type": "boolean" },
+    "urlPattern": { "type": "string" },
+    "isRegex": { "type": "boolean" },
+    "group": { "type": "string" },
+    "localFilePath": { "type": "string" },
+    "responseBody": { "type": "string" },
+    "contentType": { "type": "string" },
+    "requestHeaderOverrides": { "type": "array", "items": { "$ref": "#/definitions/headerOverride" } },
+    "responseHeaderOverrides": { "type": "array", "items": { "$ref": "#/definitions/headerOverride" } },
+    "delayMs": { "type": "number", "minimum": 0, "maximum": 60000 },
+    "statusCodeOverride": { "type": "integer", "minimum": 100, "maximum": 599 }
+  },
+  "definitions": {
+    "headerOverride": {
+      "type": "object",
+      "required": ["name", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    }
+  }
+}

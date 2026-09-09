@@ -15,14 +15,9 @@ export function installSudoersRule(): Promise<void> {
   return platform.systemProxy.setUpPasswordless()
 }
 
-/** Включает системный HTTP/HTTPS-прокси на host:port, сохранив прежнее состояние для отката */
-export function enableSystemProxy(host: string, port: number): Promise<void> {
-  return platform.systemProxy.enable(host, port)
-}
-
-/** Восстанавливает системный прокси в состояние, которое было до enableSystemProxy() */
-export function disableSystemProxy(): Promise<void> {
-  return platform.systemProxy.disable()
+/** Отзывает это разрешение (удаляет sudoers-правило) */
+export function removeSudoersRule(): Promise<void> {
+  return platform.systemProxy.revokePasswordless()
 }
 
 /** Страховка на старте/выходе: откатывает состояние прокси после аварийного завершения приложения */

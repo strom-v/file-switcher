@@ -67,12 +67,6 @@ export interface ProxyLogEvent extends LogEntryMeta {
 
 export type CertStatus = 'not-generated' | 'not-trusted' | 'trusted'
 
-export interface CertInfo {
-  sha1: string
-  expiresAt: string
-  trusted: boolean
-}
-
 export interface VpnStatus {
   /** есть признаки VPN: подключённый VPN-сервис ОС или активный туннельный интерфейс */
   active: boolean

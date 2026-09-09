@@ -5,21 +5,24 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { platform } from './platform'
 import { logStore } from './logStore'
+import { DEFAULT_PROXY_PORT } from '../shared/constants'
 import type { ProxyState, ProxyLogEvent } from '../shared/types'
 
 export type { ProxyStatus, ProxyState, ProxyLogEvent } from '../shared/types'
-
-const DEFAULT_PORT = 8080
 
 // события лога копятся и эмиттятся пачкой раз в этот интервал, а не по одному на каждый запрос —
 // при активном трафике (десятки запросов в секунду, например при загрузке тяжёлой страницы) это
 // заметно снижает частоту IPC-сообщений и React-рендеров в renderer
 const LOG_BATCH_INTERVAL_MS = 50
 
+// показывается один раз, когда файл лога сессии достиг потолка размера и запись в него прекратилась
+const LOG_SIZE_LIMIT_MESSAGE =
+  'Файл лога сессии достиг 100 МБ — новые запросы больше не сохраняются на диск (в списке отображаются). Экспортируйте лог и перезапустите приложение, чтобы начать новый файл.'
+
 /** Управляет дочерним процессом mitmdump: запуск, остановка, разбор stdout */
 export class ProxyController extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | null = null
-  private state: ProxyState = { status: 'stopped', port: DEFAULT_PORT }
+  private state: ProxyState = { status: 'stopped', port: DEFAULT_PROXY_PORT }
   private stdoutBuffer = ''
   private lastStderr = ''
   private pendingLogs: ProxyLogEvent[] = []
@@ -56,7 +59,7 @@ export class ProxyController extends EventEmitter {
     return join(process.resourcesPath, 'addon.py')
   }
 
-  start(rulesFilePath: string, port: number = DEFAULT_PORT): void {
+  start(rulesFilePath: string, port: number = DEFAULT_PROXY_PORT): void {
     if (this.child) {
       return
     }
@@ -205,6 +208,9 @@ export class ProxyController extends EventEmitter {
       this.pendingLogs = []
       this.logBatchTimer = null
       this.emit('logBatch', logStore.appendBatch(batch))
+      if (logStore.consumeSizeLimitWarning()) {
+        this.emit('stderr', LOG_SIZE_LIMIT_MESSAGE)
+      }
     }, LOG_BATCH_INTERVAL_MS)
   }
 }

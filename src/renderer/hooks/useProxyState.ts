@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { DEFAULT_PROXY_PORT } from '../../shared/constants'
 import type { ProxyState, LogEntryMeta } from '../../shared/types'
 
 // потолок отображения списка в UI — весь лог сессии лежит на диске (см. main/logStore.ts),
@@ -16,7 +17,7 @@ export function useProxyState(onStderr?: (text: string) => void): {
   /** добавляет запись в отображение из renderer (например результат повторной отправки запроса) */
   appendLog: (event: LogEntryMeta) => void
 } {
-  const [status, setStatus] = useState<ProxyState>({ status: 'stopped', port: 8080 })
+  const [status, setStatus] = useState<ProxyState>({ status: 'stopped', port: DEFAULT_PROXY_PORT })
   const [logs, setLogs] = useState<LogEntryMeta[]>([])
   const mounted = useRef(true)
   const onStderrRef = useRef(onStderr)

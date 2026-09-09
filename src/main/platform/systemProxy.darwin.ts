@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir, userInfo } from 'os'
 import { app } from 'electron'
@@ -8,6 +8,20 @@ import type { SystemProxyManager } from './types'
 import type { VpnStatus } from '../../shared/types'
 
 const SUDOERS_FILE = '/etc/sudoers.d/filesswitcher-networksetup'
+
+// правило sudoers: passwordless только для четырёх подкоманд networksetup, которыми приложение
+// включает/выключает системный прокси — не для всего бинарника. Args-glob '*' в sudoers покрывает
+// имя сетевого сервиса и host/port. Функция от username, чтобы сверять содержимое файла (см.
+// isPasswordlessSetup) и не полагаться только на факт его существования.
+function sudoersRuleFor(username: string): string {
+  const cmds = [
+    '/usr/sbin/networksetup -setwebproxy *',
+    '/usr/sbin/networksetup -setsecurewebproxy *',
+    '/usr/sbin/networksetup -setwebproxystate *',
+    '/usr/sbin/networksetup -setsecurewebproxystate *'
+  ].join(', ')
+  return `${username} ALL=(root) NOPASSWD: ${cmds}`
+}
 
 // Выполняет shell-скрипт с правами администратора через один системный диалог авторизации (Touch ID/пароль).
 // osascript сам не проходит через внешний shell (execFile), но AppleScript "do shell script" исполняет
@@ -179,12 +193,20 @@ async function hasCorpVpnProcess(): Promise<boolean> {
 }
 
 class DarwinSystemProxyManager implements SystemProxyManager {
+  /** true только если файл sudoers существует И содержит актуальное правило для текущего пользователя —
+   * иначе (файл от прежнего имени пользователя, обрезан, отредактирован) приложение всё равно упрётся
+   * в диалог авторизации, и честнее заново предложить настройку, чем молча считать её выполненной */
   isPasswordlessSetup(): boolean {
-    return existsSync(SUDOERS_FILE)
+    if (!existsSync(SUDOERS_FILE)) return false
+    try {
+      return readFileSync(SUDOERS_FILE, 'utf-8').includes(sudoersRuleFor(userInfo().username))
+    } catch {
+      return false
+    }
   }
 
   async setUpPasswordless(): Promise<void> {
-    const rule = `${userInfo().username} ALL=(root) NOPASSWD: /usr/sbin/networksetup`
+    const rule = sudoersRuleFor(userInfo().username)
     const tmpFile = join(tmpdir(), `filesswitcher-sudoers-${Date.now()}`)
     writeFileSync(tmpFile, `${rule}\n`, { mode: 0o440 })
 
@@ -199,6 +221,13 @@ class DarwinSystemProxyManager implements SystemProxyManager {
     } finally {
       unlinkSync(tmpFile)
     }
+  }
+
+  /** Удаляет sudoers-правило — passwordless-настройка отзывается, дальше networksetup снова
+   * через диалог авторизации. No-op, если файла нет. */
+  async revokePasswordless(): Promise<void> {
+    if (!existsSync(SUDOERS_FILE)) return
+    await runAsAdminViaOsascript(`rm -f "${SUDOERS_FILE}"`)
   }
 
   async getVpnStatus(): Promise<VpnStatus> {

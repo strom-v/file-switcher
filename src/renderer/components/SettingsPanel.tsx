@@ -85,6 +85,20 @@ export default function SettingsPanel({
     }
   }
 
+  const handleRemoveSudoersRule = async (): Promise<void> => {
+    setInstallingSudoers(true)
+    try {
+      await window.api.system.removeSudoersRule()
+      setSudoersInstalled(await window.api.system.sudoersInstalled())
+      message.success(t('settings.sudoersRemoveSuccess'))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      message.error(t('settings.sudoersRemoveError', { message: msg }))
+    } finally {
+      setInstallingSudoers(false)
+    }
+  }
+
   const handleInstallCert = async (): Promise<void> => {
     setInstalling(true)
     try {
@@ -194,19 +208,27 @@ export default function SettingsPanel({
           </Tooltip>
         </Space>
 
-        {!sudoersInstalled && (
-          <SectionHeader title={t('settings.sudoersAlertTitle')}>
-            <Alert
-              type="info"
-              title={t('settings.sudoersAlertDescription')}
-              action={
-                <Button size="small" onClick={handleInstallSudoersRule} loading={installingSudoers}>
-                  {t('settings.sudoersInstallButton')}
-                </Button>
-              }
-            />
-          </SectionHeader>
-        )}
+        {/* sudoers-настройка есть только на macOS (на прочих ОС isPasswordlessSetup всегда true) */}
+        {window.api.platform === 'darwin' &&
+          (!sudoersInstalled ? (
+            <SectionHeader title={t('settings.sudoersAlertTitle')}>
+              <Alert
+                type="info"
+                title={t('settings.sudoersAlertDescription')}
+                action={
+                  <Button size="small" onClick={handleInstallSudoersRule} loading={installingSudoers}>
+                    {t('settings.sudoersInstallButton')}
+                  </Button>
+                }
+              />
+            </SectionHeader>
+          ) : (
+            <Popconfirm title={t('settings.sudoersRemoveConfirm')} onConfirm={handleRemoveSudoersRule}>
+              <Button size="small" loading={installingSudoers}>
+                {t('settings.sudoersRemoveButton')}
+              </Button>
+            </Popconfirm>
+          ))}
 
         <div>
           {certStatus === 'not-generated' && (
@@ -262,9 +284,16 @@ export default function SettingsPanel({
                 { value: 'csv', label: 'CSV' }
               ]}
             />
-            <Button style={{ flex: 1 }} onClick={handleExportLog} disabled={logCount === 0}>
-              {t('log.exportButton')}
-            </Button>
+            <Popconfirm
+              title={t('log.exportConfirmTitle')}
+              description={t('log.exportConfirmDescription')}
+              onConfirm={handleExportLog}
+              disabled={logCount === 0}
+            >
+              <Button style={{ flex: 1 }} disabled={logCount === 0}>
+                {t('log.exportButton')}
+              </Button>
+            </Popconfirm>
           </Flex>
         </SectionHeader>
       </SettingsGroup>

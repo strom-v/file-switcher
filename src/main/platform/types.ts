@@ -2,7 +2,7 @@
  * Платформо-зависимые операции main-процесса за единым интерфейсом. macOS-реализация —
  * эталонная и полная; реализации для других платформ подключаются через ./index по process.platform.
  */
-import type { CertInfo, CertStatus, VpnStatus } from '../../shared/types'
+import type { CertStatus, VpnStatus } from '../../shared/types'
 
 /** Управление системным HTTP/HTTPS-прокси ОС (как это делает Fiddler/Charles) */
 export interface SystemProxyManager {
@@ -16,6 +16,8 @@ export interface SystemProxyManager {
   isPasswordlessSetup(): boolean
   /** Выдаёт такое разрешение через один системный диалог авторизации */
   setUpPasswordless(): Promise<void>
+  /** Отзывает разрешение (удаляет sudoers-правило); no-op там, где настройки нет */
+  revokePasswordless(): Promise<void>
   /** Статус VPN: есть ли туннель и заворачивает ли он весь трафик (тогда перехват прокси сломан).
    * best-effort: при ошибке определения возвращает { active: false, blocksProxy: false }. */
   getVpnStatus(): Promise<VpnStatus>
@@ -28,8 +30,6 @@ export interface CertManager {
   status(): Promise<CertStatus>
   install(): Promise<void>
   removeTrust(): Promise<void>
-  /** Все сертификаты mitmproxy в хранилище — их может накопиться несколько после переустановок */
-  list(): Promise<CertInfo[]>
 }
 
 /** Пути к бандлам, специфичные для платформы упаковки */

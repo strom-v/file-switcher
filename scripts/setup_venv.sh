@@ -6,6 +6,8 @@ cd "$(dirname "$0")/.."
 REQUIREMENTS_FILE="requirements.txt"
 if [ "${1:-}" = "--build" ]; then
   REQUIREMENTS_FILE="requirements-build.txt"
+elif [ "${1:-}" = "--dev" ]; then
+  REQUIREMENTS_FILE="requirements-dev.txt"
 fi
 
 python3 -m venv .venv
