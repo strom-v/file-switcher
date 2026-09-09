@@ -13,7 +13,7 @@ function readStoredSplitterSize(): number {
   return SPLITTER_SIZE_DEFAULT
 }
 
-/** Доля ширины левой панели (лог) в процентах — управляется перетаскиванием Splitter или напрямую в настройках */
+/** Доля ширины левой панели (лог) в процентах — управляется перетаскиванием Splitter */
 export function useSplitterSize(): { splitterSize: number; setSplitterSize: (size: number) => void } {
   const [splitterSize, setSplitterSizeState] = useState<number>(readStoredSplitterSize)
 

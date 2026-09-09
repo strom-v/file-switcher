@@ -2,7 +2,7 @@
   "app": {
     "settingsButton": "settings",
     "vpnWarning": "with some VPNs, traffic interception and substitution may not work — it's recommended to turn off the VPN before using the app",
-    "vpnBlocksWarning": "all traffic is routed through a VPN — interception and substitution don't work; turn off the VPN or switch it to split tunneling",
+    "vpnBlocksWarning": "all traffic is routed through a VPN — interception and substitution don't work; turn off the VPN",
     "startProxyButton": "start proxy",
     "stopProxyButton": "stop proxy",
     "relaunchButton": "restart the app",
@@ -91,8 +91,6 @@
   "settings": {
     "error": "error",
     "groupAppearance": "interface",
-    "splitterSizeLabel": "log/rules panel width",
-    "splitterSizeHint": "the width ratio between the left panel (log) and the right one (rules) — can also be changed by dragging the splitter between the panels",
     "groupNetwork": "general",
     "groupData": "data",
     "groupDeveloper": "developer",
@@ -103,9 +101,6 @@
     "groupDataLog": "log",
     "groupDataLogHint": "save the current traffic log to a file in the selected format",
     "portHint": "the port the local proxy server runs on — point your browser's or system's traffic at it",
-    "autoStartLabel": "start the proxy automatically when the app launches",
-    "resetButton": "reset all settings",
-    "resetConfirm": "reset language, theme, font size, port, and auto-start to their defaults?",
     "sudoersAlertTitle": "the proxy asks for a password on every start/stop",
     "sudoersAlertDescription": "allow networksetup to run without a password — one system authorization dialog, then no more password prompts for starting/stopping the proxy.",
     "sudoersInstallButton": "set up passwordless",
@@ -128,7 +123,9 @@
       "crashed": "crashed"
     },
     "themeLight": "light",
-    "themeDark": "dark"
+    "themeDark": "dark",
+    "langRu": "russian",
+    "langEn": "english"
   },
   "onboarding": {
     "title": "welcome to FileSwitcher",

@@ -29,7 +29,6 @@ import { useVpnStatus } from './hooks/useVpnStatus'
 import { useProxySettings } from './hooks/useProxySettings'
 import { useSplitterSize } from './hooks/useSplitterSize'
 import { useThemeMode } from './hooks/useThemeMode'
-import { COMPACT_FONT_SIZE_OFFSET, useFontSize } from './hooks/useFontSize'
 import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
 import { compareGroupNames } from '../shared/ruleGroups'
@@ -37,15 +36,9 @@ import type { ProxyLogEvent, Rule } from '../shared/types'
 
 const ANTD_LOCALES = { ru: ruRU, en: enUS }
 
-// ключи настроек, которые сбрасывает "сбросить все настройки"
-const RESETTABLE_STORAGE_KEYS = [
-  'file-switcher:theme',
-  'file-switcher:language',
-  'file-switcher:font-size',
-  'file-switcher:port',
-  'file-switcher:auto-start-proxy',
-  'file-switcher:splitter-size'
-]
+// базовый размер шрифта antd; компактный текст списков/деталей — на 1px меньше
+const BASE_FONT_SIZE = 13
+const COMPACT_FONT_SIZE = BASE_FONT_SIZE - 1
 
 // цвет кнопки старт/стоп отражает действие клика, а не сырой статус процесса:
 // зелёный — сейчас остановлена, клик запустит; красный — сейчас работает, клик остановит
@@ -60,7 +53,6 @@ const START_STOP_COLOR: Record<string, string> = {
 export default function App(): React.ReactElement {
   const { t, i18n } = useTranslation()
   const { mode, isDark, setMode } = useThemeMode()
-  const { fontSize, setFontSize } = useFontSize()
   const [rules, setRules] = useState<Rule[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   // при дублировании (handleDuplicate) editingRule — копия без id, чтобы форма/handleSubmit
@@ -69,7 +61,7 @@ export default function App(): React.ReactElement {
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { splitterSize, setSplitterSize } = useSplitterSize()
-  const { port, setPort, autoStart, setAutoStart } = useProxySettings()
+  const { port, setPort } = useProxySettings()
   const { status, logs, clearLogs, appendLog } = useProxyState((text) => {
     message.warning(text)
   })
@@ -82,12 +74,10 @@ export default function App(): React.ReactElement {
     }
   }, [])
 
-  // автозапуск прокси при старте приложения, если включено в настройках; порт на этот момент
-  // уже прочитан из localStorage синхронно при инициализации useProxySettings, поэтому не в deps
+  // прокси запускается автоматически при старте приложения; порт на этот момент уже прочитан
+  // из localStorage синхронно при инициализации useProxySettings, поэтому не в deps
   useEffect(() => {
-    if (autoStart) {
-      window.api.proxy.start(port)
-    }
+    window.api.proxy.start(port)
   }, [])
 
   const handleOnboardingClose = (): void => {
@@ -197,15 +187,6 @@ export default function App(): React.ReactElement {
     window.api.app.relaunch()
   }
 
-  // сбрасывает язык/тему/шрифт/порт/автостарт/лимит лога к дефолту и перезагружает окно,
-  // чтобы все хуки с персистентностью заново прочитали чистое состояние из localStorage
-  const handleResetSettings = (): void => {
-    for (const key of RESETTABLE_STORAGE_KEYS) {
-      localStorage.removeItem(key)
-    }
-    location.reload()
-  }
-
   const handleSplitterResizeEnd = (sizes: number[]): void => {
     const [left, right] = sizes
     const total = left + right
@@ -224,28 +205,28 @@ export default function App(): React.ReactElement {
   const theme = useMemo(
     () => ({
       algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-      token: { padding: 6, paddingLG: 10, marginLG: 10, borderRadius: 4, fontSize },
+      token: { padding: 6, paddingLG: 10, marginLG: 10, borderRadius: 4, fontSize: BASE_FONT_SIZE },
       components: {
         Modal: { contentPadding: 12 },
         // itemHeight у Listy = fontHeight + itemPaddingBlock*2 (см. antd/es/listy/index.js) — при
-        // дефолтном fontSize (13, fontHeight≈20) даёт ровно 36px строки лога, синхронизировано
+        // fontSize 13 (fontHeight≈20) даёт ровно 36px строки лога, синхронизировано
         // с высотой строки правил (RulesTable, см. global.css: .rules-table--compact tr min-height)
         Listy: { itemPaddingBlock: 8 }
       }
     }),
-    [isDark, fontSize]
+    [isDark]
   )
 
   // CSS-переменная для компактного текста (списки лога/правил, детали запроса) — на 1px меньше базового,
-  // применяется через var(--app-font-size-sm) вместо хардкода, чтобы масштабироваться вместе с настройкой
+  // применяется через var(--app-font-size-sm) вместо хардкода
   const rootStyle = useMemo(
     () =>
       ({
         height: '100vh',
         padding: 8,
-        '--app-font-size-sm': `${fontSize - COMPACT_FONT_SIZE_OFFSET}px`
+        '--app-font-size-sm': `${COMPACT_FONT_SIZE}px`
       }) as React.CSSProperties,
-    [fontSize]
+    []
   )
 
   return (
@@ -350,8 +331,6 @@ export default function App(): React.ReactElement {
             status={status}
             port={port}
             onPortChange={setPort}
-            autoStart={autoStart}
-            onAutoStartChange={setAutoStart}
             logCount={logs.length}
             rules={rules}
             onRulesImport={persist}
@@ -360,11 +339,6 @@ export default function App(): React.ReactElement {
             onLanguageChange={setLanguage}
             themeMode={mode}
             onThemeModeChange={setMode}
-            fontSize={fontSize}
-            onFontSizeChange={setFontSize}
-            splitterSize={splitterSize}
-            onSplitterSizeChange={setSplitterSize}
-            onResetSettings={handleResetSettings}
           />
         </Drawer>
       </Layout>
