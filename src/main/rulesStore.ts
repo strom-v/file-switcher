@@ -4,7 +4,8 @@ import { EventEmitter } from 'events'
 import { app } from 'electron'
 import { readJsonFile, writeJsonFile } from './jsonFile'
 import { initialGroupForRule } from '../shared/ruleGroups'
-import ruleSchema from '../shared/rule.schema.json'
+import { assertRuleMatchesSchema } from '../shared/validateRule'
+import { pythonRegexIncompatibility } from '../shared/regexCompat'
 import type { Rule } from '../shared/types'
 
 export type { Rule } from '../shared/types'
@@ -13,17 +14,13 @@ interface RulesFile {
   rules: Rule[]
 }
 
-// допустимые ключи правила — из общей схемы (единый контракт с addon.py, см. rule.schema.json)
-const ALLOWED_RULE_KEYS = new Set(Object.keys(ruleSchema.properties))
-
-/** Бросает понятную ошибку при невалидном правиле (пустой/битый urlPattern, невалидный JSON инлайн-тела,
- * delayMs/statusCodeOverride вне диапазона, заголовок с пустым именем) — иначе правило молча ведёт себя
- * не так, как написано, а причина видна только в stdout Python-аддона */
-function assertValidRule(rule: Rule): void {
-  const unknownKeys = Object.keys(rule).filter((key) => !ALLOWED_RULE_KEYS.has(key))
-  if (unknownKeys.length > 0) {
-    throw new Error(`Правило ${rule.id}: неизвестные поля ${unknownKeys.join(', ')} (опечатка?)`)
-  }
+/** Бросает понятную ошибку при невалидном правиле (несоответствие схеме, пустой/битый urlPattern,
+ * невалидный JSON инлайн-тела, delayMs/statusCodeOverride вне диапазона, заголовок с пустым именем) —
+ * иначе правило молча ведёт себя не так, как написано, а причина видна только в stdout Python-аддона */
+function assertValidRule(rule: unknown): asserts rule is Rule {
+  // сначала форма по общей схеме: типы полей (boolean enabled/isRegex), обязательные поля,
+  // неизвестные ключи, диапазоны delayMs/statusCodeOverride
+  assertRuleMatchesSchema(rule)
   if (!rule.urlPattern?.trim()) {
     throw new Error(`Правило ${rule.id}: пустой URL-паттерн`)
   }
@@ -33,6 +30,12 @@ function assertValidRule(rule: Rule): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       throw new Error(`Правило ${rule.id}: некорректный regex "${rule.urlPattern}" — ${message}`)
+    }
+    // regex исполняет Python re в addon.py — синтаксис двух движков расходится, отклоняем
+    // JS-специфичные конструкции до сохранения, иначе правило молча не сработает в прокси
+    const incompatibility = pythonRegexIncompatibility(rule.urlPattern)
+    if (incompatibility) {
+      throw new Error(`Правило ${rule.id}: regex несовместим с движком прокси — ${incompatibility}`)
     }
   }
   // инлайн-тело с JSON-типом должно быть валидным JSON — иначе клиент молча не разберёт ответ
@@ -97,7 +100,15 @@ export class RulesStore extends EventEmitter {
     const parsed = readJsonFile<Partial<RulesFile>>(this.filePath, {}, (message) => {
       this.emit('corrupted', message)
     })
-    const rules = parsed.rules ?? []
+    // валидный JSON, но не { rules: [...] } (например {"rules":{}}) — readJsonFile приводит его к типу
+    // молча, а дальше withGroups звал бы .every() на объекте и падал уже на первом rules:get
+    if (!Array.isArray(parsed.rules)) {
+      if (parsed.rules !== undefined) {
+        this.emit('corrupted', 'rules.json: поле "rules" не является массивом')
+      }
+      return { rules: [] }
+    }
+    const rules = parsed.rules
     // одноразовая миграция: правилам без явной группы проставляем её из пути подмены
     // (или "остальные"), чтобы дальше группировка шла только по Rule.group. Делаем в read(),
     // чтобы покрыть и импорт правил, и старый rules.json на диске

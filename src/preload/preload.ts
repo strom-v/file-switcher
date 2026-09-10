@@ -34,9 +34,9 @@ const api = {
       ipcRenderer.on('proxy:stderr', listener)
       return () => ipcRenderer.removeListener('proxy:stderr', listener)
     },
-    // повторяет запрос из лога напрямую на реальный сервер (не через прокси); возвращает лёгкую
-    // запись лога event: 'replay', которую renderer добавляет в список
-    replayRequest: (event: ProxyLogEvent): Promise<LogEntryMeta> => ipcRenderer.invoke('proxy:replayRequest', event)
+    // повторяет запрос из лога напрямую на реальный сервер (не через прокси); передаём только ts,
+    // main сам берёт исходное событие из лога; возвращает лёгкую запись event: 'replay'
+    replayRequest: (ts: number): Promise<LogEntryMeta> => ipcRenderer.invoke('proxy:replayRequest', ts)
   },
   log: {
     // последние записи лога сессии для первичной отрисовки списка
@@ -48,7 +48,9 @@ const api = {
       ipcRenderer.invoke('log:search', query, searchInBody),
     // main сам выбирает путь через системный диалог и потоково пишет туда весь лог сессии
     exportAs: (format: 'har' | 'json' | 'csv', defaultFileName: string): Promise<string | null> =>
-      ipcRenderer.invoke('log:export', format, defaultFileName)
+      ipcRenderer.invoke('log:export', format, defaultFileName),
+    // есть ли на диске записи сессии — для доступности кнопки экспорта (renderer-список чистится отдельно)
+    hasExportableEvents: (): Promise<boolean> => ipcRenderer.invoke('log:hasExportableEvents')
   },
   cert: {
     status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),

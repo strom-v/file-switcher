@@ -1,6 +1,10 @@
+import { isIP } from 'net'
+import { lookup } from 'dns/promises'
+import { redactHeaders } from '../shared/redactedHeaders'
 import type { ProxyLogEvent } from '../shared/types'
 
 const REPLAY_TIMEOUT_MS = 15_000
+const MAX_REPLAY_REDIRECTS = 5
 
 // заголовки, которые либо запрещено выставлять вручную через fetch (forbidden request headers),
 // либо описывают исходное соединение/кодирование и приведут к рассинхрону при повторной отправке
@@ -16,6 +20,66 @@ const SKIPPED_REPLAY_HEADERS = new Set([
   'referer'
 ])
 
+/** true для loopback, link-local, приватных и прочих не-публичных диапазонов IPv4/IPv6 —
+ * replay на такие адреса дал бы renderer доступ к локальным и внутрикорпоративным сервисам
+ * в обход CSP и браузерного CORS */
+function isNonPublicAddress(ip: string): boolean {
+  const family = isIP(ip)
+  if (family === 4) {
+    const [a, b] = ip.split('.').map(Number)
+    if (a === 0 || a === 10 || a === 127) return true
+    if (a === 169 && b === 254) return true // link-local
+    if (a === 172 && b >= 16 && b <= 31) return true
+    if (a === 192 && b === 168) return true
+    if (a === 100 && b >= 64 && b <= 127) return true // CGNAT
+    if (a >= 224) return true // multicast + reserved
+    return false
+  }
+  if (family === 6) {
+    const addr = ip.toLowerCase().replace(/^\[|\]$/g, '')
+    if (addr === '::1' || addr === '::') return true
+    if (addr.startsWith('fe80')) return true // link-local
+    if (addr.startsWith('fc') || addr.startsWith('fd')) return true // unique local
+    if (addr.startsWith('ff')) return true // multicast
+    // IPv4-mapped (::ffff:a.b.c.d) — проверяем встроенный IPv4
+    const mapped = addr.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
+    if (mapped) return isNonPublicAddress(mapped[1])
+    return false
+  }
+  return true
+}
+
+/** Отклоняет замену на приватный/loopback хост до отправки запроса */
+async function assertPublicTarget(rawUrl: string): Promise<void> {
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    throw new Error(`Некорректный URL для повтора: ${rawUrl}`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(`Повтор поддерживает только http/https, получено: ${url.protocol}`)
+  }
+
+  const host = url.hostname.replace(/^\[|\]$/g, '')
+  if (isIP(host)) {
+    if (isNonPublicAddress(host)) throw new Error(`Повтор на локальный/приватный адрес запрещён: ${host}`)
+    return
+  }
+  if (host === 'localhost' || host.endsWith('.localhost')) {
+    throw new Error('Повтор на localhost запрещён')
+  }
+
+  const resolved = await lookup(host, { all: true }).catch(() => {
+    throw new Error(`Не удалось разрешить хост ${host}`)
+  })
+  for (const { address } of resolved) {
+    if (isNonPublicAddress(address)) {
+      throw new Error(`Хост ${host} резолвится в локальный/приватный адрес ${address}`)
+    }
+  }
+}
+
 /** Повторяет запрос из лога напрямую на реальный сервер (не через локальный прокси — иначе
  * запрос снова попал бы в addon.py и, если правило матчит, снова получил бы подмену вместо
  * повторения оригинального запроса). Возвращает готовую запись лога (event: 'replay'), которую
@@ -27,23 +91,44 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ProxyLogEvent
     throw new Error('Тело запроса бинарное — повторная отправка исказит данные')
   }
 
+  await assertPublicTarget(event.url)
+
   const headers = new Headers()
   for (const [name, value] of Object.entries(event.requestHeaders)) {
     if (SKIPPED_REPLAY_HEADERS.has(name.toLowerCase())) continue
     headers.set(name, value)
   }
 
-  const hasBody = !['GET', 'HEAD'].includes(event.method.toUpperCase()) && event.requestBody
+  const hasBody = Boolean(event.requestBody)
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REPLAY_TIMEOUT_MS)
   try {
-    const response = await fetch(event.url, {
-      method: event.method,
-      headers,
-      body: hasBody ? event.requestBody : undefined,
-      signal: controller.signal
-    })
+    // редиректы отслеживаем вручную: undici при follow не проверяет приватность нового хоста,
+    // поэтому сервер мог бы увести replay на 127.0.0.1 или внутрикорпоративный адрес
+    let currentUrl = event.url
+    let method = event.method
+    let response: Response
+    for (let hop = 0; ; hop++) {
+      const sendBody = hasBody && !['GET', 'HEAD'].includes(method.toUpperCase())
+      response = await fetch(currentUrl, {
+        method,
+        headers,
+        body: sendBody ? event.requestBody : undefined,
+        redirect: 'manual',
+        signal: controller.signal
+      })
+      if (response.status < 300 || response.status >= 400) break
+      const location = response.headers.get('location')
+      if (!location) break
+      if (hop >= MAX_REPLAY_REDIRECTS) throw new Error(`Превышен лимит редиректов (${MAX_REPLAY_REDIRECTS})`)
+      currentUrl = new URL(location, currentUrl).toString()
+      await assertPublicTarget(currentUrl)
+      // 301/302/303 на POST превращают запрос в GET без тела — как это делают браузеры
+      if (response.status === 303 || ((response.status === 301 || response.status === 302) && method !== 'GET')) {
+        method = 'GET'
+      }
+    }
     const responseBody = await response.text()
     return {
       event: 'replay',
@@ -51,8 +136,10 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ProxyLogEvent
       file: '',
       method: event.method,
       statusCode: response.status,
-      requestHeaders: event.requestHeaders,
-      responseHeaders: Object.fromEntries(response.headers.entries()),
+      requestHeaders: redactHeaders(event.requestHeaders),
+      // обычный трафик редактирует секретные заголовки в addon.py, а replay идёт мимо аддона —
+      // без этой строки свежий Set-Cookie/X-Auth-Token от сервера попал бы в лог и экспорт открытым
+      responseHeaders: redactHeaders(Object.fromEntries(response.headers.entries())),
       responseSize: Buffer.byteLength(responseBody, 'utf-8'),
       ts: Date.now() / 1000,
       requestBody: event.requestBody,

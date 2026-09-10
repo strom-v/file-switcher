@@ -136,11 +136,9 @@ export default function LogPanel({ logs, onClear, onAddRule, onReplayLogged }: L
   // повтор запроса напрямую на реальный сервер (не через прокси); main возвращает лёгкую запись
   // лога event: 'replay', её LogPanel красит своим фоном, тело смотреть в модалке
   const replay = async (ts: number): Promise<void> => {
-    const full = await loadFull(ts)
-    if (!full) return
     const hide = message.loading(t('log.replayInProgress'), 0)
     try {
-      const logged = await window.api.proxy.replayRequest(full)
+      const logged = await window.api.proxy.replayRequest(ts)
       hide()
       onReplayLogged(logged)
       message.info(`${t('log.replayResultLabel')} ${logged.statusCode}`)

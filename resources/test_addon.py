@@ -39,6 +39,17 @@ def test_redact_keeps_all_header_names():
     assert set(addon._redact_headers(src).keys()) == set(src.keys())
 
 
+def test_redacted_headers_match_shared_contract():
+    # src/shared/redactedHeaders.ts — единый источник для Python-аддона и replay в main-процессе
+    shared = (Path(__file__).parent.parent / "src" / "shared" / "redactedHeaders.ts").read_text()
+    names_block = re.search(r"REDACTED_HEADER_NAMES\s*=\s*\[(.*?)\]", shared, re.DOTALL).group(1)
+    shared_names = set(re.findall(r"['\"]([a-z0-9-]+)['\"]", names_block))
+    assert shared_names == set(addon.REDACTED_HEADERS)
+
+    placeholder = re.search(r"REDACTED_HEADER_PLACEHOLDER\s*=\s*'([^']+)'", shared).group(1)
+    assert placeholder == addon.REDACTED_PLACEHOLDER
+
+
 # --- _substitute_groups ---
 
 def test_substitute_groups_replaces_dollar_n_from_match():

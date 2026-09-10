@@ -139,11 +139,9 @@ export class ProxyController extends EventEmitter {
   }
 
   async stop(): Promise<void> {
-    if (this.logBatchTimer) {
-      clearTimeout(this.logBatchTimer)
-      this.logBatchTimer = null
-    }
-    this.pendingLogs = []
+    // события за последние LOG_BATCH_INTERVAL_MS до Stop уже приняты от addon — дописываем их
+    // в файл и отдаём в renderer, иначе быстрый запрос перед остановкой пропал бы бесследно
+    this.flushPendingLogs()
 
     if (!this.child) {
       this.setState({ status: 'stopped', port: this.state.port })
@@ -222,16 +220,30 @@ export class ProxyController extends EventEmitter {
   private queueLogEvent(event: ProxyLogEvent): void {
     this.pendingLogs.push(event)
     if (this.logBatchTimer) return
+    this.logBatchTimer = setTimeout(() => this.flushPendingLogs(), LOG_BATCH_INTERVAL_MS)
+  }
 
-    this.logBatchTimer = setTimeout(() => {
-      const batch = this.pendingLogs
-      this.pendingLogs = []
+  /** Атомарно забирает накопленные события, пишет пачку в файл и эмиттит метаданные в renderer */
+  private flushPendingLogs(): void {
+    if (this.logBatchTimer) {
+      clearTimeout(this.logBatchTimer)
       this.logBatchTimer = null
+    }
+    if (this.pendingLogs.length === 0) return
+
+    const batch = this.pendingLogs
+    this.pendingLogs = []
+    try {
+      // appendBatch сам глушит ошибки записи на диск (переводит логирование в disabled),
+      // поэтому здесь ловим только неожиданные сбои, чтобы они не стали uncaught в main
       this.emit('logBatch', logStore.appendBatch(batch))
       if (logStore.consumeSizeLimitWarning()) {
         this.emit('stderr', LOG_SIZE_LIMIT_MESSAGE)
       }
-    }, LOG_BATCH_INTERVAL_MS)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.emit('stderr', `Ошибка записи traffic-log: ${message}`)
+    }
   }
 }
 

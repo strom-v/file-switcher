@@ -9,7 +9,6 @@ import { platform } from './platform'
 import { replayRequest } from './replayRequest'
 import { logStore } from './logStore'
 import { streamLogExport, type LogExportFormat } from './logExport'
-import type { ProxyLogEvent } from '../shared/types'
 
 // защита от IPC, пришедшего не из нашего renderer: у приложения одно окно с локальным контентом,
 // setWindowOpenHandler запрещает новые — но если renderer скомпрометирован (XSS в показанном теле,
@@ -72,7 +71,11 @@ export function registerIpcHandlers(): void {
     return getCertStatus()
   })
 
-  handle('proxy:replayRequest', async (_event, logEvent: ProxyLogEvent) => {
+  handle('proxy:replayRequest', async (_event, ts: number) => {
+    // renderer передаёт только идентификатор записи — main сам берёт исходное событие из лога,
+    // чтобы через IPC нельзя было подсунуть произвольный URL для fetch (SSRF)
+    const logEvent = logStore.getEvent(ts)
+    if (!logEvent) throw new Error('Исходная запись лога не найдена — возможно, вытеснена из файла сессии')
     const replayed = await replayRequest(logEvent)
     // повтор попадает в тот же файл лога отдельной записью event: 'replay'
     const [meta] = logStore.appendBatch([replayed])
@@ -85,6 +88,8 @@ export function registerIpcHandlers(): void {
   handle('log:getEvent', (_event, ts: number) => logStore.getEvent(ts))
 
   handle('log:search', (_event, query: string, searchInBody: boolean) => logStore.search(query, searchInBody))
+
+  handle('log:hasExportableEvents', () => logStore.hasExportableEvents())
 
   handle('log:export', async (_event, format: LogExportFormat, defaultFileName: string) => {
     const result = await dialog.showSaveDialog({ defaultPath: defaultFileName })

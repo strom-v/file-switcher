@@ -86,15 +86,19 @@ export default function App(): React.ReactElement {
   }
 
   // сохраняет оптимистично (сразу отражает next в UI); если main отклонит правила (например,
-  // невалидный regex в urlPattern) — откатывает UI к состоянию, которое реально на диске, и показывает причину
-  const persist = async (next: Rule[]): Promise<void> => {
+  // невалидный regex в urlPattern) — откатывает UI к состоянию, которое реально на диске, и показывает
+  // причину. Возвращает true при подтверждённой записи — вызывающий импорт по этому решает, показывать
+  // ли success (иначе зелёное сообщение об успехе выходило до отката)
+  const persist = async (next: Rule[]): Promise<boolean> => {
     setRules(next)
     try {
       await window.api.rules.save(next)
+      return true
     } catch (err) {
       const text = err instanceof Error ? err.message : String(err)
       message.error(text)
       setRules(await window.api.rules.get())
+      return false
     }
   }
 
@@ -331,7 +335,6 @@ export default function App(): React.ReactElement {
             status={status}
             port={port}
             onPortChange={setPort}
-            logCount={logs.length}
             rules={rules}
             onRulesImport={persist}
             onRulesRefresh={handleRefreshRules}

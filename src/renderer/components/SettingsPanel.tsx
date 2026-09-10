@@ -6,16 +6,15 @@ import SectionHeader from './SectionHeader'
 import SettingsGroup from './SettingsGroup'
 import type { ThemeMode } from '../hooks/useThemeMode'
 import type { SupportedLanguage } from '../i18n'
+import { isValidRuleArray } from '../../shared/validateRule'
 import type { CertStatus, ProxyState, Rule } from '../../shared/types'
 
 interface SettingsPanelProps {
   status: ProxyState
   port: number
   onPortChange: (port: number) => void
-  /** число записей в отображении лога — для disabled кнопки экспорта */
-  logCount: number
   rules: Rule[]
-  onRulesImport: (rules: Rule[]) => void
+  onRulesImport: (rules: Rule[]) => Promise<boolean>
   onRulesRefresh: () => Promise<void>
   language: SupportedLanguage
   onLanguageChange: (language: SupportedLanguage) => void
@@ -23,20 +22,11 @@ interface SettingsPanelProps {
   onThemeModeChange: (mode: ThemeMode) => void
 }
 
-/** Проверяет, что распарсенный JSON похож на массив Rule — минимально, без строгой валидации формы каждого поля */
-function isRuleArray(value: unknown): value is Rule[] {
-  return (
-    Array.isArray(value) &&
-    value.every((item) => item && typeof item === 'object' && 'urlPattern' in item && 'id' in item)
-  )
-}
-
 /** Панель настроек: язык/тема, порт, статус сертификата, экспорт лога и правил, devtools */
 export default function SettingsPanel({
   status,
   port,
   onPortChange,
-  logCount,
   rules,
   onRulesImport,
   onRulesRefresh,
@@ -53,6 +43,7 @@ export default function SettingsPanel({
   const [installingSudoers, setInstallingSudoers] = useState(false)
   const [refreshingRules, setRefreshingRules] = useState(false)
   const [logExportFormat, setLogExportFormat] = useState<'har' | 'json' | 'csv'>('har')
+  const [hasExportableLog, setHasExportableLog] = useState(false)
   const [devToolsOpened, setDevToolsOpened] = useState(false)
 
   const refreshCertStatus = async (): Promise<void> => {
@@ -62,6 +53,7 @@ export default function SettingsPanel({
   useEffect(() => {
     refreshCertStatus()
     window.api.system.sudoersInstalled().then(setSudoersInstalled)
+    window.api.log.hasExportableEvents().then(setHasExportableLog)
   }, [status.status])
 
   // текст кнопки devtools зависит от их состояния; синхронизируем и при открытии панели,
@@ -156,12 +148,13 @@ export default function SettingsPanel({
     if (!content) return
     try {
       const parsed = JSON.parse(content)
-      if (!isRuleArray(parsed)) {
+      if (!isValidRuleArray(parsed)) {
         message.error(t('rules.importInvalidFormat'))
         return
       }
-      onRulesImport(parsed)
-      message.success(t('rules.importSuccess', { count: parsed.length }))
+      if (await onRulesImport(parsed)) {
+        message.success(t('rules.importSuccess', { count: parsed.length }))
+      }
     } catch {
       message.error(t('rules.importInvalidFormat'))
     }
@@ -288,9 +281,9 @@ export default function SettingsPanel({
               title={t('log.exportConfirmTitle')}
               description={t('log.exportConfirmDescription')}
               onConfirm={handleExportLog}
-              disabled={logCount === 0}
+              disabled={!hasExportableLog}
             >
-              <Button style={{ flex: 1 }} disabled={logCount === 0}>
+              <Button style={{ flex: 1 }} disabled={!hasExportableLog}>
                 {t('log.exportButton')}
               </Button>
             </Popconfirm>

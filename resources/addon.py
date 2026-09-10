@@ -22,6 +22,8 @@ MATCH_FILE_KEY = "file_switcher_file"
 # заголовки с секретами (токены, сессии, ключи) — их значения не пишутся в лог: файл сессии
 # лежит на диске без шифрования и целиком уходит в HAR/JSON/CSV-экспорт, который пользователи
 # пересылают в баг-репорты. Имя заголовка сохраняем, значение заменяем на плейсхолдер.
+# Единый контракт с main-процессом (replay-ответы) — src/shared/redactedHeaders.ts;
+# test_addon.py падает, если этот набор разошёлся с тем файлом.
 REDACTED_HEADERS = frozenset(
     {
         "authorization",
@@ -395,7 +397,7 @@ class ResponseSwitcher:
         inline_body = rule.get("responseBody")
         if inline_body:
             content_type = rule.get("contentType") or "application/json; charset=utf-8"
-            flow.response = self._make_swap_response(flow, inline_body.encode("utf-8"), content_type)
+            flow.response = self._make_swap_response(inline_body.encode("utf-8"), content_type)
             flow.metadata[MATCH_FILE_KEY] = ""
             return
 
@@ -421,11 +423,14 @@ class ResponseSwitcher:
             return
 
         content_type = rule.get("contentType") or mimetypes.guess_type(path)[0] or "application/octet-stream"
-        flow.response = self._make_swap_response(flow, body, content_type)
+        flow.response = self._make_swap_response(body, content_type)
         flow.metadata[MATCH_FILE_KEY] = path
 
     @staticmethod
-    def _make_swap_response(flow: http.HTTPFlow, body: bytes, content_type: str) -> http.Response:
+    def _make_swap_response(body: bytes, content_type: str) -> http.Response:
+        # Access-Control-Allow-Origin намеренно не выставляем автоматически: это сняло бы origin-границу
+        # для любой открытой в браузере страницы, которая знает URL активного правила. Если CORS-доступ
+        # действительно нужен, пользователь добавляет заголовок явно через responseHeaderOverrides.
         return http.Response.make(
             200,
             body,
@@ -434,9 +439,6 @@ class ResponseSwitcher:
                 # без no-store браузер закэширует подмену и не будет видно,
                 # что правило вообще сработало
                 "Cache-Control": "no-store",
-                # отражаем Origin запроса, иначе CORS-проверка браузера
-                # может молча отклонить подменённый ответ
-                "Access-Control-Allow-Origin": flow.request.headers.get("Origin", "*"),
             },
         )
 

@@ -65,8 +65,10 @@ class LogStore {
   // WriteStream, где только что записанная строка могла ещё не долететь до файла)
   private writeFd: number | null = null
   private bytesWritten = 0
-  // true после первого превышения потолка размера — чтобы предупредить renderer один раз
-  private sizeLimitHit = false
+  // потолок размера файла достигнут — постоянное состояние сессии (в файл больше не пишем)
+  private sizeLimitReached = false
+  // предупреждение о потолке уже ушло в renderer — больше не повторяем за сессию
+  private sizeLimitWarned = false
   // после ошибки файловой системы запись больше не возобновляем в этой сессии, чтобы каждый
   // следующий proxy-event не повторял тот же сбой; текст предупреждения renderer забирает один раз
   private diskLoggingError: string | null = null
@@ -135,10 +137,10 @@ class LogStore {
     }
   }
 
-  /** true, если файл сессии перестал расти из-за потолка размера — renderer показывает это один раз */
+  /** true один раз за сессию — в момент, когда файл впервые упёрся в потолок размера */
   consumeSizeLimitWarning(): boolean {
-    if (!this.sizeLimitHit) return false
-    this.sizeLimitHit = false
+    if (!this.sizeLimitReached || this.sizeLimitWarned) return false
+    this.sizeLimitWarned = true
     return true
   }
 
@@ -171,8 +173,9 @@ class LogStore {
         } catch (error) {
           this.disableDiskLogging(error)
         }
-      } else if (!this.sizeLimitHit) {
-        if (!this.diskLoggingError) this.sizeLimitHit = true
+      } else if (!this.diskLoggingError) {
+        // потолок размера: событие уходит в renderer, но на диск уже не пишется
+        this.sizeLimitReached = true
       }
 
       const entry: IndexEntry = { ...toMeta(event), byteOffset, byteLength }
@@ -206,6 +209,12 @@ class LogStore {
   /** Путь к append-only JSONL текущей сессии для потокового экспорта */
   getFilePath(): string {
     return this.filePath
+  }
+
+  /** true, если в сессии есть хоть одна записанная на диск строка — для доступности кнопки экспорта.
+   * Не завязано на renderer-список: тот чистится кнопкой «очистить», а файл сессии остаётся */
+  hasExportableEvents(): boolean {
+    return this.bytesWritten > 0
   }
 
   /** Последние записи для первичной отрисовки списка */
