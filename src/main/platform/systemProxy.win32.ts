@@ -130,6 +130,10 @@ class Win32SystemProxyManager implements SystemProxyManager {
   }
 
   async enable(host: string, port: number): Promise<void> {
+    if (readSavedState()) {
+      throw new Error('Сохранённое состояние системного прокси нужно сначала восстановить')
+    }
+
     const current = await readCurrentState()
     writeSavedState(current)
 
@@ -142,26 +146,23 @@ class Win32SystemProxyManager implements SystemProxyManager {
 
   async disable(): Promise<void> {
     const saved = readSavedState()
-    clearSavedState()
+    if (!saved) return
 
-    if (saved) {
-      await regSetDword('ProxyEnable', saved.proxyEnable)
-      await regSetString('ProxyServer', saved.proxyServer)
-      await regSetString('ProxyOverride', saved.proxyOverride)
-    } else {
-      await regSetDword('ProxyEnable', 0)
-    }
+    await regSetDword('ProxyEnable', saved.proxyEnable)
+    await regSetString('ProxyServer', saved.proxyServer)
+    await regSetString('ProxyOverride', saved.proxyOverride)
     await refreshWinInet()
+    clearSavedState()
   }
 
   async recoverStale(host: string): Promise<void> {
     const saved = readSavedState()
     if (saved) {
-      clearSavedState()
       await regSetDword('ProxyEnable', saved.proxyEnable)
       await regSetString('ProxyServer', saved.proxyServer)
       await regSetString('ProxyOverride', saved.proxyOverride)
       await refreshWinInet()
+      clearSavedState()
       return
     }
 

@@ -27,6 +27,7 @@ export class ProxyController extends EventEmitter {
   private lastStderr = ''
   private pendingLogs: ProxyLogEvent[] = []
   private logBatchTimer: NodeJS.Timeout | null = null
+  private systemProxyQueue: Promise<void> = Promise.resolve()
 
   getState(): ProxyState {
     return this.state
@@ -112,14 +113,14 @@ export class ProxyController extends EventEmitter {
     child.on('spawn', () => {
       if (this.child !== child) return
       this.setState({ status: 'running', port })
-      this.applySystemProxy(port)
+      this.applySystemProxy(child, port)
     })
 
     child.on('error', (err) => {
       if (this.child !== child) return
       this.setState({ status: 'crashed', port, error: err.message })
       this.child = null
-      this.revertSystemProxy()
+      void this.revertSystemProxy()
     })
 
     child.on('exit', (code) => {
@@ -133,7 +134,7 @@ export class ProxyController extends EventEmitter {
       } else if (this.state.status !== 'stopped') {
         this.setState({ status: 'stopped', port })
       }
-      this.revertSystemProxy()
+      void this.revertSystemProxy()
     })
   }
 
@@ -146,6 +147,7 @@ export class ProxyController extends EventEmitter {
 
     if (!this.child) {
       this.setState({ status: 'stopped', port: this.state.port })
+      await this.revertSystemProxy()
       return
     }
     // обнуляем сразу, а не в обработчике 'exit' — иначе start(), вызванный сразу после stop()
@@ -157,26 +159,44 @@ export class ProxyController extends EventEmitter {
     await this.revertSystemProxy()
   }
 
+  /** Последовательно выполняет изменения системного прокси */
+  private enqueueSystemProxyOperation(operation: () => Promise<void>): Promise<void> {
+    const result = this.systemProxyQueue.then(operation)
+    this.systemProxyQueue = result.catch(() => {})
+    return result
+  }
+
+  /** Восстанавливает системный прокси после аварийного завершения прошлого запуска */
+  recoverStaleSystemProxy(host: string): Promise<void> {
+    return this.enqueueSystemProxyOperation(() => platform.systemProxy.recoverStale(host))
+  }
+
   /** Включает системный HTTP/HTTPS-прокси ОС на активных интерфейсах (реализация зависит от платформы) */
-  private async applySystemProxy(port: number): Promise<void> {
-    try {
-      await platform.systemProxy.enable('127.0.0.1', port)
-    } catch (err) {
-      // пользователь мог отменить системный диалог авторизации, либо платформа не поддерживает
-      // авто-настройку — прокси-сервер всё равно работает, трафик нужно направить вручную
-      const message = err instanceof Error ? err.message : String(err)
-      this.emit('stderr', `Не удалось включить системный прокси автоматически: ${message}`)
-    }
+  private applySystemProxy(child: ChildProcessWithoutNullStreams, port: number): void {
+    void this.enqueueSystemProxyOperation(async () => {
+      // Stop мог отменить запуск, пока в очереди завершалось восстановление прошлого состояния.
+      if (this.child !== child) return
+      try {
+        await platform.systemProxy.enable('127.0.0.1', port)
+      } catch (err) {
+        // пользователь мог отменить системный диалог авторизации, либо платформа не поддерживает
+        // авто-настройку — прокси-сервер всё равно работает, трафик нужно направить вручную
+        const message = err instanceof Error ? err.message : String(err)
+        this.emit('stderr', `Не удалось включить системный прокси автоматически: ${message}`)
+      }
+    })
   }
 
   /** Возвращает системный прокси ОС в состояние до запуска */
-  private async revertSystemProxy(): Promise<void> {
-    try {
-      await platform.systemProxy.disable()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      this.emit('stderr', `Не удалось восстановить системный прокси: ${message}`)
-    }
+  private revertSystemProxy(): Promise<void> {
+    return this.enqueueSystemProxyOperation(async () => {
+      try {
+        await platform.systemProxy.disable()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        this.emit('stderr', `Не удалось восстановить системный прокси: ${message}`)
+      }
+    })
   }
 
   private handleStdout(chunk: string): void {

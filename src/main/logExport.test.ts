@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { buildLogExport } from './logExport'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import { join } from 'path'
+import { afterEach, describe, expect, it } from 'vitest'
+import { buildLogExport, streamLogExport } from './logExport'
 import type { ProxyLogEvent } from '../shared/types'
 
 function event(patch: Partial<ProxyLogEvent>): ProxyLogEvent {
@@ -20,6 +23,28 @@ function event(patch: Partial<ProxyLogEvent>): ProxyLogEvent {
     responseBody: '{"ok":true}',
     ...patch
   }
+}
+
+const tempDirs: string[] = []
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+async function streamExport(format: 'har' | 'json' | 'csv'): Promise<string> {
+  const dir = mkdtempSync(join(tmpdir(), 'log-export-test-'))
+  tempDirs.push(dir)
+  const sourcePath = join(dir, 'traffic.jsonl')
+  const destinationPath = join(dir, `traffic.${format}`)
+  writeFileSync(
+    sourcePath,
+    `${JSON.stringify(event({}))}\ninvalid-json\n${JSON.stringify(event({ ts: 1_700_000_001 }))}\n`
+  )
+
+  await streamLogExport(sourcePath, destinationPath, format)
+  return readFileSync(destinationPath, 'utf-8')
 }
 
 describe('buildLogExport json', () => {
@@ -55,5 +80,33 @@ describe('buildLogExport csv', () => {
     expect(header).toBe('time,method,url,status,event,file,responseSize')
     expect(row).toContain('"https://x/a,b"')
     expect(row).toContain('"he said ""hi"""')
+  })
+})
+
+describe('streamLogExport', () => {
+  it('потоково создаёт JSON и пропускает повреждённые строки', async () => {
+    const parsed = JSON.parse(await streamExport('json'))
+    expect(parsed.map((item: ProxyLogEvent) => item.ts)).toEqual([1_700_000_000, 1_700_000_001])
+  })
+
+  it('потоково создаёт валидный HAR', async () => {
+    const parsed = JSON.parse(await streamExport('har'))
+    expect(parsed.log.entries).toHaveLength(2)
+    expect(parsed.log.entries[0].request.url).toBe('https://api.example.com/a')
+  })
+
+  it('потоково создаёт CSV', async () => {
+    const rows = (await streamExport('csv')).trim().split('\n')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toBe('time,method,url,status,event,file,responseSize')
+  })
+
+  it('создаёт пустой экспорт, если файл сессии ещё не появился', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'log-export-test-'))
+    tempDirs.push(dir)
+    const destinationPath = join(dir, 'traffic.json')
+
+    await streamLogExport(join(dir, 'missing.jsonl'), destinationPath, 'json')
+    expect(JSON.parse(readFileSync(destinationPath, 'utf-8'))).toEqual([])
   })
 })

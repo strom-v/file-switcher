@@ -3,9 +3,12 @@
 применение header-overrides. Запуск: .venv/bin/python3 -m pytest resources/test_addon.py
 (нужен pytest — см. requirements-dev.txt).
 """
+import json
+import os
 import re
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -56,6 +59,41 @@ def test_substitute_groups_empty_optional_group_becomes_empty_string():
     assert addon.ResponseSwitcher._substitute_groups("$1$2", m) == "users"
 
 
+def test_resolve_substituted_path_allows_nested_relative_capture(tmp_path):
+    base = tmp_path / "fixtures"
+    matched = re.search(r"/files/(.+)", "/files/api/users.json")
+
+    resolved = addon.ResponseSwitcher._resolve_substituted_path(str(base / "$1"), matched)
+
+    assert resolved == os.path.realpath(base / "api/users.json")
+
+
+def test_resolve_substituted_path_rejects_parent_traversal(tmp_path):
+    matched = re.search(r"/files/(.+)", "/files/../secret.txt")
+
+    with __import__("pytest").raises(ValueError):
+        addon.ResponseSwitcher._resolve_substituted_path(str(tmp_path / "fixtures" / "$1"), matched)
+
+
+def test_resolve_substituted_path_rejects_absolute_capture(tmp_path):
+    matched = re.search(r"/files/(.+)", "/files//etc/passwd")
+
+    with __import__("pytest").raises(ValueError):
+        addon.ResponseSwitcher._resolve_substituted_path(str(tmp_path / "fixtures" / "$1"), matched)
+
+
+def test_resolve_substituted_path_rejects_symlink_escape(tmp_path):
+    base = tmp_path / "fixtures"
+    outside = tmp_path / "outside"
+    base.mkdir()
+    outside.mkdir()
+    (base / "link").symlink_to(outside, target_is_directory=True)
+    matched = re.search(r"/files/(.+)", "/files/link/secret.txt")
+
+    with __import__("pytest").raises(ValueError):
+        addon.ResponseSwitcher._resolve_substituted_path(str(base / "$1"), matched)
+
+
 # --- _find_matching_rule ---
 
 def test_find_matching_rule_exact_url():
@@ -76,6 +114,50 @@ def test_find_matching_rule_regex():
     rule, matched = rs._find_matching_rule("https://x.com/api/v2/items?page=1")
     assert rule["id"] == "a"
     assert matched is not None
+
+
+def test_find_matching_rule_regex_keeps_common_captures_and_classes():
+    rs = make_switcher(
+        [{"id": "a", "enabled": True, "urlPattern": r"^https://x\.com/api/(v\d+)/(items|users)$", "isRegex": True}]
+    )
+
+    rule, matched = rs._find_matching_rule("https://x.com/api/v2/items")
+
+    assert rule["id"] == "a"
+    assert matched.groups() == ("v2", "items")
+
+
+def test_find_matching_rule_rejects_nested_quantifiers():
+    rs = make_switcher(
+        [
+            {"id": "unsafe", "enabled": True, "urlPattern": r"^(a+)+$", "isRegex": True},
+            {"id": "good", "enabled": True, "urlPattern": r"/ok$", "isRegex": True},
+        ]
+    )
+
+    rule, _ = rs._find_matching_rule("https://x.com/ok")
+
+    assert rule["id"] == "good"
+
+
+def test_find_matching_rule_rejects_quantified_ambiguous_alternation():
+    rs = make_switcher([{"id": "unsafe", "enabled": True, "urlPattern": r"^(a|aa)+$", "isRegex": True}])
+
+    assert rs._find_matching_rule("a" * 100 + "!") == (None, None)
+
+
+def test_find_matching_rule_skips_regex_for_oversized_url():
+    rs = make_switcher([{"id": "a", "enabled": True, "urlPattern": r"/ok$", "isRegex": True}])
+
+    assert rs._find_matching_rule("x" * addon.MAX_REGEX_URL_LENGTH + "/ok") == (None, None)
+
+
+def test_find_matching_rule_rejects_oversized_pattern():
+    rs = make_switcher(
+        [{"id": "a", "enabled": True, "urlPattern": "a" * (addon.MAX_REGEX_PATTERN_LENGTH + 1), "isRegex": True}]
+    )
+
+    assert rs._find_matching_rule("a") == (None, None)
 
 
 def test_find_matching_rule_skips_disabled():
@@ -119,3 +201,73 @@ def test_apply_header_overrides_set_and_delete():
         [{"name": "X-New", "value": "added"}, {"name": "X-Remove", "value": ""}, {"name": "", "value": "ignored"}],
     )
     assert headers == {"X-Old": "keep", "X-New": "added"}
+
+
+# --- bounded traffic logging ---
+
+def test_capture_body_truncates_before_decoding():
+    raw = b"a" * (addon.BODY_CAPTURE_LIMIT_BYTES + 100)
+
+    body, is_binary, is_truncated = addon.ResponseSwitcher._capture_body(raw)
+
+    assert body == "a" * addon.BODY_CAPTURE_LIMIT_BYTES
+    assert is_binary is False
+    assert is_truncated is True
+
+
+def test_capture_body_omits_binary_content():
+    body, is_binary, is_truncated = addon.ResponseSwitcher._capture_body(b"prefix\xffsecret")
+
+    assert body == ""
+    assert is_binary is True
+    assert is_truncated is False
+
+
+def test_serialize_log_entry_enforces_stdout_record_limit():
+    entry = {
+        "event": "passed",
+        "url": "https://x.test/" + "u" * (addon.MAX_LOG_RECORD_BYTES * 2),
+        "file": "",
+        "method": "GET",
+        "statusCode": 200,
+        "requestHeaders": {"X-Large": "h" * addon.MAX_LOG_RECORD_BYTES},
+        "responseHeaders": {},
+        "responseSize": 1,
+        "ts": 1.0,
+        "requestBody": "\x00" * addon.BODY_CAPTURE_LIMIT_BYTES,
+        "requestBodyIsBinary": False,
+        "requestBodySize": addon.BODY_CAPTURE_LIMIT_BYTES,
+        "requestBodyTruncated": False,
+        "responseBody": "\x00" * addon.BODY_CAPTURE_LIMIT_BYTES,
+        "responseBodyIsBinary": False,
+        "responseBodyTruncated": False,
+    }
+
+    serialized = addon.ResponseSwitcher._serialize_log_entry(entry)
+
+    assert len(serialized.encode("utf-8")) <= addon.MAX_LOG_RECORD_BYTES
+    assert json.loads(serialized)["requestBodyTruncated"] is True
+
+
+def test_response_logs_body_limits_and_binary_metadata(capsys):
+    rs = make_switcher([])
+    flow = SimpleNamespace(
+        metadata={},
+        request=SimpleNamespace(
+            pretty_url="https://x.test/upload",
+            method="POST",
+            headers={},
+            raw_content=b"a" * (addon.BODY_CAPTURE_LIMIT_BYTES + 1),
+        ),
+        response=SimpleNamespace(status_code=200, headers={}, raw_content=b"prefix\xffsecret"),
+    )
+
+    rs.response(flow)
+
+    logged = json.loads(capsys.readouterr().out)
+    assert logged["requestBody"] == "a" * addon.BODY_CAPTURE_LIMIT_BYTES
+    assert logged["requestBodySize"] == addon.BODY_CAPTURE_LIMIT_BYTES + 1
+    assert logged["requestBodyTruncated"] is True
+    assert logged["responseBody"] == ""
+    assert logged["responseBodyIsBinary"] is True
+    assert logged["responseSize"] == len(b"prefix\xffsecret")

@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { tmpdir, userInfo } from 'os'
+import { userInfo } from 'os'
 import { app } from 'electron'
 import { execAsync } from '../execAsync'
 import { readJsonFile, writeJsonFile } from '../jsonFile'
@@ -207,20 +207,20 @@ class DarwinSystemProxyManager implements SystemProxyManager {
 
   async setUpPasswordless(): Promise<void> {
     const rule = sudoersRuleFor(userInfo().username)
-    const tmpFile = join(tmpdir(), `filesswitcher-sudoers-${Date.now()}`)
-    writeFileSync(tmpFile, `${rule}\n`, { mode: 0o440 })
-
-    try {
-      const script = [
-        `visudo -c -f "${tmpFile}"`,
-        `cp "${tmpFile}" "${SUDOERS_FILE}"`,
-        `chmod 440 "${SUDOERS_FILE}"`,
-        `chown root:wheel "${SUDOERS_FILE}"`
-      ].join(' && ')
-      await runAsAdminViaOsascript(script)
-    } finally {
-      unlinkSync(tmpFile)
-    }
+    const encodedRule = Buffer.from(`${rule}\n`, 'utf-8').toString('base64')
+    // временный файл создаёт root внутри защищённого /etc/sudoers.d: непривилегированный
+    // процесс не может подменить его между проверкой visudo и атомарным переименованием
+    const script = [
+      'tmp_file=$(/usr/bin/mktemp /etc/sudoers.d/.filesswitcher-networksetup.XXXXXX)',
+      `trap '/bin/rm -f "$tmp_file"' EXIT`,
+      `/usr/bin/printf %s ${shellQuote(encodedRule)} | /usr/bin/base64 -D > "$tmp_file"`,
+      '/bin/chmod 440 "$tmp_file"',
+      '/usr/sbin/chown root:wheel "$tmp_file"',
+      '/usr/sbin/visudo -c -f "$tmp_file"',
+      `/bin/mv -f "$tmp_file" ${shellQuote(SUDOERS_FILE)}`,
+      'trap - EXIT'
+    ].join(' && ')
+    await runAsAdminViaOsascript(script)
   }
 
   /** Удаляет sudoers-правило — passwordless-настройка отзывается, дальше networksetup снова
@@ -250,6 +250,11 @@ class DarwinSystemProxyManager implements SystemProxyManager {
    * Бросает, если активных сетевых сервисов нет — иначе вызывающий код не может отличить "прокси
    * реально применён" от "применять было не на что", а статус в UI всё равно станет "running". */
   async enable(host: string, port: number): Promise<void> {
+    const savedStates = readSavedStates()
+    if (savedStates && Object.keys(savedStates).length > 0) {
+      throw new Error('Сохранённое состояние системного прокси нужно сначала восстановить')
+    }
+
     const services = await getActiveServices()
     if (services.length === 0) {
       throw new Error('Нет активных сетевых сервисов — системный прокси не применён ни к одному интерфейсу')
@@ -289,19 +294,15 @@ class DarwinSystemProxyManager implements SystemProxyManager {
       return
     }
 
-    clearSavedStates()
     await restoreSavedStates(states)
+    clearSavedStates()
   }
 
   async recoverStale(host: string): Promise<void> {
     const states = readSavedStates()
     if (states && Object.keys(states).length > 0) {
+      await restoreSavedStates(states)
       clearSavedStates()
-      try {
-        await restoreSavedStates(states)
-      } catch {
-        // не удалось восстановить точное состояние — ниже всё равно проверим и выключим при необходимости
-      }
       return
     }
 

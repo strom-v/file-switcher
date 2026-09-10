@@ -133,9 +133,9 @@ export default function SettingsPanel({
   }
 
   const handleExportLog = async (): Promise<void> => {
-    // весь лог сессии сериализует main (тела на диске), renderer только сохраняет результат
-    const content = await window.api.log.exportAs(logExportFormat)
-    return exportToFile(`file-switcher-log-${Date.now()}.${logExportFormat}`, content, 'log.exportSuccess')
+    const defaultFileName = `file-switcher-log-${Date.now()}.${logExportFormat}`
+    const savedPath = await window.api.log.exportAs(logExportFormat, defaultFileName)
+    if (savedPath) message.success(t('log.exportSuccess', { path: savedPath }))
   }
 
   const handleExportRules = (): Promise<void> =>

@@ -67,12 +67,16 @@ export default function LogPanel({ logs, onClear, onAddRule, onReplayLogged }: L
       setBodyMatchTs(null)
       return
     }
+    let isCurrent = true
     const timer = setTimeout(() => {
       window.api.log.search(search, true).then((metas) => {
-        setBodyMatchTs(new Set(metas.map((m) => m.ts)))
+        if (isCurrent) setBodyMatchTs(new Set(metas.map((m) => m.ts)))
       })
     }, 250)
-    return () => clearTimeout(timer)
+    return () => {
+      isCurrent = false
+      clearTimeout(timer)
+    }
   }, [search, searchInBody])
 
   const visible = useMemo(() => {

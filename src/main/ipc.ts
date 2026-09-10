@@ -8,7 +8,7 @@ import { installSudoersRule, isSudoersRuleInstalled, removeSudoersRule } from '.
 import { platform } from './platform'
 import { replayRequest } from './replayRequest'
 import { logStore } from './logStore'
-import { buildLogExport, type LogExportFormat } from './logExport'
+import { streamLogExport, type LogExportFormat } from './logExport'
 import type { ProxyLogEvent } from '../shared/types'
 
 // защита от IPC, пришедшего не из нашего renderer: у приложения одно окно с локальным контентом,
@@ -76,6 +76,7 @@ export function registerIpcHandlers(): void {
     const replayed = await replayRequest(logEvent)
     // повтор попадает в тот же файл лога отдельной записью event: 'replay'
     const [meta] = logStore.appendBatch([replayed])
+    broadcastLogStoreWarning()
     return meta
   })
 
@@ -85,7 +86,12 @@ export function registerIpcHandlers(): void {
 
   handle('log:search', (_event, query: string, searchInBody: boolean) => logStore.search(query, searchInBody))
 
-  handle('log:export', (_event, format: LogExportFormat) => buildLogExport(logStore.readAll(), format))
+  handle('log:export', async (_event, format: LogExportFormat, defaultFileName: string) => {
+    const result = await dialog.showSaveDialog({ defaultPath: defaultFileName })
+    if (result.canceled || !result.filePath) return null
+    await streamLogExport(logStore.getFilePath(), result.filePath, format)
+    return result.filePath
+  })
 
   handle('window:toggleDevTools', (event) => {
     event.sender.toggleDevTools()
@@ -127,6 +133,7 @@ export function registerIpcHandlers(): void {
 
   proxyController.on('logBatch', (batch) => {
     broadcast('proxy:logBatch', batch)
+    broadcastLogStoreWarning()
   })
 
   proxyController.on('stderr', (text: string) => {
@@ -139,6 +146,12 @@ export function registerIpcHandlers(): void {
   rulesStore.on('corrupted', (message: string) => {
     broadcast('proxy:stderr', `rules.json повреждён, правила сброшены к пустому списку: ${message}`)
   })
+}
+
+/** Передаёт renderer одно предупреждение об отключении traffic-log */
+function broadcastLogStoreWarning(): void {
+  const warning = logStore.consumeDiskLoggingWarning()
+  if (warning) broadcast('proxy:stderr', warning)
 }
 
 function broadcast(channel: string, payload: unknown): void {

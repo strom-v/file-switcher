@@ -46,8 +46,9 @@ const api = {
     // поиск по url/файлу подмены; searchInBody — дополнительно по телу запроса/ответа
     search: (query: string, searchInBody: boolean): Promise<LogEntryMeta[]> =>
       ipcRenderer.invoke('log:search', query, searchInBody),
-    // весь лог сессии, сериализованный в har/json/csv
-    exportAs: (format: 'har' | 'json' | 'csv'): Promise<string> => ipcRenderer.invoke('log:export', format)
+    // main сам выбирает путь через системный диалог и потоково пишет туда весь лог сессии
+    exportAs: (format: 'har' | 'json' | 'csv', defaultFileName: string): Promise<string | null> =>
+      ipcRenderer.invoke('log:export', format, defaultFileName)
   },
   cert: {
     status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),

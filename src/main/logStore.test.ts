@@ -76,19 +76,60 @@ describe('logStore.appendBatch + getEvent', () => {
     expect(lines).toHaveLength(2)
     expect(JSON.parse(lines[0]).ts).toBe(1)
   })
+
+  it('ошибка открытия файла не прерывает поток метаданных и предупреждается один раз', async () => {
+    writeFileSync(join(userDataDir, 'traffic-logs'), 'not-a-directory')
+    const store = await freshStore()
+
+    expect(() => store.appendBatch([event(1)])).not.toThrow()
+    expect(store.appendBatch([event(2)]).map((meta) => meta.ts)).toEqual([2])
+    expect(store.getRecent().map((meta) => meta.ts)).toEqual([1, 2])
+    expect(store.consumeDiskLoggingWarning()).toMatch(/traffic-log/)
+    expect(store.consumeDiskLoggingWarning()).toBeNull()
+  })
+
+  it('ошибка записи отключает дальнейшие попытки и не прерывает поток метаданных', async () => {
+    const writeSyncMock = vi.fn(() => {
+      throw new Error('disk full')
+    })
+    vi.doMock('fs', async () => ({ ...(await vi.importActual<typeof import('fs')>('fs')), writeSync: writeSyncMock }))
+
+    try {
+      const store = await freshStore()
+      expect(store.appendBatch([event(1)]).map((meta) => meta.ts)).toEqual([1])
+      expect(store.appendBatch([event(2)]).map((meta) => meta.ts)).toEqual([2])
+      expect(store.consumeDiskLoggingWarning()).toContain('disk full')
+      expect(writeSyncMock).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.doUnmock('fs')
+      vi.resetModules()
+    }
+  })
 })
 
 describe('logStore.search', () => {
   it('по url', async () => {
     const store = await freshStore()
     store.appendBatch([event(1, { url: 'https://a.com/foo' }), event(2, { url: 'https://b.com/bar' })])
-    expect(store.search('foo', false).map((m) => m.ts)).toEqual([1])
+    expect((await store.search('foo', false)).map((m) => m.ts)).toEqual([1])
   })
   it('по телу только с searchInBody', async () => {
     const store = await freshStore()
     store.appendBatch([event(1, { responseBody: 'needle here' }), event(2)])
-    expect(store.search('needle', false)).toHaveLength(0)
-    expect(store.search('needle', true).map((m) => m.ts)).toEqual([1])
+    expect(await store.search('needle', false)).toHaveLength(0)
+    expect((await store.search('needle', true)).map((m) => m.ts)).toEqual([1])
+  })
+
+  it('поиск по телу асинхронный и ограничен окном renderer', async () => {
+    const store = await freshStore()
+    const events = Array.from({ length: 2001 }, (_, index) =>
+      event(index + 1, { responseBody: index === 0 || index === 2000 ? 'needle' : '' })
+    )
+    store.appendBatch(events)
+
+    const search = store.search('needle', true)
+    expect(search).toBeInstanceOf(Promise)
+    expect((await search).map((meta) => meta.ts)).toEqual([2001])
   })
 })
 

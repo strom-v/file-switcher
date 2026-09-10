@@ -3,7 +3,6 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
 import { proxyController } from './proxyController'
-import { recoverStaleSystemProxy } from './proxySystemConfig'
 import packageJson from '../../package.json'
 
 let mainWindow: BrowserWindow | null = null
@@ -78,7 +77,7 @@ if (!gotLock) {
     }
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     electronApp.setAppUserModelId('com.fileswitcher.app')
     applyCsp()
 
@@ -98,20 +97,20 @@ if (!gotLock) {
       optimizer.watchWindowShortcuts(window)
     })
 
+    // страховка: если прошлый запуск завершился аварийно с включённым системным прокси
+    // (например приложение упало), возвращаем прокси в исходное состояние сейчас, до того как
+    // пользователь успеет запустить новый прокси или столкнётся с потерей сети. На платформах
+    // без своей реализации recoverStaleSystemProxy — no-op (см. platform/unsupported.ts)
+    await proxyController.recoverStaleSystemProxy('127.0.0.1').catch(() => {
+      // best-effort: если не получилось (например пользователь отменил диалог авторизации),
+      // ничего страшного — обычный запуск прокси всё равно попробует настроить систему заново
+    })
+
     registerIpcHandlers()
     createWindow()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
-    })
-
-    // страховка: если прошлый запуск завершился аварийно с включённым системным прокси
-    // (например приложение упало), возвращаем прокси в исходное состояние сейчас, до того как
-    // пользователь успеет запустить новый прокси или столкнётся с потерей сети. На платформах
-    // без своей реализации recoverStaleSystemProxy — no-op (см. platform/unsupported.ts)
-    recoverStaleSystemProxy('127.0.0.1').catch(() => {
-      // best-effort: если не получилось (например пользователь отменил диалог авторизации),
-      // ничего страшного — обычный запуск прокси всё равно попробует настроить систему заново
     })
   })
 

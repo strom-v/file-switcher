@@ -1,4 +1,6 @@
-import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, readSync, rmSync, writeSync } from 'fs'
+import { closeSync, mkdirSync, openSync, readdirSync, readSync, rmSync, writeSync } from 'fs'
+import { open as openFile } from 'fs/promises'
+import type { FileHandle } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
 import type { LogEntryMeta, ProxyLogEvent } from '../shared/types'
@@ -65,13 +67,14 @@ class LogStore {
   private bytesWritten = 0
   // true после первого превышения потолка размера — чтобы предупредить renderer один раз
   private sizeLimitHit = false
+  // после ошибки файловой системы запись больше не возобновляем в этой сессии, чтобы каждый
+  // следующий proxy-event не повторял тот же сбой; текст предупреждения renderer забирает один раз
+  private diskLoggingError: string | null = null
+  private diskLoggingWarning: string | null = null
   // индекс записей (последние MAX_INDEX_ENTRIES): метаданные + смещение/длина строки в файле
   private index: IndexEntry[] = []
-  // всего записей за сессию — монотонный счётчик для инвалидации bodyCache (index.length
-  // перестаёт расти после потолка, а событий в файле по-прежнему прибавляется)
-  private totalAppended = 0
-  // кэш полного разбора файла для поиска по телу: валиден, пока не добавились новые записи
-  private bodyCache: { count: number; events: ProxyLogEvent[] } | null = null
+  // новый поиск отменяет предыдущий между асинхронными чтениями строк
+  private searchGeneration = 0
 
   constructor() {
     this.pruneOldSessionFiles()
@@ -110,7 +113,25 @@ class LogStore {
     const buf = Buffer.from(line, 'utf-8')
     let written = 0
     while (written < buf.length) {
-      written += writeSync(this.ensureWriteFd(), buf, written)
+      const chunkSize = writeSync(this.ensureWriteFd(), buf, written)
+      if (chunkSize === 0) throw new Error('Файловая система не записала данные')
+      written += chunkSize
+    }
+  }
+
+  /** Отключает запись на диск после первой ошибки файловой системы */
+  private disableDiskLogging(error: unknown): void {
+    if (this.diskLoggingError) return
+    const message = error instanceof Error ? error.message : String(error)
+    this.diskLoggingError = message
+    this.diskLoggingWarning = `Запись traffic-log на диск отключена: ${message}`
+    if (this.writeFd !== null) {
+      try {
+        closeSync(this.writeFd)
+      } catch {
+        // исходная ошибка записи важнее ошибки закрытия уже неисправного дескриптора
+      }
+      this.writeFd = null
     }
   }
 
@@ -119,6 +140,13 @@ class LogStore {
     if (!this.sizeLimitHit) return false
     this.sizeLimitHit = false
     return true
+  }
+
+  /** Возвращает предупреждение об отключении дискового лога только один раз */
+  consumeDiskLoggingWarning(): string | null {
+    const warning = this.diskLoggingWarning
+    this.diskLoggingWarning = null
+    return warning
   }
 
   /** Дописывает пачку событий в файл, возвращает их лёгкие версии для отправки в renderer.
@@ -134,18 +162,21 @@ class LogStore {
       let byteOffset = 0
       let byteLength = 0
 
-      if (this.bytesWritten + lineBytes <= MAX_SESSION_FILE_BYTES) {
-        this.writeLine(line)
-        byteOffset = this.bytesWritten
-        byteLength = lineBytes
-        this.bytesWritten += lineBytes
+      if (!this.diskLoggingError && this.bytesWritten + lineBytes <= MAX_SESSION_FILE_BYTES) {
+        try {
+          this.writeLine(line)
+          byteOffset = this.bytesWritten
+          byteLength = lineBytes
+          this.bytesWritten += lineBytes
+        } catch (error) {
+          this.disableDiskLogging(error)
+        }
       } else if (!this.sizeLimitHit) {
-        this.sizeLimitHit = true
+        if (!this.diskLoggingError) this.sizeLimitHit = true
       }
 
       const entry: IndexEntry = { ...toMeta(event), byteOffset, byteLength }
       this.index.push(entry)
-      this.totalAppended++
       metas.push(toMeta(entry))
     }
     if (this.index.length > MAX_INDEX_ENTRIES) {
@@ -172,17 +203,9 @@ class LogStore {
     }
   }
 
-  /** Все полные события файла лога — для экспорта (редкое действие, разбор всего файла) */
-  readAll(): ProxyLogEvent[] {
-    const events: ProxyLogEvent[] = []
-    for (const line of this.readLines()) {
-      try {
-        events.push(JSON.parse(line) as ProxyLogEvent)
-      } catch {
-        // битая строка (обрыв записи) — пропускаем
-      }
-    }
-    return events
+  /** Путь к append-only JSONL текущей сессии для потокового экспорта */
+  getFilePath(): string {
+    return this.filePath
   }
 
   /** Последние записи для первичной отрисовки списка */
@@ -191,45 +214,57 @@ class LogStore {
   }
 
   /** Метаданные записей, чьи url/method/тело содержат query (по телу — только с searchInBody) */
-  search(query: string, searchInBody: boolean): LogEntryMeta[] {
+  async search(query: string, searchInBody: boolean): Promise<LogEntryMeta[]> {
+    const generation = ++this.searchGeneration
     const q = query.trim().toLowerCase()
     if (!q) return this.getRecent()
 
+    // renderer хранит только RECENT_LIMIT последних записей; более старые совпадения нельзя
+    // показать, поэтому не читаем и не отправляем их через IPC
+    const searchable = this.index.slice(-RECENT_LIMIT)
+
     const matchedTs = new Set(
-      this.index
+      searchable
         .filter((m) => m.url.toLowerCase().includes(q) || (m.event === 'matched' && m.file.toLowerCase().includes(q)))
         .map((m) => m.ts)
     )
 
     if (searchInBody) {
-      for (const event of this.eventsForBodySearch()) {
-        if (matchedTs.has(event.ts)) continue
-        if (event.requestBody.toLowerCase().includes(q) || event.responseBody.toLowerCase().includes(q)) {
-          matchedTs.add(event.ts)
+      let file: FileHandle | null = null
+      try {
+        file = await openFile(this.filePath, 'r')
+        for (const entry of searchable) {
+          if (generation !== this.searchGeneration) return []
+          if (matchedTs.has(entry.ts) || entry.byteLength === 0) continue
+          const event = await this.readIndexedEvent(file, entry)
+          if (event && (event.requestBody.toLowerCase().includes(q) || event.responseBody.toLowerCase().includes(q))) {
+            matchedTs.add(entry.ts)
+          }
         }
+      } catch {
+        // файл мог стать недоступен после ошибки диска; совпадения по метаданным всё равно валидны
+      } finally {
+        await file?.close().catch(() => undefined)
       }
     }
 
-    return this.index.filter((m) => matchedTs.has(m.ts)).map(toMeta)
+    if (generation !== this.searchGeneration) return []
+    return searchable.filter((m) => matchedTs.has(m.ts)).map(toMeta)
   }
 
-  /** Разбор всех событий для поиска по телу с кэшем: файл append-only, число записей растёт —
-   * пока index.length не изменился с прошлого поиска, переиспользуем разобранный массив, а не
-   * читаем и парсим файл заново на каждое нажатие клавиши */
-  private eventsForBodySearch(): ProxyLogEvent[] {
-    if (this.bodyCache && this.bodyCache.count === this.totalAppended) {
-      return this.bodyCache.events
+  /** Асинхронно читает одну индексированную JSONL-запись без блокировки main-потока */
+  private async readIndexedEvent(file: FileHandle, entry: IndexEntry): Promise<ProxyLogEvent | null> {
+    const buffer = Buffer.allocUnsafe(entry.byteLength)
+    let bytesRead = 0
+    while (bytesRead < buffer.length) {
+      const result = await file.read(buffer, bytesRead, buffer.length - bytesRead, entry.byteOffset + bytesRead)
+      if (result.bytesRead === 0) return null
+      bytesRead += result.bytesRead
     }
-    const events = this.readAll()
-    this.bodyCache = { count: this.totalAppended, events }
-    return events
-  }
-
-  private readLines(): string[] {
     try {
-      return readFileSync(this.filePath, 'utf-8').split('\n').filter(Boolean)
+      return JSON.parse(buffer.toString('utf-8')) as ProxyLogEvent
     } catch {
-      return []
+      return null
     }
   }
 }
