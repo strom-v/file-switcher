@@ -48,8 +48,20 @@ MAX_LOG_TEXT_FIELD_CHARS = 16 * 1024
 MAX_LOG_HEADER_CHARS = 64 * 1024
 MAX_LOG_HEADER_COUNT = 100
 
+# rules.json перечитывается по mtime, но getmtime на КАЖДЫЙ проксируемый запрос — лишний syscall
+# на горячем пути; проверяем не чаще раза в этот интервал (правки правил применяются с задержкой ≤1 с)
+RULES_MTIME_CHECK_INTERVAL_S = 1.0
+# файл-подмену читаем целиком в память (Response.make) — выше этого размера отклоняем,
+# чтобы 100-мегабайтный бандл не блокировал event loop и не раздувал память
+MAX_REPLACEMENT_FILE_BYTES = 16 * 1024 * 1024
+
 GROUP_REFERENCE_RE = re.compile(r"\$(\d+)")
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _read_file_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
 
 
 def _redact_headers(headers: dict) -> dict:
@@ -67,7 +79,17 @@ class ResponseSwitcher:
         if "rules_file" in updated:
             self.rules_path = ctx.options.rules_file
             self.rules = []
+            # индекс правил, построенный в _reload: exact-URL → rule и список (rule, compiled) для regex.
+            # Строим один раз при перезагрузке, а не компилируем regex и не проверяем безопасность
+            # на каждый проксируемый запрос
+            self._exact_rules = {}
+            self._regex_rules = []
             self.last_mtime = None
+            # монотонное время последней проверки mtime — троттлинг getmtime на горячем пути
+            self._last_mtime_check = 0.0
+            # кэш содержимого файла-подмены: path → (mtime, size, bytes); чтобы не перечитывать
+            # с диска один и тот же неизменный бандл на каждый матч
+            self._replacement_cache = {}
             # текст последней ошибки чтения rules_file — чтобы не спамить одинаковым warning
             # на каждый запрос, пока файл невалиден (перечитывание пробуется каждый раз)
             self.last_reload_error = None
@@ -92,6 +114,38 @@ class ResponseSwitcher:
         with open(self.rules_path, encoding="utf-8") as f:
             self.rules = json.load(f)["rules"]
         self.last_mtime = os.path.getmtime(self.rules_path)
+        self._rebuild_index()
+
+    def _rebuild_index(self):
+        """Строит быстрый индекс правил вне горячего пути запроса."""
+        exact = {}
+        regex_rules = []
+        for rule in self.rules:
+            if not rule.get("enabled"):
+                continue
+            pattern = rule.get("urlPattern")
+            if not pattern:
+                ctx.log.warn(f"правило {rule.get('id')} пропущено: пустой urlPattern")
+                continue
+            if not rule.get("isRegex"):
+                # первое правило с данным точным URL выигрывает — как и при линейном проходе
+                exact.setdefault(pattern, rule)
+                continue
+            if len(pattern) > MAX_REGEX_PATTERN_LENGTH:
+                ctx.log.warn(f"regex правила {rule.get('id')} пропущен: шаблон длиннее {MAX_REGEX_PATTERN_LENGTH}")
+                continue
+            unsafe_reason = self._unsafe_regex_reason(pattern)
+            if unsafe_reason:
+                ctx.log.warn(f"небезопасный regex в правиле {rule.get('id')}: {unsafe_reason}")
+                continue
+            try:
+                compiled = re.compile(pattern)
+            except re.error as e:
+                ctx.log.warn(f"некорректный regex в правиле {rule.get('id')}: {e}")
+                continue
+            regex_rules.append((rule, compiled))
+        self._exact_rules = exact
+        self._regex_rules = regex_rules
 
     @staticmethod
     def _capture_body(raw: bytes | None) -> tuple[str, bool, bool]:
@@ -332,53 +386,37 @@ class ResponseSwitcher:
                 del headers[name]
 
     def _find_matching_rule(self, url: str):
-        for rule in self.rules:
-            if not rule.get("enabled"):
-                continue
+        # индекс правил построен в _rebuild_index: точные URL — по хешу, regex — предкомпилированы
+        # и уже проверены на безопасность, поэтому на горячем пути только сам матчинг
+        exact = self._exact_rules.get(url)
+        if exact is not None:
+            return exact, None
 
-            # .get() вместо [] — битое правило без urlPattern (например rules.json отредактирован
-            # вручную) не должно ронять обработку всех остальных запросов через KeyError
-            pattern = rule.get("urlPattern")
-            if not pattern:
-                ctx.log.warn(f"правило {rule.get('id')} пропущено: пустой urlPattern")
-                continue
+        if len(url) > MAX_REGEX_URL_LENGTH:
+            return None, None
 
-            is_regex = rule.get("isRegex")
-            try:
-                if is_regex:
-                    unsafe_reason = self._unsafe_regex_reason(pattern)
-                    if unsafe_reason:
-                        ctx.log.warn(f"небезопасный regex в правиле {rule.get('id')}: {unsafe_reason}")
-                        continue
-                    if len(url) > MAX_REGEX_URL_LENGTH:
-                        ctx.log.warn(
-                            f"regex правила {rule.get('id')} пропущен: URL длиннее {MAX_REGEX_URL_LENGTH} символов"
-                        )
-                        continue
-                    matched = re.search(pattern, url)
-                    if matched:
-                        return rule, matched
-                elif pattern == url:
-                    return rule, None
-            except re.error as e:
-                ctx.log.warn(f"некорректный regex в правиле {rule.get('id')}: {e}")
-                continue
+        for rule, compiled in self._regex_rules:
+            matched = compiled.search(url)
+            if matched:
+                return rule, matched
         return None, None
 
     async def request(self, flow: http.HTTPFlow):
         if not self.rules_path:
             return
 
-        try:
-            mtime = os.path.getmtime(self.rules_path)
-        except OSError as e:
-            ctx.log.warn(f"rules_file недоступен: {e}")
-            return
-
-        if mtime != self.last_mtime:
-            # при неудаче _try_reload оставляет прежние правила и повторит на следующем запросе;
-            # не return — матчим по последнему валидному набору, а не пропускаем запрос вовсе
-            self._try_reload("не удалось перечитать rules_file")
+        now = time.monotonic()
+        if now - self._last_mtime_check >= RULES_MTIME_CHECK_INTERVAL_S:
+            self._last_mtime_check = now
+            try:
+                mtime = os.path.getmtime(self.rules_path)
+            except OSError as e:
+                ctx.log.warn(f"rules_file недоступен: {e}")
+                return
+            if mtime != self.last_mtime:
+                # при неудаче _try_reload оставляет прежние правила и повторит позже;
+                # не return — матчим по последнему валидному набору, а не пропускаем запрос вовсе
+                self._try_reload("не удалось перечитать rules_file")
 
         rule, matched = self._find_matching_rule(flow.request.pretty_url)
         if not rule:
@@ -416,15 +454,33 @@ class ResponseSwitcher:
                 ctx.log.warn(f"небезопасный localFilePath правила {rule.get('id')}: {e}")
                 return
         try:
-            with open(path, "rb") as f:
-                body = f.read()
+            body = await self._read_replacement_file(path)
         except OSError as e:
             ctx.log.warn(f"не удалось прочитать localFilePath {path}: {e}")
+            return
+        except ValueError as e:
+            ctx.log.warn(f"localFilePath правила {rule.get('id')} не применён: {e}")
             return
 
         content_type = rule.get("contentType") or mimetypes.guess_type(path)[0] or "application/octet-stream"
         flow.response = self._make_swap_response(body, content_type)
         flow.metadata[MATCH_FILE_KEY] = path
+
+    async def _read_replacement_file(self, path: str) -> bytes:
+        """Читает файл-подмену вне event loop, с лимитом размера и кэшем по mtime."""
+        stat = await asyncio.to_thread(os.stat, path)
+        if stat.st_size > MAX_REPLACEMENT_FILE_BYTES:
+            raise ValueError(
+                f"файл {stat.st_size} Б превышает лимит {MAX_REPLACEMENT_FILE_BYTES} Б"
+            )
+
+        cached = self._replacement_cache.get(path)
+        if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+            return cached[2]
+
+        body = await asyncio.to_thread(_read_file_bytes, path)
+        self._replacement_cache[path] = (stat.st_mtime_ns, stat.st_size, body)
+        return body
 
     @staticmethod
     def _make_swap_response(body: bytes, content_type: str) -> http.Response:

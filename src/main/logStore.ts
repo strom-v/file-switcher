@@ -156,29 +156,47 @@ class LogStore {
    * (тогда byteLength = 0 — событие есть в списке, но тела на диске нет). */
   appendBatch(events: ProxyLogEvent[]): LogEntryMeta[] {
     if (events.length === 0) return []
-    const metas: LogEntryMeta[] = []
-    for (const event of events) {
-      const line = `${JSON.stringify(event)}\n`
-      const lineBytes = Buffer.byteLength(line, 'utf-8')
-      // byteLength 0 = строка в файл не попала (превышен потолок размера); getEvent вернёт null
-      let byteOffset = 0
-      let byteLength = 0
 
-      if (!this.diskLoggingError && this.bytesWritten + lineBytes <= MAX_SESSION_FILE_BYTES) {
+    // сериализуем всю пачку и один раз записываем на диск — раньше был writeSync на каждое событие
+    // (500-1000 синхронных записей/с блокировали main); порядок и byteOffset при этом сохраняются
+    const lines = events.map((event) => `${JSON.stringify(event)}\n`)
+    const lineByteLengths = lines.map((line) => Buffer.byteLength(line, 'utf-8'))
+    const writeStartOffset = this.bytesWritten
+    let writtenInBatch = 0
+
+    if (!this.diskLoggingError) {
+      const toWrite: string[] = []
+      for (let i = 0; i < lines.length; i++) {
+        if (writeStartOffset + writtenInBatch + lineByteLengths[i] <= MAX_SESSION_FILE_BYTES) {
+          toWrite.push(lines[i])
+          writtenInBatch += lineByteLengths[i]
+        } else {
+          // потолок размера: остаток пачки уходит в renderer, но на диск уже не пишется
+          this.sizeLimitReached = true
+          break
+        }
+      }
+      if (toWrite.length > 0) {
         try {
-          this.writeLine(line)
-          byteOffset = this.bytesWritten
-          byteLength = lineBytes
-          this.bytesWritten += lineBytes
+          this.writeLine(toWrite.join(''))
+          this.bytesWritten += writtenInBatch
         } catch (error) {
           this.disableDiskLogging(error)
+          writtenInBatch = 0
         }
-      } else if (!this.diskLoggingError) {
-        // потолок размера: событие уходит в renderer, но на диск уже не пишется
-        this.sizeLimitReached = true
       }
+    }
 
-      const entry: IndexEntry = { ...toMeta(event), byteOffset, byteLength }
+    const metas: LogEntryMeta[] = []
+    let offsetCursor = writeStartOffset
+    for (let i = 0; i < events.length; i++) {
+      // byteLength 0 = строка в файл не попала (потолок размера или ошибка диска); getEvent вернёт null
+      const onDisk = offsetCursor + lineByteLengths[i] <= writeStartOffset + writtenInBatch
+      const byteOffset = onDisk ? offsetCursor : 0
+      const byteLength = onDisk ? lineByteLengths[i] : 0
+      if (onDisk) offsetCursor += lineByteLengths[i]
+
+      const entry: IndexEntry = { ...toMeta(events[i]), byteOffset, byteLength }
       this.index.push(entry)
       metas.push(toMeta(entry))
     }

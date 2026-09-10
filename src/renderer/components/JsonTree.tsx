@@ -9,6 +9,11 @@ interface JsonTreeProps {
   defaultExpandDepth?: number
 }
 
+// потолок символов в formatters.ts не ограничивает структурную сложность: валидный ответ на
+// <2 МБ может содержать сотни тысяч значений, и по узлу React на каждое подвешивает renderer.
+// Строим не больше этого числа узлов, дальше показываем узел-обрезку
+const MAX_TREE_NODES = 5_000
+
 // подсветка по типу значения — та же палитра, что у jsonview (строки зелёным, числа/bool синим,
 // null красным); ключи остаются обычным текстом, без подсветки
 function renderPrimitive(value: unknown): React.ReactNode {
@@ -25,52 +30,56 @@ function renderPrimitive(value: unknown): React.ReactNode {
 }
 
 /** Строит узлы antd Tree рекурсивно из произвольного JSON-значения; объекты/массивы — сворачиваемые
- * узлы с числом элементов в заголовке, примитивы — лист с подсветкой по типу */
-function buildTreeNodes(value: unknown, keyPrefix: string): TreeDataNode[] {
-  if (Array.isArray(value)) {
-    return value.map((item, index) => {
-      const key = `${keyPrefix}.${index}`
-      const isExpandable = item !== null && typeof item === 'object'
-      return {
-        key,
-        title: isExpandable ? (
-          <Typography.Text strong>
-            [{index}] {Array.isArray(item) ? `Array(${item.length})` : `Object`}
-          </Typography.Text>
-        ) : (
-          <>
-            <Typography.Text type="secondary">[{index}] </Typography.Text>
-            {renderPrimitive(item)}
-          </>
-        ),
-        children: isExpandable ? buildTreeNodes(item, key) : undefined
-      }
-    })
+ * узлы с числом элементов в заголовке, примитивы — лист с подсветкой по типу.
+ * budget.remaining ограничивает общее число узлов — при исчерпании ветка обрывается узлом-обрезкой */
+function buildTreeNodes(value: unknown, keyPrefix: string, budget: { remaining: number }): TreeDataNode[] {
+  const entries: [string | number, unknown][] = Array.isArray(value)
+    ? value.map((item, index) => [index, item])
+    : value !== null && typeof value === 'object'
+      ? Object.entries(value)
+      : []
+
+  if (entries.length === 0) {
+    // корневое значение — не объект и не массив (например тело — просто число или строка в кавычках)
+    return [{ key: keyPrefix, title: renderPrimitive(value) }]
   }
 
-  if (value !== null && typeof value === 'object') {
-    return Object.entries(value).map(([prop, propValue]) => {
-      const key = `${keyPrefix}.${prop}`
-      const isExpandable = propValue !== null && typeof propValue === 'object'
-      return {
-        key,
-        title: isExpandable ? (
-          <Typography.Text strong>
-            {prop}: {Array.isArray(propValue) ? `Array(${propValue.length})` : `Object`}
-          </Typography.Text>
-        ) : (
-          <>
+  const nodes: TreeDataNode[] = []
+  for (const [prop, propValue] of entries) {
+    if (budget.remaining <= 0) {
+      nodes.push({
+        key: `${keyPrefix}.__truncated__`,
+        title: <Typography.Text type="secondary">… дерево обрезано (слишком много узлов)</Typography.Text>,
+        selectable: false
+      })
+      break
+    }
+    budget.remaining--
+    const key = `${keyPrefix}.${prop}`
+    const isExpandable = propValue !== null && typeof propValue === 'object'
+    const isIndex = typeof prop === 'number'
+    const typeLabel = Array.isArray(propValue) ? `Array(${propValue.length})` : 'Object'
+    nodes.push({
+      key,
+      title: isExpandable ? (
+        <Typography.Text strong>
+          {isIndex ? `[${prop}] ` : `${prop}: `}
+          {typeLabel}
+        </Typography.Text>
+      ) : (
+        <>
+          {isIndex ? (
+            <Typography.Text type="secondary">[{prop}] </Typography.Text>
+          ) : (
             <Typography.Text strong>{prop}: </Typography.Text>
-            {renderPrimitive(propValue)}
-          </>
-        ),
-        children: isExpandable ? buildTreeNodes(propValue, key) : undefined
-      }
+          )}
+          {renderPrimitive(propValue)}
+        </>
+      ),
+      children: isExpandable ? buildTreeNodes(propValue, key, budget) : undefined
     })
   }
-
-  // корневое значение — не объект и не массив (например тело — просто число или строка в кавычках)
-  return [{ key: keyPrefix, title: renderPrimitive(value) }]
+  return nodes
 }
 
 /** Собирает ключи узлов до заданной глубины включительно — для стартового набора развёрнутых веток */
@@ -93,7 +102,7 @@ export default function JsonTree({ value, defaultExpandDepth }: JsonTreeProps): 
   // теряет состояние развёрнутости), но уникальны между разными открытыми деревьями на странице —
   // useId даёт стабильный на весь жизненный цикл компонента и глобально уникальный префикс
   const rootPrefix = `json-${useId()}`
-  const treeData = useMemo(() => buildTreeNodes(value, rootPrefix), [value, rootPrefix])
+  const treeData = useMemo(() => buildTreeNodes(value, rootPrefix, { remaining: MAX_TREE_NODES }), [value, rootPrefix])
   const defaultExpandedKeys = useMemo(
     () => (defaultExpandDepth === undefined ? undefined : collectKeysToDepth(treeData, defaultExpandDepth)),
     [treeData, defaultExpandDepth]

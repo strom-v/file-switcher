@@ -17,8 +17,12 @@ import addon  # noqa: E402
 
 def make_switcher(rules):
     rs = addon.ResponseSwitcher()
-    rs.rules = rules
     rs.rules_path = "/fake/rules.json"
+    rs._exact_rules = {}
+    rs._regex_rules = []
+    rs._replacement_cache = {}
+    rs.rules = rules
+    rs._rebuild_index()
     return rs
 
 
@@ -201,6 +205,55 @@ def test_find_matching_rule_first_match_wins():
     )
     rule, _ = rs._find_matching_rule("https://x.com/api/v2/x")
     assert rule["id"] == "first"
+
+
+def test_index_recompiles_regex_once_and_reuses_it():
+    rs = make_switcher([{"id": "a", "enabled": True, "urlPattern": r"/api/(\d+)$", "isRegex": True}])
+    first_compiled = rs._regex_rules[0][1]
+    # повторный матчинг не должен пересобирать индекс
+    rs._find_matching_rule("https://x.com/api/1")
+    assert rs._regex_rules[0][1] is first_compiled
+
+
+def test_index_drops_disabled_and_unsafe_rules():
+    rs = make_switcher(
+        [
+            {"id": "off", "enabled": False, "urlPattern": "https://x.com/off", "isRegex": False},
+            {"id": "unsafe", "enabled": True, "urlPattern": r"^(a+)+$", "isRegex": True},
+            {"id": "ok", "enabled": True, "urlPattern": "https://x.com/ok", "isRegex": False},
+        ]
+    )
+    assert set(rs._exact_rules) == {"https://x.com/ok"}
+    assert rs._regex_rules == []
+
+
+# --- _read_replacement_file ---
+
+def _run(coro):
+    return __import__("asyncio").new_event_loop().run_until_complete(coro)
+
+
+def test_read_replacement_file_caches_by_mtime(tmp_path):
+    rs = make_switcher([])
+    target = tmp_path / "mock.json"
+    target.write_bytes(b'{"a":1}')
+
+    first = _run(rs._read_replacement_file(str(target)))
+    assert first == b'{"a":1}'
+    assert str(target) in rs._replacement_cache
+
+    # тот же неизменный файл — отдаётся из кэша тот же объект bytes
+    second = _run(rs._read_replacement_file(str(target)))
+    assert second is first
+
+
+def test_read_replacement_file_rejects_oversized(tmp_path):
+    rs = make_switcher([])
+    target = tmp_path / "big.bin"
+    target.write_bytes(b"x" * (addon.MAX_REPLACEMENT_FILE_BYTES + 1))
+
+    with __import__("pytest").raises(ValueError):
+        _run(rs._read_replacement_file(str(target)))
 
 
 # --- _apply_header_overrides ---
