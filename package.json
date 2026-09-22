@@ -14,11 +14,11 @@
     "test:watch": "vitest",
     "test:py": ".venv/bin/python3 -m pytest resources/ -q",
     "start": "electron-vite preview",
-    "build:mac": "electron-vite build && electron-builder --mac",
+    "build:mac": "node scripts/check_mitmdump.mjs && electron-vite build && electron-builder --mac",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\" \"*.{ts,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\" \"*.{ts,json}\"",
-    "build:win": "electron-vite build && electron-builder --win",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:win": "node scripts/check_mitmdump.mjs && electron-vite build && electron-builder --win",
+    "build:linux": "node scripts/check_mitmdump.mjs && electron-vite build && electron-builder --linux"
   },
   "overrides": {
     "js-yaml": "^4.3.2"

@@ -7,5 +7,6 @@ out/
 build/*
 !build/icon.png
 !build/icon.icns
-resources/bin/
+# собранные бинарники mitmdump КОММИТЯТСЯ в репозиторий (resources/bin/mac|win|linux) —
+# чтобы свежий клон собирался без Python/PyInstaller; не добавлять их сюда
 *.tsbuildinfo

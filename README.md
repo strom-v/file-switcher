@@ -50,27 +50,26 @@ npm run build        # electron-vite build (бандлы, без упаковк�
 
 ### Сборка дистрибутива
 
-`mitmdump` — отдельный бинарник (PyInstaller не кросс-компилирует, собирать на целевой ОС):
+Собранный `mitmdump` — standalone-бинарник — **закоммичен в репозиторий** (`resources/bin/mac`,
+`resources/bin/win`). Поэтому обычная сборка из свежего клона — две команды, ничего больше
+устанавливать не нужно (Python не требуется ни для сборки, ни для запуска):
 
 ```bash
-scripts/setup_venv.sh --build
-scripts/build_mitmdump.sh      # → resources/bin/mac/mitmdump  (build_mitmdump.ps1 для Windows)
-npm run build:mac              # → dist/*.dmg  (build:win / build:linux аналогично)
+npm install
+npm run build:mac     # → dist/*.dmg  (build:win / build:linux аналогично, на соответствующей ОС)
 ```
 
-`resources/bin/` в gitignore — бинарник кладётся локально перед упаковкой. Учтите: `electron-builder`
-молча пропускает отсутствующий `extraResources` — установщик соберётся «успешно», но при запуске
-прокси упадёт с `mitmdump не найден`. Проверяйте, что `resources/bin/<os>/mitmdump[.exe]` существует
-до `build:*`.
+`build:*` начинается с предпроверки `scripts/check_mitmdump.mjs`: если бинарника нет, сборка
+падает сразу с понятным сообщением, а не «успешно» собирает установщик, который упадёт у
+пользователя (electron-builder молча пропускает отсутствующий `extraResources`).
 
-### Сборка под Windows
+Пересборка бинарника нужна только при обновлении версии mitmproxy. PyInstaller не
+кросс-компилирует — собирается на целевой ОС и результат коммитится:
 
-Сборка выполняется на самой Windows-машине (PyInstaller не кросс-компилирует):
-
-```powershell
-powershell -File scripts/setup_venv.ps1 -Build   # venv + mitmproxy + pyinstaller
-powershell -File scripts/build_mitmdump.ps1      # → resources\bin\win\mitmdump.exe
-npm run build:win                                # → dist\*.exe (NSIS)
+```bash
+scripts/setup_venv.sh --build        # venv + pyinstaller (один раз)
+scripts/build_mitmdump.sh --force    # → resources/bin/mac/mitmdump, затем git add + commit
+# Windows: powershell -File scripts/setup_venv.ps1 -Build; ... build_mitmdump.ps1 -Force
 ```
 
 #### Сборка за корпоративным прокси (MITM)

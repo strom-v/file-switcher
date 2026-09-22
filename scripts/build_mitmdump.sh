@@ -8,6 +8,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# бинарник закоммичен в репозиторий — по умолчанию ничего не пересобираем, чтобы свежий клон
+# собирался без Python/PyInstaller; пересборка (после обновления mitmproxy) — с флагом --force
+if [ "${1:-}" != "--force" ] && [ -f resources/bin/mac/mitmdump ]; then
+  echo "resources/bin/mac/mitmdump уже существует — пропускаю (пересборка: $0 --force)"
+  exit 0
+fi
+
 if [ ! -d .venv ]; then
   echo "venv не найден, сначала запустите: scripts/setup_venv.sh --build" >&2
   exit 1
