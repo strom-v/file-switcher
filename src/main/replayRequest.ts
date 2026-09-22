@@ -6,6 +6,38 @@ import type { ProxyLogEvent } from '../shared/types'
 const REPLAY_TIMEOUT_MS = 15_000
 const MAX_REPLAY_REDIRECTS = 5
 
+// ответ replay читается с потолком: без него endpoint, отдающий сотни мегабайт, качался бы целиком
+// в память main-процесса (и ещё раз копировался при JSON.stringify в лог) — OOM всего приложения
+const MAX_REPLAY_BODY_BYTES = 8 * 1024 * 1024
+
+/** Читает тело ответа с потолком MAX_REPLAY_BODY_BYTES; при превышении обрывает загрузку
+ * (reader.cancel) и помечает текст маркером обрезки */
+async function readBoundedText(response: Response): Promise<{ text: string; size: number }> {
+  const body = response.body
+  if (!body) return { text: '', size: 0 }
+  const reader = body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  let truncated = false
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (size + value.byteLength > MAX_REPLAY_BODY_BYTES) {
+        truncated = true
+        break
+      }
+      chunks.push(value)
+      size += value.byteLength
+    }
+  } finally {
+    if (truncated) await reader.cancel().catch(() => undefined)
+  }
+  let text = Buffer.concat(chunks).toString('utf-8')
+  if (truncated) text += `\n… [обрезано FileSwitcher: ответ больше ${MAX_REPLAY_BODY_BYTES} байт]`
+  return { text, size }
+}
+
 // заголовки, которые либо запрещено выставлять вручную через fetch (forbidden request headers),
 // либо описывают исходное соединение/кодирование и приведут к рассинхрону при повторной отправке
 // (например Content-Length будет неверным, если тело перекодировалось; Host мешает fetch самому
@@ -129,7 +161,7 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ProxyLogEvent
         method = 'GET'
       }
     }
-    const responseBody = await response.text()
+    const { text: responseBody, size: responseSize } = await readBoundedText(response)
     return {
       event: 'replay',
       url: event.url,
@@ -140,7 +172,7 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ProxyLogEvent
       // обычный трафик редактирует секретные заголовки в addon.py, а replay идёт мимо аддона —
       // без этой строки свежий Set-Cookie/X-Auth-Token от сервера попал бы в лог и экспорт открытым
       responseHeaders: redactHeaders(Object.fromEntries(response.headers.entries())),
-      responseSize: Buffer.byteLength(responseBody, 'utf-8'),
+      responseSize,
       ts: Date.now() / 1000,
       requestBody: event.requestBody,
       requestBodyIsBinary: false,

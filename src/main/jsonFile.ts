@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 
 /** Читает JSON-файл; при отсутствии возвращает fallback молча (нормальный случай — файл ещё не создан).
@@ -22,6 +22,17 @@ export function readJsonFile<T>(filePath: string, fallback: T, onCorrupted?: (me
  * никогда не оказывается наполовину записанным JSON */
 export function writeJsonFile(filePath: string, data: unknown): void {
   const tmpPath = join(dirname(filePath), `.${Date.now()}-${process.pid}.tmp`)
-  writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8')
-  renameSync(tmpPath, filePath)
+  try {
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8')
+    renameSync(tmpPath, filePath)
+  } catch (err) {
+    // rename упал (например целевой файл заблокирован на Windows) — без подчистки временный
+    // файл оставался бы мусором в userData при каждой такой неудаче
+    try {
+      rmSync(tmpPath, { force: true })
+    } catch {
+      // исходная ошибка важнее неудачи подчистки
+    }
+    throw err
+  }
 }

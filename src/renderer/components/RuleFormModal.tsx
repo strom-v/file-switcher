@@ -106,7 +106,13 @@ export default function RuleFormModal({
   const isUrlPatternEmpty = !currentValues?.urlPattern?.trim()
 
   const handleOk = async (): Promise<void> => {
-    const values = await form.validateFields()
+    let values: FormValues
+    try {
+      values = await form.validateFields()
+    } catch {
+      // валидация не прошла — antd уже подсветил поля; без catch rejection улетал бы в консоль
+      return
+    }
     // вид подмены вычисляется автоматически: непустое тело важнее файла; при пустом теле —
     // подмена файлом. Поле неактивного вида сохраняем пустым, чтобы вид оставался однозначным.
     // contentType не редактируется — переносится как есть (для правил из лога это тип исходного

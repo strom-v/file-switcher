@@ -91,7 +91,8 @@ export class ProxyController extends EventEmitter {
       String(port)
     ]
 
-    const child = spawn(mitmdumpPath, args)
+    // windowsHide: без него на Windows при запуске консольного mitmdump.exe мелькает окно консоли
+    const child = spawn(mitmdumpPath, args, { windowsHide: true })
     this.child = child
 
     // все обработчики ниже проверяют this.child === child перед тем, как трогать состояние

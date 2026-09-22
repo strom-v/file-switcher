@@ -214,7 +214,14 @@ class LogStore {
       const fd = openSync(this.filePath, 'r')
       try {
         const buf = Buffer.allocUnsafe(entry.byteLength)
-        readSync(fd, buf, 0, entry.byteLength, entry.byteOffset)
+        // одиночный readSync не гарантирует полное чтение — при частичном JSON.parse получал бы
+        // урезанную строку и молча возвращал null, хотя запись в файле цела
+        let bytesRead = 0
+        while (bytesRead < entry.byteLength) {
+          const n = readSync(fd, buf, bytesRead, entry.byteLength - bytesRead, entry.byteOffset + bytesRead)
+          if (n === 0) return null
+          bytesRead += n
+        }
         return JSON.parse(buf.toString('utf-8')) as ProxyLogEvent
       } finally {
         closeSync(fd)
@@ -264,7 +271,11 @@ class LogStore {
           if (generation !== this.searchGeneration) return []
           if (matchedTs.has(entry.ts) || entry.byteLength === 0) continue
           const event = await this.readIndexedEvent(file, entry)
-          if (event && (event.requestBody.toLowerCase().includes(q) || event.responseBody.toLowerCase().includes(q))) {
+          // запись на диске может быть от старой версии формата без тел — null-safe доступ,
+          // иначе один TypeError обрывал бы поиск по телу для всех остальных записей
+          const requestBody = typeof event?.requestBody === 'string' ? event.requestBody.toLowerCase() : ''
+          const responseBody = typeof event?.responseBody === 'string' ? event.responseBody.toLowerCase() : ''
+          if (requestBody.includes(q) || responseBody.includes(q)) {
             matchedTs.add(entry.ts)
           }
         }

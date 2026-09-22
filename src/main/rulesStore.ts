@@ -77,7 +77,15 @@ export class RulesStore extends EventEmitter {
     super()
     this.filePath = filePath
     if (!existsSync(this.filePath)) {
-      this.write({ rules: [] })
+      try {
+        this.write({ rules: [] })
+      } catch (err) {
+        // userData недоступен для записи — не роняем main на этапе импорта модуля (иначе приложение
+        // упало бы ещё до создания окна). Правила будут пустыми, а реальная ошибка покажется
+        // пользователю при первой попытке сохранить (saveAll бросает её через IPC в renderer)
+        const message = err instanceof Error ? err.message : String(err)
+        console.error(`не удалось создать rules.json: ${message}`)
+      }
     }
   }
 

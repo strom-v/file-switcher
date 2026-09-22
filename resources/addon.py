@@ -112,8 +112,19 @@ class ResponseSwitcher:
 
     def _reload(self):
         with open(self.rules_path, encoding="utf-8") as f:
-            self.rules = json.load(f)["rules"]
+            rules = json.load(f)["rules"]
+        # ручная правка rules.json может сделать "rules" словарём или списком не-объектов —
+        # _rebuild_index упал бы с AttributeError, которого нет в перехвате _try_reload,
+        # и при старте такой файл ронял бы весь mitmdump (ошибка в configure)
+        if not isinstance(rules, list):
+            raise TypeError(f'"rules" должен быть списком, получено {type(rules).__name__}')
+        for rule in rules:
+            if not isinstance(rule, dict):
+                raise TypeError(f"правило должно быть объектом, получено {type(rule).__name__}: {rule!r}")
+        # присваиваем self.rules только после всех проверок: при ошибке прежний валидный
+        # набор остаётся активным и самосогласованным с индексом
         self.last_mtime = os.path.getmtime(self.rules_path)
+        self.rules = rules
         self._rebuild_index()
 
     def _rebuild_index(self):

@@ -77,7 +77,8 @@ export default function App(): React.ReactElement {
   // прокси запускается автоматически при старте приложения; порт на этот момент уже прочитан
   // из localStorage синхронно при инициализации useProxySettings, поэтому не в deps
   useEffect(() => {
-    window.api.proxy.start(port)
+    // rejection глушим: итог запуска (в т.ч. crash с текстом ошибки) приходит через proxy:status broadcast
+    window.api.proxy.start(port).catch(() => undefined)
   }, [])
 
   const handleOnboardingClose = (): void => {

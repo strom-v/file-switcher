@@ -120,14 +120,23 @@ export default function SettingsPanel({
   }
 
   const exportToFile = async (defaultFileName: string, content: string, successKey: string): Promise<void> => {
-    const savedPath = await window.api.dialog.saveTextFile(defaultFileName, content)
-    if (savedPath) message.success(t(successKey, { path: savedPath }))
+    try {
+      const savedPath = await window.api.dialog.saveTextFile(defaultFileName, content)
+      if (savedPath) message.success(t(successKey, { path: savedPath }))
+    } catch (err) {
+      // ошибка записи на диск (нет места, нет прав) — без catch rejection улетал бы в консоль молча
+      message.error(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const handleExportLog = async (): Promise<void> => {
     const defaultFileName = `file-switcher-log-${Date.now()}.${logExportFormat}`
-    const savedPath = await window.api.log.exportAs(logExportFormat, defaultFileName)
-    if (savedPath) message.success(t('log.exportSuccess', { path: savedPath }))
+    try {
+      const savedPath = await window.api.log.exportAs(logExportFormat, defaultFileName)
+      if (savedPath) message.success(t('log.exportSuccess', { path: savedPath }))
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const handleExportRules = (): Promise<void> =>
@@ -144,7 +153,14 @@ export default function SettingsPanel({
   }
 
   const handleImportRules = async (): Promise<void> => {
-    const content = await window.api.dialog.openTextFile(['json'])
+    let content: string | null
+    try {
+      content = await window.api.dialog.openTextFile(['json'])
+    } catch (err) {
+      // ошибка чтения выбранного файла (нет прав, файл удалён между диалогом и чтением)
+      message.error(err instanceof Error ? err.message : String(err))
+      return
+    }
     if (!content) return
     try {
       const parsed = JSON.parse(content)
