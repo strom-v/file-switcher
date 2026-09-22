@@ -28,6 +28,12 @@ describe('assertRuleMatchesSchema', () => {
     ).not.toThrow()
   })
 
+  it('пропускает явный undefined в опциональном поле (форма шлёт его при смене вида подмены)', () => {
+    expect(() =>
+      assertRuleMatchesSchema({ ...validRule, responseBody: undefined, contentType: undefined })
+    ).not.toThrow()
+  })
+
   it('отклоняет отсутствующее обязательное поле', () => {
     const { enabled: _enabled, ...withoutEnabled } = validRule
     expect(() => assertRuleMatchesSchema(withoutEnabled)).toThrow(/enabled/)

@@ -5,6 +5,9 @@
  *
  * Реализован минимальный поднабор draft-07, которого хватает для этой схемы: type (включая integer),
  * required, additionalProperties: false, minimum/maximum, items + $ref на #/definitions/*.
+ *
+ * Поле со значением undefined считается отсутствующим: форма правила явно ставит undefined в поля
+ * неактивного вида подмены, а после записи в JSON такой ключ всё равно исчезает.
  */
 import ruleSchema from './rule.schema.json'
 import type { Rule } from './types'
@@ -63,7 +66,7 @@ function collectErrors(value: unknown, rawSchema: JsonSchema, path: string): str
   if (schema.type === 'object') {
     const obj = value as Record<string, unknown>
     for (const key of schema.required ?? []) {
-      if (!(key in obj)) errors.push(`${at}: отсутствует обязательное поле "${key}"`)
+      if (obj[key] === undefined) errors.push(`${at}: отсутствует обязательное поле "${key}"`)
     }
     if (schema.additionalProperties === false && schema.properties) {
       for (const key of Object.keys(obj)) {
@@ -71,7 +74,7 @@ function collectErrors(value: unknown, rawSchema: JsonSchema, path: string): str
       }
     }
     for (const [key, propSchema] of Object.entries(schema.properties ?? {})) {
-      if (key in obj) errors.push(...collectErrors(obj[key], propSchema, path ? `${path}.${key}` : key))
+      if (obj[key] !== undefined) errors.push(...collectErrors(obj[key], propSchema, path ? `${path}.${key}` : key))
     }
   }
 
