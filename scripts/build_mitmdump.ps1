@@ -1,4 +1,4 @@
-# Windows-эквивалент scripts/build_mitmdump.sh: собирает mitmdump.exe в resources/bin/win/.
+﻿# Windows-эквивалент scripts/build_mitmdump.sh: собирает mitmdump.exe в resources/bin/win/.
 # PyInstaller не кросс-компилирует — этот скрипт запускается на Windows-машине.
 # Использование: powershell -File scripts/build_mitmdump.ps1
 

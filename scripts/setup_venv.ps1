@@ -1,4 +1,4 @@
-# Windows-эквивалент scripts/setup_venv.sh: создаёт .venv и ставит зависимости mitmproxy.
+﻿# Windows-эквивалент scripts/setup_venv.sh: создаёт .venv и ставит зависимости mitmproxy.
 # Использование: powershell -File scripts/setup_venv.ps1 [-Build]
 param([switch]$Build)
 
