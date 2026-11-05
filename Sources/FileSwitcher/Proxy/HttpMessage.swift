@@ -121,6 +121,14 @@ func forwardableHeaders(_ headers: HTTPHeaders) -> [(String, String)] {
     return pairs
 }
 
+/// Заголовки запроса для настоящего сервера: без accept-encoding, чтобы тело ответа
+/// попадало в журнал несжатым и было читаемо в поиске и деталях
+func forwardableRequestHeaders(_ headers: HTTPHeaders) -> [(String, String)] {
+    var pairs = forwardableHeaders(headers)
+    pairs.removeAll { $0.0.lowercased() == "accept-encoding" }
+    return pairs
+}
+
 /// Заголовки ответа для клиента: hop-by-hop убираются, но признак chunked сохраняется,
 /// иначе тело нельзя закодировать частями
 func forwardableResponseHeaders(_ headers: HTTPHeaders) -> [(String, String)] {

@@ -65,12 +65,20 @@ final class LogDetailSheet: NSViewController {
             pasteboard.clearContents()
             pasteboard.setString(EventFormatter.describe(event), forType: .string)
         }
+        let curlButton = ClosureButton(title: "cURL") { [weak self] in
+            guard let self else {
+                return
+            }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(EventFormatter.curl(event), forType: .string)
+        }
         let closeButton = ClosureButton(title: "Закрыть") { [weak self] in
             self?.dismiss(nil)
         }
         closeButton.keyEquivalent = "\r"
 
-        let bottomRow = makeRow([createButton, replayButton, copyButton, makeSpacer(), closeButton], spacing: 8)
+        let bottomRow = makeRow([createButton, replayButton, copyButton, curlButton, makeSpacer(), closeButton], spacing: 8)
         bottomRow.distribution = .fill
 
         let summary = makeSummary()

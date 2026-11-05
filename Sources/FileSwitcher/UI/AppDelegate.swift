@@ -9,12 +9,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        AppearanceSettings.applyStored()
+        AppMenu.install(appDelegate: self)
         runtime.controller?.recoverStaleSystemProxy()
         let controller = MainWindowController(runtime: runtime)
         mainWindowController = controller
         controller.showWindow(nil)
         controller.startProxyIfNeeded()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Открывает настройки из меню приложения
+    @objc func showSettings(_ sender: Any?) {
+        mainWindowController?.showSettings()
+    }
+
+    /// Переключает тему оформления выбранным пунктом меню
+    @objc func selectAppearance(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let mode = AppearanceSettings.Mode(rawValue: raw) else {
+            return
+        }
+        AppearanceSettings.apply(mode)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -32,5 +47,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
+    }
+}
+
+extension AppDelegate: NSMenuItemValidation {
+    /// Отмечает галочкой выбранную тему в меню «Вид»
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        guard let raw = menuItem.representedObject as? String,
+              let mode = AppearanceSettings.Mode(rawValue: raw) else {
+            return true
+        }
+        menuItem.state = AppearanceSettings.mode == mode ? .on : .off
+        return true
     }
 }

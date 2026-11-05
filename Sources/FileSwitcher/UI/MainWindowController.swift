@@ -93,7 +93,7 @@ extension MainWindowController {
         ])
 
         let settingsButton = ClosureButton(symbol: "gearshape") { [weak self] in
-            self?.openSettings()
+            self?.showSettings()
         }
         settingsButton.isBordered = false
         settingsButton.toolTip = "Настройки"
@@ -244,7 +244,7 @@ extension MainWindowController {
     }
 
     /// Открывает панель настроек
-    private func openSettings() {
+    func showSettings() {
         let settings = SettingsSheet(runtime: runtime)
         settings.onPortChange = { port in
             ProxyPortSettings.save(port)

@@ -26,6 +26,14 @@ enum AppTheme {
     static let groupFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
     static let monoFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
 
+    /// Ответ сервера с ошибкой клиента или сервера
+    static func isHttpError(_ statusCode: Int?) -> Bool {
+        guard let statusCode else {
+            return false
+        }
+        return statusCode >= 400
+    }
+
     /// Цвет значения HTTP-статуса: цветом выделяются только ошибки
     static func httpStatusColor(_ statusCode: Int?) -> NSColor {
         guard let statusCode else {

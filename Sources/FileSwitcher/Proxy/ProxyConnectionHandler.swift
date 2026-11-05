@@ -115,7 +115,7 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
         }
         target = resolvedTarget
         url = prettyUrl(target: resolvedTarget, hostHeader: requestHead.headers.first(name: "host"), path: path)
-        requestPairs = forwardableHeaders(requestHead.headers)
+        requestPairs = forwardableRequestHeaders(requestHead.headers)
         match = setup.ruleEngine?.match(url)
         if let match {
             applyHeaderOverrides(&requestPairs, match.rule.requestHeaderOverrides)

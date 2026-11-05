@@ -193,6 +193,11 @@ final class RulesViewController: NSViewController {
         presentForm(rule: nil, draft: draft)
     }
 
+    /// Открывает форму нового правила из меню (Cmd+N)
+    @objc func createNewRule(_ sender: Any?) {
+        createRule()
+    }
+
     /// Показывает модальную форму создания или правки правила
     private func presentForm(rule: Rule?, draft: Rule?) {
         let sheet = RuleFormSheet(rule: rule, draft: draft, groups: knownGroups())

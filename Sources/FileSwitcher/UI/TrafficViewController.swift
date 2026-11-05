@@ -13,6 +13,14 @@ final class TrafficViewController: NSViewController {
     private let runtime: AppRuntime
     private var entries: [LogEntryMeta] = []
     private var visible: [LogEntryMeta] = []
+    /// Потолок строк, которые держим в памяти; файл журнала на диске хранит всё
+    private static let maxEntries = 2000
+    /// Сколько подмен среди строк в памяти
+    private var matchedTotal = 0
+    /// Запись новых строк журнала приостановлена
+    private var isPaused = false
+    /// Показывать только ответы со статусом 4xx-5xx
+    private var onlyErrors = false
     /// ts записей, найденных поиском по телам; nil - поиск по телам не активен
     private var bodyMatches: Set<Double>?
     private var bodySearchTask: Task<Void, Never>?
@@ -89,6 +97,18 @@ final class TrafficViewController: NSViewController {
             keyEquivalent: ""
         )
         replayItem.target = self
+        let pauseItem = actionsMenu.addItem(
+            withTitle: "Пауза записи",
+            action: #selector(togglePause(_:)),
+            keyEquivalent: ""
+        )
+        pauseItem.target = self
+        let errorsItem = actionsMenu.addItem(
+            withTitle: "Только ошибки 4xx-5xx",
+            action: #selector(toggleOnlyErrors(_:)),
+            keyEquivalent: ""
+        )
+        errorsItem.target = self
         let exportItem = actionsMenu.addItem(
             withTitle: "Экспортировать журнал…",
             action: #selector(exportLog),
@@ -165,6 +185,10 @@ final class TrafficViewController: NSViewController {
     /// Подписывается на события прокси и показывает накопленный журнал
     private func bindRuntime() {
         entries = runtime.controller?.recentEntries() ?? []
+        if entries.count > Self.maxEntries {
+            entries.removeFirst(entries.count - Self.maxEntries)
+        }
+        matchedTotal = entries.filter { $0.event == .matched }.count
         rebuildVisible()
         guard let controller = runtime.controller else {
             emptyLabel.stringValue = runtime.startupError ?? "Прокси недоступен"
@@ -180,11 +204,36 @@ final class TrafficViewController: NSViewController {
 
     /// Добавляет новые записи журнала в список
     private func append(_ metas: [LogEntryMeta]) {
-        guard !metas.isEmpty else {
+        guard !metas.isEmpty, !isPaused else {
             return
         }
-        entries.append(contentsOf: metas)
-        rebuildVisible()
+        let incoming = metas.count > Self.maxEntries ? Array(metas.suffix(Self.maxEntries)) : metas
+        entries.append(contentsOf: incoming)
+        matchedTotal += incoming.filter { $0.event == .matched }.count
+        if entries.count > Self.maxEntries {
+            let extra = entries.count - Self.maxEntries
+            matchedTotal -= entries.prefix(extra).filter { $0.event == .matched }.count
+            entries.removeFirst(extra)
+        }
+        guard !isFiltering else {
+            rebuildVisible()
+            return
+        }
+        // без поиска и фильтра новые записи просто встают в начало списка
+        visible.insert(contentsOf: incoming.reversed(), at: 0)
+        if visible.count > Self.maxEntries {
+            visible.removeLast(visible.count - Self.maxEntries)
+        }
+        let added = min(incoming.count, visible.count)
+        tableView.insertRows(at: IndexSet(integersIn: 0..<added), withAnimation: [])
+        updateCounters()
+    }
+
+    /// Активен ли поиск или фильтр по списку
+    private var isFiltering: Bool {
+        let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filter = EventFilter(rawValue: filterControl.selectedSegment) ?? .all
+        return !query.isEmpty || filter != .all || bodyMatches != nil || onlyErrors
     }
 
     /// Пересчитывает видимый список: новые записи сверху, с учётом фильтра и поиска
@@ -195,6 +244,9 @@ final class TrafficViewController: NSViewController {
         for entry in entries.reversed() {
             // повтор запроса - результат явного действия пользователя, показываем при любом фильтре
             if filter == .matched, entry.event != .matched, entry.event != .replay {
+                continue
+            }
+            if onlyErrors, !AppTheme.isHttpError(entry.statusCode) {
                 continue
             }
             if !query.isEmpty {
@@ -214,8 +266,7 @@ final class TrafficViewController: NSViewController {
 
     /// Обновляет счётчик записей и подмен и текст пустого состояния
     private func updateCounters() {
-        let matchedCount = entries.filter { $0.event == .matched }.count
-        countLabel.stringValue = "\(entries.count) / \(matchedCount)"
+        countLabel.stringValue = "\(entries.count) / \(matchedTotal)"
         if visible.isEmpty {
             emptyLabel.stringValue = entries.isEmpty ? "Записей пока нет" : "Ничего не найдено"
             emptyLabel.isHidden = false
@@ -226,7 +277,63 @@ final class TrafficViewController: NSViewController {
 
     /// Открывает меню действий с журналом под кнопкой «…»
     @objc private func showActionsMenu(_ sender: NSButton) {
+        for item in actionsMenu.items {
+            switch item.action {
+            case #selector(togglePause(_:)):
+                item.state = isPaused ? .on : .off
+                item.title = isPaused ? "Продолжить запись" : "Пауза записи"
+            case #selector(toggleOnlyErrors(_:)):
+                item.state = onlyErrors ? .on : .off
+            default:
+                break
+            }
+        }
         actionsMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
+    }
+
+    /// Приостанавливает и возобновляет показ новых записей
+    @objc private func togglePause(_ sender: Any?) {
+        isPaused.toggle()
+        guard !isPaused else {
+            return
+        }
+        // пока список стоял на паузе, записи продолжали писаться на диск - дочитываем их
+        entries = runtime.controller?.recentEntries() ?? entries
+        if entries.count > Self.maxEntries {
+            entries.removeFirst(entries.count - Self.maxEntries)
+        }
+        matchedTotal = entries.filter { $0.event == .matched }.count
+        rebuildVisible()
+    }
+
+    /// Включает и выключает показ только ответов с ошибкой
+    @objc private func toggleOnlyErrors(_ sender: Any?) {
+        onlyErrors.toggle()
+        rebuildVisible()
+    }
+
+    /// Ставит фокус в поле поиска журнала (Cmd+F)
+    @objc func focusSearchField(_ sender: Any?) {
+        view.window?.makeFirstResponder(searchField)
+    }
+
+    /// Повторяет выбранную запись журнала (Cmd+R)
+    @objc func replaySelectedRequest(_ sender: Any?) {
+        replaySelected()
+    }
+
+    /// Сбрасывает поиск и фильтр журнала (Esc)
+    @objc func resetFilter(_ sender: Any?) {
+        bodySearchTask?.cancel()
+        searchField.stringValue = ""
+        bodySearchButton.state = .off
+        bodyMatches = nil
+        filterControl.selectedSegment = 0
+        rebuildVisible()
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        resetFilter(sender)
     }
 
     /// Применяет поиск: по URL и файлу сразу, по телам - через хранилище журнала
@@ -265,6 +372,7 @@ final class TrafficViewController: NSViewController {
             return
         }
         entries = keepsMatched ? entries.filter { $0.event != .matched } : []
+        matchedTotal = 0
         rebuildVisible()
     }
 
