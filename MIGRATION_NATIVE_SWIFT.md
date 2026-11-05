@@ -131,26 +131,34 @@ AGENTS.md README.md .gitignore
 
 ### Этап 0. Предусловия (0.5 дня)
 
-- [ ] Виталий коммитит текущую рабочую копию: встроенный прокси вместо mitmdump, macOS-only, husky/
-      lint-staged (сейчас `D requirements*.txt`, `D resources/addon.py`, правки в `package.json`).
-- [ ] Тег `electron-legacy` на этот коммит, ветка `native-swift`.
-- [ ] Подтверждены решения из раздела 2 (в первую очередь зависимости NIO).
+- [x] Виталий коммитит текущую рабочую копию: встроенный прокси вместо mitmdump, macOS-only, husky/
+      lint-staged (сейчас `D requirements*.txt`, `D resources/addon.py`, правки в `package.json`) -
+      2026-11-05 (`1e00c6d`).
+- [x] Тег `electron-legacy` на этот коммит, ветка `native-swift` - 2026-11-05.
+- [x] Подтверждены решения из раздела 2 (в первую очередь зависимости NIO) - 2026-11-05, пакет
+      собирается на `swift-nio` 2.x + `swift-nio-ssl` 2.x.
 - [ ] Ручной чек-лист "что должно работать" из README (перехват, подмена, группы, экспорт, VPN) -
       им проверяется паритет на этапах 2-6.
 
 ### Этап 1. Каркас + спайк MITM (1-2 дня) - главный риск
 
-- [ ] `Package.swift` (executable `FileSwitcher` + `FileSwitcherTests`), зависимости nio/nio-ssl,
-      `.gitignore` под `.build/`, `dist/`.
-- [ ] `DerEncoder.swift` + тесты на байтовый вывод (CN, SAN, расширения, подпись) - без сети.
-- [ ] `CertificateAuthority.swift`: чтение `~/.mitmproxy/mitmproxy-ca.pem`, выпуск листового
-      сертификата для хоста, кэш контекстов.
-- [ ] CLI-режим `--proxy-only <порт>` для спайка: листенер, `CONNECT`, dynamic `NIOSSLServerHandler`,
-      апстрим через NIOSSL.
-- [ ] Готово, когда: `curl -x http://127.0.0.1:38765 https://example.com` отдаёт 200 и HTML, а
-      `security verify-cert -c leaf.pem -l` подтверждает доверие выданному сертификату.
-- [ ] Стоп-условие: если dynamic TLS upgrade не заработал за день, дальше не идти - вернуться к
-      запасным вариантам раздела 8, а не обходить проблему любой ценой.
+- [x] `Package.swift` (executable `FileSwitcher` + `FileSwitcherTests`), зависимости nio/nio-ssl,
+      `.gitignore` под `.build/`, `dist/` - 2026-11-05.
+- [x] `DerEncoder.swift` + тесты на байтовый вывод (CN, SAN, расширения, подпись) - без сети,
+      2026-11-05 (12 тестов).
+- [x] `CertificateAuthority.swift`: чтение `~/.mitmproxy/mitmproxy-ca.pem`, выпуск листового
+      сертификата для хоста, кэш контекстов - 2026-11-05 (7 тестов, включая цепочку до CA и отказ
+      чужому хосту).
+- [x] CLI-режим `--proxy-only <порт>` для спайка: листенер, `CONNECT`, dynamic `NIOSSLServerHandler`,
+      апстрим через NIOSSL - 2026-11-05.
+- [x] Готово, когда: `curl -x http://127.0.0.1:38765 https://example.com` отдаёт 200 и HTML, а
+      `security verify-cert -c leaf.pem -l` подтверждает доверие выданному сертификату -
+      2026-11-05: `curl` (SecureTransport, доверие из keychain) через прокси на 38999 отдаёт 200 для
+      `https://example.com`, `https://www.wikipedia.org` (122 КБ), `http://neverssl.com`; 3 МБ с
+      `speed.cloudflare.com` скачиваются на 5.8 МБ/с; keep-alive - второй запрос без нового CONNECT.
+      CA `CN=mitmproxy` лежит в System keychain, его SHA-256 совпадает с
+      `~/.mitmproxy/mitmproxy-ca-cert.pem`, поэтому 200 у curl и есть проверка доверия листовому.
+- [x] Стоп-условие не сработало: dynamic TLS upgrade в SwiftNIO работает - 2026-11-05.
 
 ### Этап 2. Ядро прокси без правил (2-3 дня)
 

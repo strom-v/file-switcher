@@ -7,3 +7,5 @@ build/*
 !build/icon.png
 !build/icon.icns
 *.tsbuildinfo
+.build/
+.swiftpm/
