@@ -11,24 +11,13 @@ files:
   - '!test'
   - '!scripts'
 extraResources:
-  - from: resources/addon.py
-    to: addon.py
+  - from: resources
+    to: .
+    filter:
+      - trayTemplate*.png
 mac:
   target: dmg
   category: public.app-category.developer-tools
   identity: null
-  extraResources:
-    - from: resources/bin/mac
-      to: bin/mac
-win:
-  target: nsis
-  # собрать mitmdump.exe на Windows (PyInstaller не кросс-компилирует) и положить в resources/bin/win/
-  extraResources:
-    - from: resources/bin/win
-      to: bin/win
-linux:
-  target: AppImage
-  category: Development
-  extraResources:
-    - from: resources/bin/linux
-      to: bin/linux
+  extendInfo:
+    LSUIElement: true

@@ -11,28 +11,18 @@ import { win32SystemProxy } from './systemProxy.win32'
 import { darwinCert } from './cert.darwin'
 import { win32Cert } from './cert.win32'
 import { unsupportedCert, unsupportedSystemProxy } from './unsupported'
-import type { Platform, PlatformPaths } from './types'
+import type { Platform } from './types'
 
-export type { Platform, PlatformPaths, SystemProxyManager, CertManager } from './types'
-
-const PLATFORM_PATHS: Record<NodeJS.Platform, PlatformPaths> = {
-  darwin: { mitmdumpBinDir: 'mac', mitmdumpBinName: 'mitmdump' },
-  win32: { mitmdumpBinDir: 'win', mitmdumpBinName: 'mitmdump.exe' },
-  linux: { mitmdumpBinDir: 'linux', mitmdumpBinName: 'mitmdump' }
-} as Record<NodeJS.Platform, PlatformPaths>
-
-function pickPaths(): PlatformPaths {
-  return PLATFORM_PATHS[process.platform] ?? PLATFORM_PATHS.linux
-}
+export type { Platform, SystemProxyManager, CertManager } from './types'
 
 function pickPlatform(): Platform {
   switch (process.platform) {
     case 'darwin':
-      return { systemProxy: darwinSystemProxy, cert: darwinCert, paths: pickPaths() }
+      return { systemProxy: darwinSystemProxy, cert: darwinCert }
     case 'win32':
-      return { systemProxy: win32SystemProxy, cert: win32Cert, paths: pickPaths() }
+      return { systemProxy: win32SystemProxy, cert: win32Cert }
     default:
-      return { systemProxy: unsupportedSystemProxy, cert: unsupportedCert, paths: pickPaths() }
+      return { systemProxy: unsupportedSystemProxy, cert: unsupportedCert }
   }
 }
 

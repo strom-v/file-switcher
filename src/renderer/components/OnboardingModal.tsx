@@ -29,11 +29,6 @@ export default function OnboardingModal({ open, onClose }: OnboardingModalProps)
         items={[
           { title: t('onboarding.steps.addRule.title'), description: t('onboarding.steps.addRule.description') },
           { title: t('onboarding.steps.startProxy.title'), description: t('onboarding.steps.startProxy.description') },
-          { title: t('onboarding.steps.openMitm.title'), description: t('onboarding.steps.openMitm.description') },
-          {
-            title: t('onboarding.steps.downloadCert.title'),
-            description: t('onboarding.steps.downloadCert.description')
-          },
           { title: t('onboarding.steps.trustCert.title'), description: t('onboarding.steps.trustCert.description') }
         ]}
       />

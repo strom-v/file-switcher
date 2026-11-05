@@ -1,11 +1,8 @@
-import { homedir } from 'os'
 import { existsSync } from 'fs'
-import { join } from 'path'
 import { execAsync } from '../execAsync'
+import { CA_CERT_PATH, ensureCaExists } from '../proxy/certificateAuthority'
 import type { CertManager } from './types'
 import type { CertStatus } from '../../shared/types'
-
-const CA_CERT_PATH = join(homedir(), '.mitmproxy', 'mitmproxy-ca-cert.pem')
 
 class DarwinCertManager implements CertManager {
   readonly caCertPath = CA_CERT_PATH
@@ -16,7 +13,7 @@ class DarwinCertManager implements CertManager {
     }
   }
 
-  /** Проверяет, доверен ли CA-сертификат mitmproxy как root в системе текущего пользователя */
+  /** Проверяет, доверен ли CA-сертификат прокси как root в системе текущего пользователя */
   async status(): Promise<CertStatus> {
     if (!existsSync(CA_CERT_PATH)) {
       return 'not-generated'
@@ -33,17 +30,17 @@ class DarwinCertManager implements CertManager {
   }
 
   /**
-   * Устанавливает доверие к CA-сертификату mitmproxy в user keychain текущего пользователя.
+   * Устанавливает доверие к CA-сертификату прокси (создав его при необходимости) в user keychain текущего пользователя.
    * Без флага -d (admin/system store), поэтому macOS сам запрашивает пароль/Touch ID
    * через системный диалог — эскалация через sudo для user-домена не нужна и не работает
    * (SecTrustSettingsSetTrustSettings отказывает без полноценного GUI-авторизационного контекста).
    */
   async install(): Promise<void> {
-    this.assertCertExists('. Сначала запустите прокси и откройте http://mitm.it')
+    ensureCaExists()
     await execAsync('security', ['add-trusted-cert', '-r', 'trustRoot', CA_CERT_PATH])
   }
 
-  /** Убирает доверие к CA-сертификату mitmproxy из user keychain (сам файл сертификата не удаляет) */
+  /** Убирает доверие к CA-сертификату прокси из user keychain (сам файл сертификата не удаляет) */
   async removeTrust(): Promise<void> {
     this.assertCertExists('')
     await execAsync('security', ['remove-trusted-cert', CA_CERT_PATH])

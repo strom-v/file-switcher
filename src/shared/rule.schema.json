@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$comment": "Канонический контракт правила подмены. Единый источник для TS (src/shared/types.ts, rulesStore) и Python (resources/addon.py). Тесты src/shared/ruleSchema.test.ts и resources/test_rule_schema.py падают, если любая из сторон разошлась со схемой.",
+  "$comment": "Канонический контракт правила подмены (src/shared/types.ts, rulesStore, прокси в src/main/proxy). Тест src/shared/ruleSchema.test.ts падает, если типы разошлись со схемой.",
   "title": "Rule",
   "type": "object",
   "required": ["id", "enabled", "urlPattern", "isRegex"],

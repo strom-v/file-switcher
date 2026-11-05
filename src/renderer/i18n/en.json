@@ -110,7 +110,7 @@
     "sudoersRemoveSuccess": "sudoers rule removed",
     "sudoersRemoveError": "revoke failed: {{message}}",
     "certNotGeneratedAlertTitle": "certificate not yet created",
-    "certNotGeneratedAlertDescription": "start the proxy and open http://mitm.it in your browser so mitmproxy can generate a CA certificate, then trust it.",
+    "certNotGeneratedAlertDescription": "click \"install automatically\" - the certificate will be created and trusted.",
     "installCertButton": "install automatically",
     "installCertSuccess": "certificate added to trusted",
     "installCertError": "failed to install certificate: {{message}}",
@@ -136,14 +136,6 @@
       "startProxy": {
         "title": "start the proxy",
         "description": "open Settings and click «Start proxy»"
-      },
-      "openMitm": {
-        "title": "open mitm.it",
-        "description": "with the proxy active, open http://mitm.it in your browser"
-      },
-      "downloadCert": {
-        "title": "download the certificate",
-        "description": "download the certificate for your OS"
       },
       "trustCert": {
         "title": "trust the certificate",

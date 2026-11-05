@@ -1,19 +1,21 @@
-import { EventEmitter } from 'events'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  spawn: vi.fn(),
+  listen: vi.fn(),
+  close: vi.fn(),
   enable: vi.fn(),
   disable: vi.fn(),
   recoverStale: vi.fn()
 }))
 
-vi.mock('child_process', () => ({ spawn: mocks.spawn }))
-vi.mock('fs', () => ({ existsSync: () => true }))
-vi.mock('@electron-toolkit/utils', () => ({ is: { dev: true } }))
+vi.mock('./proxy/proxyServer', () => ({
+  ProxyServer: class {
+    listen = mocks.listen
+    close = mocks.close
+  }
+}))
 vi.mock('./platform', () => ({
   platform: {
-    paths: { mitmdumpBinDir: 'mitmdump', mitmdumpBinName: 'mitmdump' },
     systemProxy: {
       enable: mocks.enable,
       disable: mocks.disable,
@@ -30,20 +32,6 @@ vi.mock('./logStore', () => ({
 
 import { ProxyController } from './proxyController'
 
-interface FakeChild extends EventEmitter {
-  stdout: EventEmitter
-  stderr: EventEmitter
-  kill: ReturnType<typeof vi.fn>
-}
-
-function createChild(): FakeChild {
-  const child = new EventEmitter() as FakeChild
-  child.stdout = new EventEmitter()
-  child.stderr = new EventEmitter()
-  child.kill = vi.fn()
-  return child
-}
-
 function deferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve = (): void => {}
   const promise = new Promise<void>((done) => {
@@ -54,6 +42,7 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.listen.mockResolvedValue(undefined)
   mocks.enable.mockResolvedValue(undefined)
   mocks.disable.mockResolvedValue(undefined)
   mocks.recoverStale.mockResolvedValue(undefined)
@@ -62,14 +51,12 @@ beforeEach(() => {
 describe('ProxyController system proxy lifecycle', () => {
   it('отменяет ожидающее включение, если Stop вызван во время восстановления при старте', async () => {
     const recoveryGate = deferred()
-    const child = createChild()
-    mocks.spawn.mockReturnValue(child)
     mocks.recoverStale.mockReturnValue(recoveryGate.promise)
     const controller = new ProxyController()
 
     const recovery = controller.recoverStaleSystemProxy('127.0.0.1')
     controller.start('/tmp/rules.json')
-    child.emit('spawn')
+    await Promise.resolve()
     const stopping = controller.stop()
     recoveryGate.resolve()
 
@@ -81,14 +68,11 @@ describe('ProxyController system proxy lifecycle', () => {
 
   it('не запускает disable параллельно с уже начавшимся enable', async () => {
     const enableGate = deferred()
-    const child = createChild()
-    mocks.spawn.mockReturnValue(child)
     mocks.enable.mockReturnValue(enableGate.promise)
     const controller = new ProxyController()
 
     controller.start('/tmp/rules.json')
-    child.emit('spawn')
-    await Promise.resolve()
+    await vi.waitFor(() => expect(mocks.enable).toHaveBeenCalledOnce())
     expect(mocks.enable).toHaveBeenCalledOnce()
 
     const stopping = controller.stop()
@@ -97,5 +81,16 @@ describe('ProxyController system proxy lifecycle', () => {
     await stopping
 
     expect(mocks.disable).toHaveBeenCalledOnce()
+  })
+
+  it('сообщает о занятом порте', async () => {
+    mocks.listen.mockRejectedValue(Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' }))
+    const controller = new ProxyController()
+
+    controller.start('/tmp/rules.json', 38765)
+
+    await vi.waitFor(() => expect(controller.getState().status).toBe('crashed'))
+    expect(controller.getState().error).toBe('Порт 38765 уже занят другим процессом')
+    expect(mocks.enable).not.toHaveBeenCalled()
   })
 })

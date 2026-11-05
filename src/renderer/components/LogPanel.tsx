@@ -168,8 +168,8 @@ export default function LogPanel({ logs, onClear, onAddRule, onReplayLogged }: L
       key: 'replay',
       label: t('log.replayButton'),
       icon: <RedoOutlined />,
-      // бинарное тело запроса испорчено errors="replace" при декодировании (см. addon.py) —
-      // повторная отправка передаст мусор, поэтому повтор для таких запросов недоступен
+      // бинарное тело запроса в лог не сохраняется (см. proxy/proxyServer.ts) —
+      // повторять нечего, поэтому повтор для таких запросов недоступен
       disabled: item.requestBodyIsBinary,
       onClick: () => replay(item.ts)
     }

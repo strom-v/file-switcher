@@ -1,24 +1,22 @@
 # FileSwitcher
 
-Настольное приложение (macOS, частично Windows), запускающее локальный прокси для подмены файлов и
-ответов в HTTP(S)-трафике. Правила подмены задаются по URL (точное совпадение или regex), журнал
-всего трафика виден в реальном времени.
+Menu-bar приложение для macOS: локальный прокси для подмены файлов и ответов в HTTP(S)-трафике.
+Правила подмены задаются по URL (точное совпадение или regex), журнал всего трафика виден в реальном
+времени. Иконка живёт в строке меню, в Dock приложение не показывается.
 
 ## Как это устроено
 
-Три процесса:
-
-- **main** (`src/main/`) — Node/Electron. Управляет дочерним процессом `mitmdump`, системным прокси
-  ОС (вкл./выкл. с откатом при краше), доверием к CA-сертификату, хранением правил и журнала.
-  Платформозависимые операции — за интерфейсом `src/main/platform/` (`systemProxy.*`, `cert.*`),
-  выбор реализации по `process.platform`. macOS — эталонная полная реализация, Windows — частичная,
-  прочее — заглушки (работает только сам прокси-сервер).
+- **main** (`src/main/`) — Node/Electron. Сам прокси встроен в main-процесс (`src/main/proxy/`):
+  HTTP-прокси с перехватом TLS в CONNECT-туннелях, сертификаты хостов подписываются своим CA
+  (`~/.mitmproxy/mitmproxy-ca*.pem`, совместим с CA от прежнего mitmproxy-движка). Там же системный
+  прокси macOS (вкл./выкл. с откатом при краше), доверие к CA, хранение правил и журнала.
+  Контракт правила — `src/shared/rule.schema.json`.
 - **preload** (`src/preload/preload.ts`) — узкий типизированный мост `window.api` через
   `contextBridge` (renderer в sandbox, без Node).
 - **renderer** (`src/renderer/`) — React + antd. Панели журнала и правил, настройки в Drawer.
-- **прокси** (`resources/addon.py`) — Python-аддон для `mitmproxy`: матчинг правил, подмена тела/
-  статуса/заголовков, логирование трафика в stdout как JSONL. Контракт правила (какие поля читает) —
-  `src/shared/rule.schema.json`, общий с TS-стороной.
+
+Ограничения движка: HTTP/2 не перехватывается (браузер договаривается на HTTP/1.1), regex правил —
+безопасный поднабор JS RegExp без lookaround и обратных ссылок (`src/shared/regexSafety.ts`).
 
 ## Приватность журнала
 
@@ -30,63 +28,12 @@
 
 ## Разработка
 
-Нужен Python-venv с `mitmproxy` до первого `npm run dev`:
-
-```bash
-scripts/setup_venv.sh          # runtime: mitmproxy (для dev)
-scripts/setup_venv.sh --dev    # + pytest (для тестов addon.py)
-scripts/setup_venv.sh --build  # + pyinstaller (для сборки бинарника)
-```
-
 ```bash
 npm install
 npm run dev          # запуск с HMR
 npm run typecheck    # tsc по main+renderer
-npm test             # vitest (чистые функции TS/JS)
-npm run test:py      # pytest (логика addon.py)
+npm test             # vitest
 npm run format       # prettier
 npm run build        # electron-vite build (бандлы, без упаковки)
+npm run build:mac    # → dist/*.dmg
 ```
-
-### Сборка дистрибутива
-
-Собранный `mitmdump` — standalone-бинарник — **закоммичен в репозиторий** (`resources/bin/mac`,
-`resources/bin/win`). Поэтому обычная сборка из свежего клона — две команды, ничего больше
-устанавливать не нужно (Python не требуется ни для сборки, ни для запуска):
-
-```bash
-npm install
-npm run build:mac     # → dist/*.dmg  (build:win / build:linux аналогично, на соответствующей ОС)
-```
-
-`build:*` начинается с предпроверки `scripts/check_mitmdump.mjs`: если бинарника нет, сборка
-падает сразу с понятным сообщением, а не «успешно» собирает установщик, который упадёт у
-пользователя (electron-builder молча пропускает отсутствующий `extraResources`).
-
-Пересборка бинарника нужна только при обновлении версии mitmproxy. PyInstaller не
-кросс-компилирует — собирается на целевой ОС и результат коммитится:
-
-```bash
-scripts/setup_venv.sh --build        # venv + pyinstaller (один раз)
-scripts/build_mitmdump.sh --force    # → resources/bin/mac/mitmdump, затем git add + commit
-# Windows: powershell -File scripts/setup_venv.ps1 -Build; ... build_mitmdump.ps1 -Force
-```
-
-#### Сборка за корпоративным прокси (MITM)
-
-Если сборка/установка падают с `unable to verify the first certificate` — TLS ломается на
-корпоративном MITM-прокси, чей корневой CA стоит в системе, но не виден Node.js и pip:
-
-```powershell
-# electron-builder качает winCodeSign/NSIS с GitHub — учим Node доверять системным корням
-$env:NODE_OPTIONS="--use-system-ca"               # Node 22+
-# либо явно указать корневой CA компании:
-$env:NODE_EXTRA_CA_CERTS="C:\path\to\corp-root-ca.pem"
-
-# pip при setup_venv.ps1 — то же самое:
-$env:PIP_CERT="C:\path\to\corp-root-ca.pem"
-```
-
-Не используйте `NODE_TLS_REJECT_UNAUTHORIZED=0` — это отключает проверку сертификатов глобально.
-Альтернатива без сети: вручную положить кэш electron-builder (`%LOCALAPPDATA%\electron-builder\Cache`,
-нужны `winCodeSign` и `nsis` соответствующих версий).

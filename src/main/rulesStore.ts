@@ -5,7 +5,7 @@ import { app } from 'electron'
 import { readJsonFile, writeJsonFile } from './jsonFile'
 import { initialGroupForRule } from '../shared/ruleGroups'
 import { assertRuleMatchesSchema } from '../shared/validateRule'
-import { pythonRegexIncompatibility } from '../shared/regexCompat'
+import { unsafeRegexReason } from '../shared/regexSafety'
 import type { Rule } from '../shared/types'
 
 export type { Rule } from '../shared/types'
@@ -16,7 +16,7 @@ interface RulesFile {
 
 /** Бросает понятную ошибку при невалидном правиле (несоответствие схеме, пустой/битый urlPattern,
  * невалидный JSON инлайн-тела, delayMs/statusCodeOverride вне диапазона, заголовок с пустым именем) —
- * иначе правило молча ведёт себя не так, как написано, а причина видна только в stdout Python-аддона */
+ * иначе правило молча ведёт себя не так, как написано, а причина видна только в предупреждении прокси */
 function assertValidRule(rule: unknown): asserts rule is Rule {
   // сначала форма по общей схеме: типы полей (boolean enabled/isRegex), обязательные поля,
   // неизвестные ключи, диапазоны delayMs/statusCodeOverride
@@ -31,11 +31,10 @@ function assertValidRule(rule: unknown): asserts rule is Rule {
       const message = err instanceof Error ? err.message : String(err)
       throw new Error(`Правило ${rule.id}: некорректный regex "${rule.urlPattern}" — ${message}`)
     }
-    // regex исполняет Python re в addon.py — синтаксис двух движков расходится, отклоняем
-    // JS-специфичные конструкции до сохранения, иначе правило молча не сработает в прокси
-    const incompatibility = pythonRegexIncompatibility(rule.urlPattern)
-    if (incompatibility) {
-      throw new Error(`Правило ${rule.id}: regex несовместим с движком прокси — ${incompatibility}`)
+    // прокси пропускает regex вне безопасного поднабора — отклоняем его до сохранения
+    const unsafeReason = unsafeRegexReason(rule.urlPattern)
+    if (unsafeReason) {
+      throw new Error(`Правило ${rule.id}: regex не поддерживается прокси — ${unsafeReason}`)
     }
   }
   // инлайн-тело с JSON-типом должно быть валидным JSON — иначе клиент молча не разберёт ответ

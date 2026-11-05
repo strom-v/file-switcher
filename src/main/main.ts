@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, shell } from 'electron'
+import { app, BrowserWindow, Menu, Tray, nativeImage, session, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { registerIpcHandlers } from './ipc'
@@ -6,6 +6,8 @@ import { proxyController } from './proxyController'
 import packageJson from '../../package.json'
 
 let mainWindow: BrowserWindow | null = null
+// держим ссылку, иначе GC уберёт иконку из menu bar
+let tray: Tray | null = null
 
 // CSP для renderer. В проде — только собственные ресурсы (style-src unsafe-inline нужен antd,
 // который вставляет <style> в рантайме). В dev дополнительно нужен ws: для HMR electron-vite и
@@ -45,6 +47,10 @@ function createWindow(): void {
     mainWindow?.show()
   })
 
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
   // renderer держит стейт "devtools открыты?" для текста кнопки в настройках — уведомляем его об
   // открытии/закрытии, в т.ч. когда пользователь закрыл панель горячей клавишей, а не кнопкой
   const sendDevToolsState = (opened: boolean): void => {
@@ -65,27 +71,46 @@ function createWindow(): void {
   }
 }
 
+/** Показывает главное окно, создавая его при необходимости */
+function showWindow(): void {
+  if (!mainWindow) {
+    createWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+/** Создаёт иконку в menu bar */
+function createTray(): void {
+  const iconPath = is.dev
+    ? join(__dirname, '../../resources/trayTemplate.png')
+    : join(process.resourcesPath, 'trayTemplate.png')
+  tray = new Tray(nativeImage.createFromPath(iconPath))
+  tray.setToolTip('FileSwitcher')
+  const menu = Menu.buildFromTemplate([
+    { label: 'Открыть FileSwitcher', click: showWindow },
+    { type: 'separator' },
+    { label: 'Выйти', click: () => app.quit() }
+  ])
+  tray.on('click', showWindow)
+  tray.on('right-click', () => tray?.popUpContextMenu(menu))
+}
+
 const gotLock = app.requestSingleInstanceLock()
 
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-    }
-  })
+  app.on('second-instance', showWindow)
 
   app.whenReady().then(async () => {
     electronApp.setAppUserModelId('com.fileswitcher.app')
     applyCsp()
 
-    // в dev-режиме macOS показывает в Dock стандартную иконку Electron —
-    // собственная иконка приложения подхватывается только из собранного .app
-    if (is.dev && process.platform === 'darwin') {
-      app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
-    }
+    // приложение живёт в menu bar; в собранном .app Dock скрыт ещё и через LSUIElement
+    app.dock?.hide()
 
     app.setAboutPanelOptions({
       applicationName: 'FileSwitcher',
@@ -107,6 +132,7 @@ if (!gotLock) {
     })
 
     registerIpcHandlers()
+    createTray()
     createWindow()
 
     app.on('activate', () => {

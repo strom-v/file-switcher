@@ -116,7 +116,7 @@ export default function RuleFormModal({
     // вид подмены вычисляется автоматически: непустое тело важнее файла; при пустом теле —
     // подмена файлом. Поле неактивного вида сохраняем пустым, чтобы вид оставался однозначным.
     // contentType не редактируется — переносится как есть (для правил из лога это тип исходного
-    // ответа; для правил, созданных вручную, его нет, и addon.py ставит application/json)
+    // ответа; для правил, созданных вручную, его нет, и прокси ставит application/json)
     const hasBody = !!values.responseBody?.trim()
     const swapFields = hasBody
       ? { responseBody: values.responseBody, localFilePath: undefined }

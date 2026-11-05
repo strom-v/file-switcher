@@ -1,4 +1,4 @@
-/** Unix-время в секундах (как приходит от addon.py) → объект Date */
+/** Unix-время в секундах (как приходит от прокси) → объект Date */
 export function tsToDate(ts: number): Date {
   return new Date(ts * 1000)
 }

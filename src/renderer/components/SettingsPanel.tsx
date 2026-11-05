@@ -255,7 +255,7 @@ export default function SettingsPanel({
                 {t('settings.removeCertButton')}
               </Button>
             ) : (
-              <Button onClick={handleInstallCert} loading={installing} disabled={certStatus === 'not-generated'}>
+              <Button onClick={handleInstallCert} loading={installing}>
                 {t('settings.installCertButton')}
               </Button>
             )}

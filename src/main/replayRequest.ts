@@ -113,7 +113,7 @@ async function assertPublicTarget(rawUrl: string): Promise<void> {
 }
 
 /** Повторяет запрос из лога напрямую на реальный сервер (не через локальный прокси — иначе
- * запрос снова попал бы в addon.py и, если правило матчит, снова получил бы подмену вместо
+ * запрос снова попал бы в матчинг правил и, если правило матчит, снова получил бы подмену вместо
  * повторения оригинального запроса). Возвращает готовую запись лога (event: 'replay'), которую
  * renderer добавляет в список. Тело запроса в логе уже декодировано как текст, поэтому повторная
  * отправка бинарных тел исказит байты — вызывающий код не должен звать эту функцию для
@@ -169,7 +169,7 @@ export async function replayRequest(event: ProxyLogEvent): Promise<ProxyLogEvent
       method: event.method,
       statusCode: response.status,
       requestHeaders: redactHeaders(event.requestHeaders),
-      // обычный трафик редактирует секретные заголовки в addon.py, а replay идёт мимо аддона —
+      // обычный трафик редактирует секретные заголовки в прокси, а replay идёт мимо него —
       // без этой строки свежий Set-Cookie/X-Auth-Token от сервера попал бы в лог и экспорт открытым
       responseHeaders: redactHeaders(Object.fromEntries(response.headers.entries())),
       responseSize,

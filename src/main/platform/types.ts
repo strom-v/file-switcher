@@ -23,25 +23,16 @@ export interface SystemProxyManager {
   getVpnStatus(): Promise<VpnStatus>
 }
 
-/** Управление доверием к CA-сертификату mitmproxy в системном хранилище */
+/** Управление доверием к CA-сертификату прокси в системном хранилище */
 export interface CertManager {
-  /** Путь к CA-сертификату mitmproxy, который генерирует сам mitmproxy при первом запуске */
+  /** Путь к CA-сертификату, которым прокси подписывает сертификаты перехватываемых хостов */
   readonly caCertPath: string
   status(): Promise<CertStatus>
   install(): Promise<void>
   removeTrust(): Promise<void>
 }
 
-/** Пути к бандлам, специфичные для платформы упаковки */
-export interface PlatformPaths {
-  /** Поддиректория resources/bin/<...> с бинарником mitmdump для текущей платформы */
-  readonly mitmdumpBinDir: string
-  /** Имя исполняемого файла mitmdump (с расширением на Windows) */
-  readonly mitmdumpBinName: string
-}
-
 export interface Platform {
   readonly systemProxy: SystemProxyManager
   readonly cert: CertManager
-  readonly paths: PlatformPaths
 }

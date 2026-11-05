@@ -3,11 +3,8 @@
  * в лог: файл сессии лежит на диске без шифрования и целиком уходит в HAR/JSON/CSV-экспорт,
  * который пользователи пересылают в баг-репорты.
  *
- * Источник для двух сторон:
- * - Python-аддон обычного трафика (resources/addon.py, зеркальный набор REDACTED_HEADERS)
- * - main-процесс для replay-ответов, которые идут мимо аддона (src/main/replayRequest.ts)
- *
- * resources/test_addon.py падает, если набор в addon.py разошёлся с этим файлом.
+ * Используется прокси для обычного трафика (src/main/proxy/proxyServer.ts) и replay-ответами,
+ * которые идут мимо прокси (src/main/replayRequest.ts).
  * Имена — в нижнем регистре, сравнение регистронезависимое.
  */
 export const REDACTED_HEADER_NAMES = [
