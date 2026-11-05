@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = MainWindowController(runtime: runtime)
         mainWindowController = controller
         controller.showWindow(nil)
+        controller.startProxyIfNeeded()
         NSApp.activate(ignoringOtherApps: true)
     }
 

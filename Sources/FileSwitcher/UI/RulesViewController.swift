@@ -1,20 +1,26 @@
 import AppKit
 
-/// Вкладка правил: список, включение и редактирование правил подмены
+/// Панель правил подмены: список по группам, включение, правка и перенос между группами
 @MainActor
 final class RulesViewController: NSViewController {
+    /// Строка списка: заголовок группы или правило
+    private enum Row {
+        case group(String)
+        case rule(Rule)
+    }
+
     private let runtime: AppRuntime
     private var rules: [Rule] = []
-
+    private var rows: [Row] = []
     private let tableView = NSTableView()
-    private let patternField = NSTextField()
-    private let groupField = NSTextField()
-    private let filePathField = NSTextField()
-    private let isRegexBox = NSButton(checkboxWithTitle: "regex", target: nil, action: nil)
-    private let statusField = NSTextField(string: "")
-    private let delayField = NSTextField(string: "")
-    private let errorLabel = NSTextField(labelWithString: "")
-    private let bodyView = NSTextView()
+    private let selectAllBox: NSButton = {
+        let box = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+        box.allowsMixedState = true
+        box.toolTip = "Включить или выключить все правила"
+        box.translatesAutoresizingMaskIntoConstraints = false
+        return box
+    }()
+    private let emptyLabel = makeLabel("Правил пока нет", font: AppTheme.baseFont, color: .secondaryLabelColor)
 
     init(runtime: AppRuntime) {
         self.runtime = runtime
@@ -27,203 +33,528 @@ final class RulesViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 940, height: 560))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 600))
         buildLayout()
-        reload()
+        reloadRules()
     }
 
-    /// Собирает таблицу правил и форму выбранного правила
+    /// Собирает шапку с чекбоксом всех правил и кнопкой добавления
     private func buildLayout() {
-        guard let view = view as NSView? else {
-            return
-        }
-        tableView.usesAlternatingRowBackgroundColors = true
+        selectAllBox.target = self
+        selectAllBox.action = #selector(toggleAll)
+        let addButton = makeIconButton(
+            symbol: "plus",
+            tooltip: "Добавить правило",
+            target: self,
+            action: #selector(createRule)
+        )
+        let headerRow = makeRow([selectAllBox, makeSpacer(), addButton], spacing: 8)
+        headerRow.distribution = .fill
+
+        tableView.headerView = nil
+        tableView.style = .plain
+        tableView.rowHeight = 34
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.usesAlternatingRowBackgroundColors = false
+        tableView.allowsEmptySelection = true
         tableView.dataSource = self
         tableView.delegate = self
-        for (title, width) in [("вкл", 40.0), ("паттерн", 320.0), ("группа", 120.0), ("подмена", 240.0)] {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(title))
-            column.title = title
-            column.width = width
-            tableView.addTableColumn(column)
-        }
+        tableView.target = self
+        tableView.action = #selector(openSelectedRule)
+        tableView.menu = makeContextMenu()
+        tableView.registerForDraggedTypes([.string])
+        tableView.setDraggingSourceOperationMask(.move, forLocal: true)
+        tableView.draggingDestinationFeedbackStyle = .gap
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("rule"))
+        column.resizingMask = .autoresizingMask
+        tableView.addTableColumn(column)
+
         let scroll = NSScrollView()
         scroll.documentView = tableView
         scroll.hasVerticalScroller = true
-        scroll.borderType = .bezelBorder
-        scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
 
-        let addButton = NSButton(title: "Добавить", target: self, action: #selector(addRule))
-        let removeButton = NSButton(title: "Удалить", target: self, action: #selector(removeRule))
-        let toggleButton = NSButton(title: "Вкл/выкл", target: self, action: #selector(toggleRule))
-        let saveButton = NSButton(title: "Сохранить изменения", target: self, action: #selector(saveEditedRule))
-        let openButton = NSButton(title: "Открыть rules.json", target: self, action: #selector(openRulesFile))
-        let buttons = NSStackView(views: [addButton, removeButton, toggleButton, saveButton, openButton])
-        buttons.orientation = .horizontal
-        buttons.spacing = 8
+        emptyLabel.alignment = .center
 
-        patternField.placeholderString = "URL или regex"
-        groupField.placeholderString = "группа"
-        filePathField.placeholderString = "путь к файлу подмены (пусто - только модификации)"
-        delayField.placeholderString = "delayMs"
-        statusField.placeholderString = "statusCodeOverride"
-        isRegexBox.target = self
-        isRegexBox.action = #selector(syncSelectionToForm)
-
-        let formRow = NSStackView(views: [isRegexBox, patternField, groupField])
-        formRow.orientation = .horizontal
-        formRow.spacing = 8
-        let pathRow = NSStackView(views: [filePathField, delayField, statusField])
-        pathRow.orientation = .horizontal
-        pathRow.spacing = 8
-
-        bodyView.isEditable = true
-        bodyView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        let bodyScroll = NSScrollView()
-        bodyScroll.documentView = bodyView
-        bodyScroll.hasVerticalScroller = true
-        bodyScroll.borderType = .bezelBorder
-        bodyScroll.heightAnchor.constraint(equalToConstant: 110).isActive = true
-
-        errorLabel.textColor = .systemRed
-        errorLabel.maximumNumberOfLines = 2
-
-        let stack = NSStackView(views: [buttons, scroll, formRow, pathRow, NSTextField(labelWithString: "тело ответа (inline):"), bodyScroll, errorLabel])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+        let container = NSView()
+        container.addSubview(scroll)
+        container.addSubview(emptyLabel)
+        scroll.pinEdges(to: container)
+        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
-            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
-            scroll.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            formRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            pathRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            bodyScroll.widthAnchor.constraint(equalTo: stack.widthAnchor)
+            emptyLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            emptyLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor)
         ])
+
+        let columnStack = makeColumn([headerRow, container], spacing: 6)
+        columnStack.alignment = .leading
+        NSLayoutConstraint.activate([
+            headerRow.widthAnchor.constraint(equalTo: columnStack.widthAnchor),
+            container.widthAnchor.constraint(equalTo: columnStack.widthAnchor)
+        ])
+        container.setContentHuggingPriority(.defaultLow, for: .vertical)
+        view.addSubview(columnStack)
+        columnStack.pinEdges(to: view, insets: NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8))
     }
 
-    /// Перечитывает правила из файла
-    private func reload() {
+    /// Перечитывает правила из файла и перестраивает список
+    func reloadRules() {
         rules = runtime.rulesStore.all()
-        tableView.reloadData()
-        errorLabel.stringValue = ""
+        rebuildRows()
     }
 
-    /// Заполняет форму выбранным правилом
-    @objc private func syncSelectionToForm() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < rules.count else {
-            return
+    /// Открывает форму нового правила, заполненного из записи журнала
+    func addRule(from event: ProxyLogEvent) {
+        var draft = draftRule(from: event)
+        if let firstRule = rules.first {
+            let firstGroup = groupKey(of: firstRule)
+            draft.group = firstGroup == otherGroupKey ? nil : firstGroup
         }
-        let rule = rules[row]
-        patternField.stringValue = rule.urlPattern
-        groupField.stringValue = rule.group ?? ""
-        filePathField.stringValue = rule.localFilePath ?? ""
-        isRegexBox.state = rule.isRegex ? .on : .off
-        delayField.stringValue = rule.delayMs.map(String.init) ?? ""
-        statusField.stringValue = rule.statusCodeOverride.map(String.init) ?? ""
-        bodyView.string = rule.responseBody ?? ""
+        presentForm(rule: nil, draft: draft)
     }
 
-    /// Добавляет пустое правило и сразу сохраняет файл
-    @objc private func addRule() {
-        var rule = Rule(id: UUID().uuidString, enabled: true, urlPattern: "", isRegex: true)
-        rule.group = otherGroupKey
-        rules.append(rule)
-        saveRules()
-        tableView.reloadData()
-        tableView.selectRowIndexes(IndexSet(integer: rules.count - 1), byExtendingSelection: false)
-        syncSelectionToForm()
-    }
-
-    /// Удаляет выбранное правило
-    @objc private func removeRule() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < rules.count else {
-            return
+    /// Строит строки списка: именованные группы по алфавиту, «остальные» в конце
+    private func rebuildRows() {
+        var namedGroups: [String] = []
+        for rule in rules {
+            let key = groupKey(of: rule)
+            if key != otherGroupKey, !namedGroups.contains(key) {
+                namedGroups.append(key)
+            }
         }
-        rules.remove(at: row)
-        saveRules()
-        tableView.reloadData()
-    }
+        namedGroups.sort(by: compareGroupNames)
 
-    /// Включает или выключает выбранное правило
-    @objc private func toggleRule() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < rules.count else {
-            return
+        var result: [Row] = []
+        for key in namedGroups {
+            result.append(.group(key))
+            result.append(contentsOf: rules.filter { groupKey(of: $0) == key }.map { Row.rule($0) })
         }
-        rules[row].enabled.toggle()
-        saveRules()
-        tableView.reloadData()
-    }
-
-    /// Переносит содержимое формы в выбранное правило и сохраняет
-    @objc private func saveEditedRule() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < rules.count else {
-            errorLabel.stringValue = "выберите правило"
-            return
+        let others = rules.filter { groupKey(of: $0) == otherGroupKey }
+        if !others.isEmpty {
+            result.append(.group(otherGroupKey))
+            result.append(contentsOf: others.map { Row.rule($0) })
         }
-        var rule = rules[row]
-        rule.urlPattern = patternField.stringValue
-        rule.isRegex = isRegexBox.state == .on
-        let group = groupField.stringValue
-        rule.group = group.isEmpty ? otherGroupKey : group
-        let filePath = filePathField.stringValue.trimmingCharacters(in: .whitespaces)
-        rule.localFilePath = filePath.isEmpty ? nil : filePath
-        rule.delayMs = Int(delayField.stringValue)
-        rule.statusCodeOverride = Int(statusField.stringValue)
-        let body = bodyView.string
-        rule.responseBody = body.isEmpty ? nil : body
-        rules[row] = rule
-        saveRules()
+        rows = result
         tableView.reloadData()
+        updateHeader()
     }
 
-    /// Открывает rules.json в редакторе по умолчанию
-    @objc private func openRulesFile() {
-        NSWorkspace.shared.open(URL(fileURLWithPath: runtime.rulesStore.filePath))
+    /// Обновляет чекбокс всех правил
+    private func updateHeader() {
+        let enabledCount = rules.filter(\.enabled).count
+        if rules.isEmpty || enabledCount == 0 {
+            selectAllBox.state = .off
+        } else if enabledCount == rules.count {
+            selectAllBox.state = .on
+        } else {
+            selectAllBox.state = .mixed
+        }
+        emptyLabel.isHidden = !rules.isEmpty
     }
 
-    /// Сохраняет набор правил и показывает ошибку валидации
-    private func saveRules() {
+    /// Сохраняет правила в файл и обновляет список
+    private func saveRules(_ next: [Rule]) {
         do {
-            rules = try runtime.rulesStore.saveAll(rules)
-            errorLabel.stringValue = ""
+            rules = try runtime.rulesStore.saveAll(next)
+            rebuildRows()
         } catch {
-            errorLabel.stringValue = error.localizedDescription
+            showAlert("Правило не сохранено", error.localizedDescription)
         }
+    }
+
+    /// Включает или выключает все правила сразу
+    @objc private func toggleAll() {
+        let enableAll = selectAllBox.state != .on
+        var next = rules
+        for index in next.indices {
+            next[index].enabled = enableAll
+        }
+        saveRules(next)
+    }
+
+    /// Открывает форму правила под курсором
+    @objc private func openSelectedRule() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard let rule = rule(at: row) else {
+            return
+        }
+        presentForm(rule: rule, draft: nil)
+    }
+
+    /// Открывает форму нового правила
+    @objc private func createRule() {
+        var draft = Rule(id: UUID().uuidString, enabled: true, urlPattern: "", isRegex: false)
+        if let firstRule = rules.first {
+            let firstGroup = groupKey(of: firstRule)
+            draft.group = firstGroup == otherGroupKey ? nil : firstGroup
+        }
+        presentForm(rule: nil, draft: draft)
+    }
+
+    /// Показывает модальную форму создания или правки правила
+    private func presentForm(rule: Rule?, draft: Rule?) {
+        let sheet = RuleFormSheet(rule: rule, draft: draft, groups: knownGroups())
+        sheet.onSave = { [weak self] saved in
+            self?.upsert(saved, isNew: rule == nil)
+        }
+        sheet.onDelete = { [weak self] deleted in
+            self?.deleteRule(id: deleted.id)
+        }
+        sheet.onDuplicate = { [weak self] source in
+            self?.duplicateRule(source)
+        }
+        presentAsSheet(sheet)
+    }
+
+    /// Добавляет новое правило или обновляет существующее
+    private func upsert(_ rule: Rule, isNew: Bool) {
+        var next = rules
+        if let index = next.firstIndex(where: { $0.id == rule.id }) {
+            next[index] = rule
+        } else {
+            next.append(rule)
+        }
+        if isNew {
+            next = next.filter { $0.id != rule.id } + [rule]
+        }
+        saveRules(next)
+    }
+
+    /// Удаляет правило по идентификатору
+    private func deleteRule(id: String) {
+        saveRules(rules.filter { $0.id != id })
+    }
+
+    /// Создаёт копию правила в той же группе
+    private func duplicateRule(_ source: Rule) {
+        var copy = source
+        copy.id = UUID().uuidString
+        saveRules(rules + [copy])
+    }
+
+    /// Переносит правило в другую группу
+    private func moveRule(id: String, to group: String) {
+        var next = rules
+        guard let index = next.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        next[index].group = group.isEmpty ? nil : group
+        saveRules(next)
+    }
+
+    /// Список групп, которые уже есть в правилах
+    private func knownGroups() -> [String] {
+        var groups: [String] = []
+        for rule in rules {
+            let key = groupKey(of: rule)
+            if key != otherGroupKey, !groups.contains(key) {
+                groups.append(key)
+            }
+        }
+        return groups.sorted(by: compareGroupNames)
+    }
+
+    /// Правило в указанной строке списка
+    private func rule(at row: Int) -> Rule? {
+        guard row >= 0, row < rows.count, case let .rule(rule) = rows[row] else {
+            return nil
+        }
+        return rule
+    }
+
+    /// Показывает модальное сообщение
+    private func showAlert(_ title: String, _ text: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 }
 
-/// Таблица правил
+
 extension RulesViewController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        rules.count
+        rows.count
+    }
+
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        guard row < rows.count, case .rule = rows[row] else {
+            return 24
+        }
+        return 34
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let column = tableColumn, row < rules.count else {
+        guard row < rows.count else {
             return nil
         }
-        let rule = rules[row]
-        let text: String = switch column.identifier.rawValue {
-        case "вкл": rule.enabled ? "✓" : ""
-        case "паттерн": rule.urlPattern
-        case "группа": rule.group ?? ""
-        default: rule.responseBody != nil ? "тело в правиле" : (rule.localFilePath ?? "")
+        switch rows[row] {
+        case let .group(key):
+            let identifier = NSUserInterfaceItemIdentifier("rule-group")
+            let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? RuleGroupCellView
+                ?? RuleGroupCellView(identifier: identifier)
+            cell.apply(key: key)
+            return cell
+        case let .rule(rule):
+            let identifier = NSUserInterfaceItemIdentifier("rule-cell")
+            let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? RuleCellView
+                ?? RuleCellView(identifier: identifier)
+            cell.apply(rule: rule)
+            cell.onToggle = { [weak self] isOn in
+                self?.setEnabled(isOn, ruleId: rule.id)
+            }
+            return cell
         }
-        let cell = NSTextField(labelWithString: text)
-        cell.lineBreakMode = .byTruncatingMiddle
-        cell.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        return cell
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        syncSelectionToForm()
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        let rowView = RuleRowView()
+        guard row < rows.count, case let .rule(rule) = rows[row] else {
+            return rowView
+        }
+        if let body = rule.responseBody, !body.isEmpty {
+            rowView.fillColor = AppTheme.bodyRow
+        } else if let path = rule.localFilePath, !path.isEmpty {
+            rowView.fillColor = AppTheme.fileRow
+        }
+        return rowView
+    }
+
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard row < rows.count, case let .rule(rule) = rows[row] else {
+            return nil
+        }
+        return rule.id as NSString
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        validateDrop info: NSDraggingInfo,
+        proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
+        guard dropOperation == .on else {
+            return []
+        }
+        return .move
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        acceptDrop info: NSDraggingInfo,
+        row: Int,
+        dropOperation: NSTableView.DropOperation
+    ) -> Bool {
+        guard let id = info.draggingPasteboard.string(forType: .string), row >= 0, row < rows.count else {
+            return false
+        }
+        switch rows[row] {
+        case let .group(key):
+            moveRule(id: id, to: key)
+        case let .rule(rule):
+            moveRule(id: id, to: groupKey(of: rule))
+        }
+        return true
     }
 }
+
+extension RulesViewController: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let row = tableView.clickedRow
+        let isRuleRow = rule(at: row) != nil
+        for item in menu.items where item.action != nil {
+            item.isEnabled = isRuleRow
+        }
+    }
+}
+
+
+extension RulesViewController {
+    /// Включает или выключает одно правило
+    func setEnabled(_ enabled: Bool, ruleId: String) {
+        var next = rules
+        guard let index = next.firstIndex(where: { $0.id == ruleId }) else {
+            return
+        }
+        next[index].enabled = enabled
+        saveRules(next)
+    }
+
+    /// Меню правого клика по строке правила
+    func makeContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.delegate = self
+        menu.addItem(withTitle: "Изменить", action: #selector(editRow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Дублировать", action: #selector(duplicateRow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Переместить в группу…", action: #selector(moveRowToGroup), keyEquivalent: "")
+            .target = self
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "Удалить", action: #selector(deleteRow), keyEquivalent: "").target = self
+        return menu
+    }
+
+    /// Открывает форму правила из контекстного меню
+    @objc private func editRow() {
+        guard let rule = rule(at: tableView.clickedRow) else {
+            return
+        }
+        presentForm(rule: rule, draft: nil)
+    }
+
+    /// Дублирует правило из контекстного меню
+    @objc private func duplicateRow() {
+        guard let rule = rule(at: tableView.clickedRow) else {
+            return
+        }
+        duplicateRule(rule)
+    }
+
+    /// Удаляет правило после подтверждения
+    @objc private func deleteRow() {
+        guard let rule = rule(at: tableView.clickedRow) else {
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Удалить правило?"
+        alert.informativeText = rule.urlPattern
+        alert.addButton(withTitle: "Удалить")
+        alert.addButton(withTitle: "Отмена")
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+        deleteRule(id: rule.id)
+    }
+
+    /// Спрашивает группу и переносит в неё правило
+    @objc private func moveRowToGroup() {
+        guard let rule = rule(at: tableView.clickedRow) else {
+            return
+        }
+        let groups = knownGroups() + [otherGroupKey]
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
+        for group in groups {
+            popup.addItem(withTitle: group.isEmpty ? "остальные" : group)
+        }
+        if let index = groups.firstIndex(of: groupKey(of: rule)) {
+            popup.selectItem(at: index)
+        }
+        let alert = NSAlert()
+        alert.messageText = "Переместить правило"
+        alert.informativeText = "Выберите группу для правила"
+        alert.accessoryView = popup
+        alert.addButton(withTitle: "Переместить")
+        alert.addButton(withTitle: "Отмена")
+        guard alert.runModal() == .alertFirstButtonReturn, popup.indexOfSelectedItem >= 0 else {
+            return
+        }
+        moveRule(id: rule.id, to: groups[popup.indexOfSelectedItem])
+    }
+}
+
+
+/// Заголовок группы правил в списке
+@MainActor
+final class RuleGroupCellView: NSView {
+    private let label = makeLabel("", font: AppTheme.groupFont, color: .secondaryLabelColor)
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        addSubview(label)
+        label.pinEdges(to: self, insets: NSEdgeInsets(top: 6, left: 6, bottom: 0, right: 6))
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) не используется")
+    }
+
+    /// Показывает название группы
+    func apply(key: String) {
+        let name = key.isEmpty ? "остальные" : key
+        label.stringValue = name.uppercased()
+    }
+}
+
+/// Строка правила: чекбокс включения, URL-паттерн и вторая строка с деталями подмены
+@MainActor
+final class RuleCellView: NSView {
+    private let checkbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    private let urlLabel = makeLabel("", font: AppTheme.compactBoldFont)
+    private let detailLabel = makeLabel("", font: AppTheme.compactFont, color: .secondaryLabelColor)
+    /// Переключили включение правила
+    var onToggle: ((Bool) -> Void)?
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        checkbox.target = self
+        checkbox.action = #selector(toggle)
+        checkbox.translatesAutoresizingMaskIntoConstraints = false
+
+        urlLabel.lineBreakMode = .byTruncatingTail
+        detailLabel.lineBreakMode = .byTruncatingMiddle
+        let textColumn = makeColumn([urlLabel, detailLabel], spacing: 0)
+        textColumn.alignment = .leading
+
+        addSubview(checkbox)
+        addSubview(textColumn)
+        NSLayoutConstraint.activate([
+            checkbox.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
+            checkbox.widthAnchor.constraint(equalToConstant: 18),
+            textColumn.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 6),
+            textColumn.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            textColumn.centerYAnchor.constraint(equalTo: centerYAnchor)
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) не используется")
+    }
+
+    /// Заполняет строку данными правила
+    func apply(rule: Rule) {
+        checkbox.state = rule.enabled ? .on : .off
+        urlLabel.stringValue = rule.urlPattern
+        urlLabel.textColor = rule.enabled ? .labelColor : .secondaryLabelColor
+        detailLabel.stringValue = detailText(rule)
+        toolTip = rule.localFilePath
+    }
+
+    /// Вторая строка правила: файл подмены, тело в правиле или пометка об отсутствии подмены
+    private func detailText(_ rule: Rule) -> String {
+        if let body = rule.responseBody, !body.isEmpty {
+            return "тело в правиле, \(MetaFormat.size(body.utf8.count))"
+        }
+        if let path = rule.localFilePath, !path.isEmpty {
+            return MetaFormat.stripHome(path)
+        }
+        return "без подмены"
+    }
+
+    @objc private func toggle() {
+        onToggle?(checkbox.state == .on)
+    }
+}
+
+/// Строка списка с фоном по типу подмены правила
+@MainActor
+final class RuleRowView: NSTableRowView {
+    var fillColor: NSColor?
+
+    override func drawBackground(in dirtyRect: NSRect) {
+        guard let fillColor else {
+            super.drawBackground(in: dirtyRect)
+            return
+        }
+        fillColor.setFill()
+        dirtyRect.fill()
+    }
+}
+
+

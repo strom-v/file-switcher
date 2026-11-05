@@ -17,7 +17,7 @@ FileSwitcher - нативное macOS-приложение для перехва
 | `Sources/FileSwitcher/Storage/` | `LogStore` (jsonl-журнал), `LogEvent`, экспорт HAR/JSON/CSV |
 | `Sources/FileSwitcher/System/` | системный прокси macOS, доверие к CA, перечисление сетевых сервисов, запуск `sudo`-команд |
 | `Sources/FileSwitcher/Support/` | пути данных, JSON-файлы, `--system-check`, отладочный прокси |
-| `Sources/FileSwitcher/UI/` | AppKit: `AppDelegate`, окно, контроллеры вкладок "Трафик" и "Правила" |
+| `Sources/FileSwitcher/UI/` | AppKit: `AppDelegate`, единое окно с журналом и правилами (`MainWindowController`), панели, формы правила, деталей и настроек, палитра `AppTheme` |
 | `Tests/FileSwitcherTests/` | Swift Testing, по файлу на модуль |
 
 ## Команды

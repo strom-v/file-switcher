@@ -24,4 +24,35 @@ enum EventFormatter {
         }
         return lines.joined(separator: "\n")
     }
+
+    /// Заголовки в виде "ключ: значение" по одному в строке
+    static func headers(_ headers: [String: String]) -> String {
+        guard !headers.isEmpty else {
+            return "(заголовков нет)"
+        }
+        return headers.keys.sorted().compactMap { key in
+            headers[key].map { "\(key): \($0)" }
+        }.joined(separator: "\n")
+    }
+
+    /// Готовая команда curl для повторной отправки запроса из терминала
+    static func curl(_ event: ProxyLogEvent) -> String {
+        let skipped = ["host", "content-length", "accept-encoding", "connection"]
+        var parts = ["curl"]
+        if event.method != "GET" {
+            parts.append("-X \(event.method)")
+        }
+        for key in event.requestHeaders.keys.sorted() where !skipped.contains(key.lowercased()) {
+            guard let value = event.requestHeaders[key] else {
+                continue
+            }
+            parts.append("-H \(SystemProxyDarwin.shellQuote("\(key): \(value)"))")
+        }
+        if !event.requestBody.isEmpty, !event.requestBodyIsBinary {
+            parts.append("--data-raw \(SystemProxyDarwin.shellQuote(event.requestBody))")
+        }
+        parts.append(SystemProxyDarwin.shellQuote(event.url))
+        return parts.joined(separator: " \\\n  ")
+    }
 }
+

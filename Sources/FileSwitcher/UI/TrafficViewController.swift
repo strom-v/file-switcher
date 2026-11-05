@@ -1,23 +1,40 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// Вкладка трафика: состояние прокси, запуск и остановка, журнал запросов
+/// Панель журнала: поиск, фильтр событий, список запросов и детали выбранной записи
 @MainActor
 final class TrafficViewController: NSViewController {
+    /// Фильтр списка по типу события
+    private enum EventFilter: Int {
+        case all
+        case matched
+    }
+
     private let runtime: AppRuntime
     private var entries: [LogEntryMeta] = []
-    private var filtered: [LogEntryMeta] = []
+    private var visible: [LogEntryMeta] = []
+    /// ts записей, найденных поиском по телам; nil - поиск по телам не активен
+    private var bodyMatches: Set<Double>?
+    private var bodySearchTask: Task<Void, Never>?
 
-    private let statusLabel = NSTextField(labelWithString: "Прокси остановлен")
-    private let certLabel = NSTextField(labelWithString: "")
-    private let vpnLabel = NSTextField(labelWithString: "")
-    private let toggleButton = NSButton(title: "Запустить прокси", target: nil, action: nil)
-    private let portField = NSTextField(string: String(defaultProxyPort))
     private let searchField = NSSearchField()
-    private let searchInBodyBox = NSButton(checkboxWithTitle: "искать в телах", target: nil, action: nil)
-    private let clearButton = NSButton(title: "Очистить список", target: nil, action: nil)
+    private let bodySearchButton = NSButton()
+    private let filterControl = NSSegmentedControl(
+        labels: ["Все", "Подмены"],
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
+    private let countLabel = makeLabel("", font: AppTheme.compactFont, color: .tertiaryLabelColor)
     private let tableView = NSTableView()
-    private let detailView = NSTextView()
+    /// Меню действий с журналом под кнопкой «…»
+    private let actionsMenu = NSMenu()
+    private let emptyLabel = makeLabel("", font: AppTheme.baseFont, color: .secondaryLabelColor)
+
+    /// Создать черновик правила из записи журнала
+    var onCreateRule: ((ProxyLogEvent) -> Void)?
+    /// Показать предупреждение прокси в главном окне
+    var onWarning: ((String) -> Void)?
 
     init(runtime: AppRuntime) {
         self.runtime = runtime
@@ -30,194 +47,228 @@ final class TrafficViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 940, height: 560))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 540, height: 600))
         buildLayout()
         bindRuntime()
-        refreshSystemState()
     }
 
-    /// Собирает панель состояния, поиск и таблицу журнала
+    /// Собирает тулбар поиска, счётчики и список журнала
     private func buildLayout() {
-        guard let view = view as NSView? else {
-            return
-        }
-
-        toggleButton.target = self
-        toggleButton.action = #selector(toggleProxy)
-        toggleButton.bezelStyle = .rounded
-        portField.alignment = .right
-        portField.widthAnchor.constraint(equalToConstant: 70).isActive = true
-
-        clearButton.target = self
-        clearButton.action = #selector(clearLog)
+        searchField.placeholderString = "Поиск по URL или файлу подмены"
+        searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.target = self
         searchField.action = #selector(applySearch)
-        searchField.placeholderString = "фильтр по URL"
-        searchInBodyBox.target = self
-        searchInBodyBox.action = #selector(applySearch)
+        searchField.sendsWholeSearchString = false
 
-        let topRow = NSStackView(views: [toggleButton, NSTextField(labelWithString: "порт:"), portField, statusLabel])
-        topRow.orientation = .horizontal
-        topRow.spacing = 8
+        bodySearchButton.image = AppTheme.symbol("doc.text.magnifyingglass")
+        bodySearchButton.imagePosition = .imageOnly
+        bodySearchButton.isBordered = false
+        bodySearchButton.bezelStyle = .regularSquare
+        bodySearchButton.setButtonType(.toggle)
+        bodySearchButton.toolTip = "Искать и в телах запросов"
+        bodySearchButton.target = self
+        bodySearchButton.action = #selector(applySearch)
+        bodySearchButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            bodySearchButton.widthAnchor.constraint(equalToConstant: 24),
+            bodySearchButton.heightAnchor.constraint(equalToConstant: 22)
+        ])
 
-        let infoRow = NSStackView(views: [certLabel, vpnLabel])
-        infoRow.orientation = .horizontal
-        infoRow.spacing = 16
+        filterControl.selectedSegment = 0
+        filterControl.target = self
+        filterControl.action = #selector(applySearch)
+        filterControl.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        filterControl.translatesAutoresizingMaskIntoConstraints = false
 
-        let exportButton = NSButton(title: "Экспорт журнала", target: self, action: #selector(exportLog))
-        let replayButton = NSButton(title: "Повтор запроса", target: self, action: #selector(replaySelected))
-        let searchRow = NSStackView(views: [searchField, searchInBodyBox, clearButton, exportButton, replayButton])
-        searchRow.orientation = .horizontal
-        searchRow.spacing = 8
+        countLabel.toolTip = "всего записей / подмен"
+        countLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
-        tableView.usesAlternatingRowBackgroundColors = true
+        let replayItem = actionsMenu.addItem(
+            withTitle: "Повторить выбранный запрос",
+            action: #selector(replaySelected),
+            keyEquivalent: ""
+        )
+        replayItem.target = self
+        let exportItem = actionsMenu.addItem(
+            withTitle: "Экспортировать журнал…",
+            action: #selector(exportLog),
+            keyEquivalent: ""
+        )
+        exportItem.target = self
+        actionsMenu.addItem(.separator())
+        let clearItem = actionsMenu.addItem(
+            withTitle: "Очистить список…",
+            action: #selector(clearLog),
+            keyEquivalent: ""
+        )
+        clearItem.target = self
+
+        let actionsButton = makeIconButton(
+            symbol: "ellipsis",
+            tooltip: "Действия с журналом",
+            target: self,
+            action: #selector(showActionsMenu(_:))
+        )
+
+        let searchRow = makeRow(
+            [searchField, bodySearchButton, filterControl, countLabel, actionsButton],
+            spacing: 6
+        )
+        searchRow.distribution = .fill
+
+        tableView.headerView = nil
+        tableView.style = .plain
+        tableView.rowHeight = 28
+        tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.usesAlternatingRowBackgroundColors = false
+        tableView.allowsEmptySelection = true
         tableView.dataSource = self
         tableView.delegate = self
-        for (title, width) in [("время", 80.0), ("событие", 70.0), ("метод", 60.0), ("статус", 60.0), ("размер", 80.0), ("URL", 400.0)] {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(title))
-            column.title = title
-            column.width = width
-            tableView.addTableColumn(column)
-        }
+        tableView.target = self
+        tableView.action = #selector(openSelectedEvent)
+        tableView.menu = makeContextMenu()
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("log"))
+        column.resizingMask = .autoresizingMask
+        tableView.addTableColumn(column)
 
         let scroll = NSScrollView()
         scroll.documentView = tableView
         scroll.hasVerticalScroller = true
-        scroll.borderType = .bezelBorder
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
 
-        detailView.isEditable = false
-        detailView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        let detailScroll = NSScrollView()
-        detailScroll.documentView = detailView
-        detailScroll.hasVerticalScroller = true
-        detailScroll.borderType = .bezelBorder
+        emptyLabel.alignment = .center
 
-        let split = NSSplitView()
-        split.isVertical = false
-        split.dividerStyle = .thin
-        split.addArrangedSubview(scroll)
-        split.addArrangedSubview(detailScroll)
-        split.setHoldingPriority(.defaultLow, forSubviewAt: 1)
-        scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 240).isActive = true
-        detailScroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
-
-        let stack = NSStackView(views: [topRow, infoRow, searchRow, split])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 8
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+        let container = NSView()
+        container.addSubview(scroll)
+        container.addSubview(emptyLabel)
+        scroll.pinEdges(to: container)
+        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -10),
-            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: 10),
-            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -10),
-            split.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            searchField.widthAnchor.constraint(greaterThanOrEqualToConstant: 240)
+            emptyLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            emptyLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            emptyLabel.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 8)
         ])
+
+        let columnStack = makeColumn([searchRow, container], spacing: 6)
+        columnStack.alignment = .leading
+        NSLayoutConstraint.activate([
+            searchRow.widthAnchor.constraint(equalTo: columnStack.widthAnchor),
+            container.widthAnchor.constraint(equalTo: columnStack.widthAnchor)
+        ])
+        container.setContentHuggingPriority(.defaultLow, for: .vertical)
+        view.addSubview(columnStack)
+        columnStack.pinEdges(to: view, insets: NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8))
     }
 
-    /// Подписывается на события прокси
+    /// Подписывается на события прокси и показывает накопленный журнал
     private func bindRuntime() {
         entries = runtime.controller?.recentEntries() ?? []
-        filtered = entries
-        tableView.reloadData()
+        rebuildVisible()
         guard let controller = runtime.controller else {
-            statusLabel.stringValue = runtime.startupError ?? "Прокси недоступен"
-            toggleButton.isEnabled = false
+            emptyLabel.stringValue = runtime.startupError ?? "Прокси недоступен"
             return
-        }
-        controller.onStateChange = { [weak self] state in
-            self?.render(state: state)
         }
         controller.onLogBatch = { [weak self] metas in
             self?.append(metas)
         }
         controller.onWarning = { [weak self] message in
-            self?.detailView.string = message
-        }
-        render(state: controller.state)
-    }
-
-    /// Показывает состояние прокси на панели
-    private func render(state: ProxyState) {
-        switch state.status {
-        case .stopped:
-            statusLabel.stringValue = "остановлен"
-            toggleButton.title = "Запустить прокси"
-        case .starting:
-            statusLabel.stringValue = "запускается на порту \(state.port)"
-            toggleButton.title = "Остановить"
-        case .running:
-            statusLabel.stringValue = "работает на 127.0.0.1:\(state.port)"
-            toggleButton.title = "Остановить"
-        case .crashed:
-            statusLabel.stringValue = state.error ?? "ошибка запуска"
-            toggleButton.title = "Запустить прокси"
+            self?.onWarning?(message)
         }
     }
 
-    /// Подтягивает статус сертификата и VPN
-    private func refreshSystemState() {
-        Task { @MainActor in
-            let certStatus = await CertTrustDarwin.status()
-            certLabel.stringValue = switch certStatus {
-            case .trusted: "CA: доверен"
-            case .notTrusted: "CA: не доверен"
-            case .notGenerated: "CA: нет сертификата"
-            }
-            let vpn = await VpnDetector.status()
-            if vpn.blocksProxy {
-                vpnLabel.stringValue = "VPN: весь трафик мимо системного прокси"
-            } else if vpn.active {
-                vpnLabel.stringValue = "VPN: активен"
-            } else {
-                vpnLabel.stringValue = "VPN: нет"
-            }
-        }
-    }
-
-    /// Запускает или останавливает прокси
-    @objc private func toggleProxy() {
-        guard let controller = runtime.controller else {
+    /// Добавляет новые записи журнала в список
+    private func append(_ metas: [LogEntryMeta]) {
+        guard !metas.isEmpty else {
             return
         }
-        if controller.state.status == .running || controller.state.status == .starting {
-            controller.stop()
-            return
-        }
-        let port = Int(portField.stringValue) ?? defaultProxyPort
-        controller.start(port: port)
+        entries.append(contentsOf: metas)
+        rebuildVisible()
     }
 
-    /// Сбрасывает список в интерфейсе (файл журнала остаётся)
-    @objc private func clearLog() {
-        entries = []
-        filtered = []
+    /// Пересчитывает видимый список: новые записи сверху, с учётом фильтра и поиска
+    private func rebuildVisible() {
+        let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let filter = EventFilter(rawValue: filterControl.selectedSegment) ?? .all
+        var result: [LogEntryMeta] = []
+        for entry in entries.reversed() {
+            // повтор запроса - результат явного действия пользователя, показываем при любом фильтре
+            if filter == .matched, entry.event != .matched, entry.event != .replay {
+                continue
+            }
+            if !query.isEmpty {
+                let matchesUrl = entry.url.lowercased().contains(query)
+                let matchesFile = entry.event == .matched && entry.file.lowercased().contains(query)
+                let matchesBody = bodyMatches?.contains(entry.ts) ?? false
+                if !matchesUrl && !matchesFile && !matchesBody {
+                    continue
+                }
+            }
+            result.append(entry)
+        }
+        visible = result
         tableView.reloadData()
-        detailView.string = ""
+        updateCounters()
     }
 
-    /// Применяет фильтр по URL и телу
+    /// Обновляет счётчик записей и подмен и текст пустого состояния
+    private func updateCounters() {
+        let matchedCount = entries.filter { $0.event == .matched }.count
+        countLabel.stringValue = "\(entries.count) / \(matchedCount)"
+        if visible.isEmpty {
+            emptyLabel.stringValue = entries.isEmpty ? "Записей пока нет" : "Ничего не найдено"
+            emptyLabel.isHidden = false
+        } else {
+            emptyLabel.isHidden = true
+        }
+    }
+
+    /// Открывает меню действий с журналом под кнопкой «…»
+    @objc private func showActionsMenu(_ sender: NSButton) {
+        actionsMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 4), in: sender)
+    }
+
+    /// Применяет поиск: по URL и файлу сразу, по телам - через хранилище журнала
     @objc private func applySearch() {
-        let query = searchField.stringValue
-        let searchInBody = searchInBodyBox.state == .on
-        guard !query.trimmingCharacters(in: .whitespaces).isEmpty, runtime.controller != nil else {
-            filtered = entries
-            tableView.reloadData()
+        bodySearchTask?.cancel()
+        let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard bodySearchButton.state == .on, !query.isEmpty, let controller = runtime.controller else {
+            bodyMatches = nil
+            rebuildVisible()
             return
         }
-        Task { @MainActor in
-            let store = runtime.store
-            let found = await Task.detached(priority: .userInitiated) {
-                store.search(query: query, searchInBody: searchInBody)
-            }.value
-            filtered = found
-            tableView.reloadData()
+        bodySearchTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self, !Task.isCancelled else {
+                return
+            }
+            let found = controller.search(query: query, searchInBody: true)
+            guard !Task.isCancelled else {
+                return
+            }
+            bodyMatches = Set(found.map { $0.ts })
+            rebuildVisible()
         }
     }
 
-    /// Просит файл и экспортирует журнал в HAR, JSON или CSV по расширению
+    /// Очищает журнал в интерфейсе (файл журнала остаётся на диске)
+    @objc private func clearLog() {
+        let filter = EventFilter(rawValue: filterControl.selectedSegment) ?? .all
+        let keepsMatched = filter == .matched
+        let alert = NSAlert()
+        alert.messageText = keepsMatched ? "Убрать из списка записи о подменах?" : "Очистить журнал?"
+        alert.informativeText = "Файл журнала на диске останется - очищается только список в окне."
+        alert.addButton(withTitle: "Очистить")
+        alert.addButton(withTitle: "Отмена")
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+        entries = keepsMatched ? entries.filter { $0.event != .matched } : []
+        rebuildVisible()
+    }
+
+    /// Просит файл и экспортирует журнал в HAR, JSON или CSV по выбранному расширению
     @objc private func exportLog() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "file-switcher-log"
@@ -237,28 +288,61 @@ final class TrafficViewController: NSViewController {
 
     /// Повторяет выбранный запрос мимо прокси и добавляет запись в список
     @objc private func replaySelected() {
-        let row = tableView.selectedRow
-        guard row >= 0, row < filtered.count else {
-            showAlert("Повтор запроса", "Выберите запись в списке")
+        guard let event = eventForAction() else {
             return
         }
-        let meta = filtered[row]
-        guard let event = runtime.store.getEvent(ts: meta.ts) else {
-            showAlert("Повтор запроса", "Запись уже недоступна в файле журнала")
-            return
-        }
+        replay(event)
+    }
+
+    /// Отправляет запрос повторно и показывает результат в журнале
+    private func replay(_ event: ProxyLogEvent) {
         Task { @MainActor in
             do {
                 let replayEvent = try await ReplayRequest.replay(event)
-                let metas = runtime.store.appendBatch([replayEvent])
-                append(metas)
+                append(runtime.store.appendBatch([replayEvent]))
             } catch {
                 showAlert("Не удалось повторить запрос", error.localizedDescription)
             }
         }
     }
 
-    /// Показывает модальное сообщение об ошибке
+    /// Открывает детали записи под курсором
+    @objc private func openSelectedEvent() {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0, row < visible.count else {
+            return
+        }
+        openDetails(for: visible[row].ts)
+    }
+
+
+    /// Показывает модальную панель с заголовками и телами запроса
+    func openDetails(for ts: Double) {
+        guard let event = runtime.controller?.event(ts: ts) else {
+            showAlert("Запись недоступна", "Этой записи больше нет в файле журнала")
+            return
+        }
+        let sheet = LogDetailSheet(event: event)
+        sheet.onCreateRule = { [weak self] logged in
+            self?.onCreateRule?(logged)
+        }
+        sheet.onReplay = { [weak self] logged in
+            self?.replay(logged)
+        }
+        presentAsSheet(sheet)
+    }
+
+    /// Полная запись для строки, по которой вызвали действие, или предупреждение
+    private func eventForAction() -> ProxyLogEvent? {
+        let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
+        guard row >= 0, row < visible.count, let event = runtime.controller?.event(ts: visible[row].ts) else {
+            showAlert("Запись недоступна", "Выберите запись в журнале")
+            return nil
+        }
+        return event
+    }
+
+    /// Показывает модальное сообщение
     private func showAlert(_ title: String, _ text: String) {
         let alert = NSAlert()
         alert.messageText = title
@@ -267,70 +351,187 @@ final class TrafficViewController: NSViewController {
         alert.runModal()
     }
 
-    /// Добавляет пачку записей и прокручивает к последней
-    private func append(_ metas: [LogEntryMeta]) {
-        guard !metas.isEmpty else {
+    /// Меню правого клика по строке журнала
+    private func makeContextMenu() -> NSMenu {
+        let menu = NSMenu()
+        let createItem = menu.addItem(
+            withTitle: "Создать правило подмены",
+            action: #selector(createRuleFromRow),
+            keyEquivalent: ""
+        )
+        createItem.target = self
+        let copyMenu = NSMenu()
+        let copyUrlItem = copyMenu.addItem(withTitle: "Копировать URL", action: #selector(copyUrl), keyEquivalent: "")
+        copyUrlItem.target = self
+        let copyCurlItem = copyMenu.addItem(
+            withTitle: "Копировать как cURL",
+            action: #selector(copyAsCurl),
+            keyEquivalent: ""
+        )
+        copyCurlItem.target = self
+        let copyItem = NSMenuItem(title: "Копировать", action: nil, keyEquivalent: "")
+        copyItem.submenu = copyMenu
+        menu.addItem(copyItem)
+        let replayItem = menu.addItem(withTitle: "Повторить запрос", action: #selector(replayRow), keyEquivalent: "")
+        replayItem.target = self
+        return menu
+    }
+
+    /// Создаёт черновик правила из записи журнала
+    @objc private func createRuleFromRow() {
+        guard let event = eventForAction() else {
             return
         }
-        entries.append(contentsOf: metas)
-        if searchField.stringValue.trimmingCharacters(in: .whitespaces).isEmpty {
-            filtered = entries
+        onCreateRule?(event)
+    }
+
+    /// Копирует URL записи в буфер обмена
+    @objc private func copyUrl() {
+        guard let event = eventForAction() else {
+            return
         }
-        tableView.reloadData()
-        if !filtered.isEmpty {
-            tableView.scrollRowToVisible(filtered.count - 1)
+        copyToClipboard(event.url)
+    }
+
+    /// Копирует запрос в виде готовой команды curl
+    @objc private func copyAsCurl() {
+        guard let event = eventForAction() else {
+            return
         }
+        copyToClipboard(EventFormatter.curl(event))
+    }
+
+    /// Повторяет запрос из контекстного меню
+    @objc private func replayRow() {
+        guard let event = eventForAction() else {
+            return
+        }
+        replay(event)
+    }
+
+    /// Кладёт текст в системный буфер обмена
+    private func copyToClipboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
     }
 }
 
-/// Таблица журнала: строки и выбор записи
 extension TrafficViewController: NSTableViewDataSource, NSTableViewDelegate {
     func numberOfRows(in tableView: NSTableView) -> Int {
-        filtered.count
+        visible.count
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        guard let column = tableColumn, row < filtered.count else {
+        guard row < visible.count else {
             return nil
         }
-        let entry = filtered[row]
-        let identifier = column.identifier
-        let cell = NSTextField(labelWithString: text(for: entry, column: identifier.rawValue))
-        cell.lineBreakMode = .byTruncatingMiddle
-        cell.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        let identifier = NSUserInterfaceItemIdentifier("log-cell")
+        let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? LogCellView
+            ?? LogCellView(identifier: identifier)
+        cell.apply(entry: visible[row])
         return cell
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        let row = tableView.selectedRow
-        guard row >= 0, row < filtered.count, let event = runtime.controller?.event(ts: filtered[row].ts) else {
-            detailView.string = ""
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        let rowView = LogRowView()
+        guard row < visible.count else {
+            return rowView
+        }
+        switch visible[row].event {
+        case .matched:
+            rowView.fillColor = AppTheme.matchedRow
+        case .replay:
+            rowView.fillColor = AppTheme.replayRow
+        case .passed:
+            rowView.fillColor = nil
+        }
+        return rowView
+    }
+}
+
+extension TrafficViewController: NSMenuDelegate {
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        let row = tableView.clickedRow
+        guard row >= 0, row < visible.count else {
             return
         }
-        detailView.string = EventFormatter.describe(event)
-    }
-
-    /// Текст ячейки по названию колонки
-    private func text(for entry: LogEntryMeta, column: String) -> String {
-        switch column {
-        case "время":
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss.SSS"
-            return formatter.string(from: Date(timeIntervalSince1970: entry.ts))
-        case "событие":
-            return switch entry.event {
-            case .matched: "подмена"
-            case .passed: "прошёл"
-            case .replay: "повтор"
-            }
-        case "метод":
-            return entry.method
-        case "статус":
-            return entry.statusCode.map(String.init) ?? "-"
-        case "размер":
-            return "\(entry.responseSize) Б"
-        default:
-            return entry.url
+        // бинарное тело запроса в лог не сохраняется - повторять нечего
+        let canReplay = !visible[row].requestBodyIsBinary
+        for item in menu.items where item.action == #selector(replayRow) {
+            item.isEnabled = canReplay
         }
     }
 }
+
+/// Строка списка журнала: метод, статус, время и URL с файлом подмены
+@MainActor
+final class LogCellView: NSStackView {
+    private let methodLabel = makeLabel("", font: AppTheme.compactBoldFont)
+    private let statusLabel = makeLabel("", font: AppTheme.compactBoldFont)
+    private let timeLabel = makeLabel("", font: AppTheme.compactFont, color: .secondaryLabelColor)
+    private let urlLabel = makeLabel("", font: AppTheme.compactFont)
+
+    init(identifier: NSUserInterfaceItemIdentifier) {
+        super.init(frame: .zero)
+        self.identifier = identifier
+        orientation = .horizontal
+        alignment = .centerY
+        spacing = 6
+        edgeInsets = NSEdgeInsets(top: 0, left: 6, bottom: 0, right: 6)
+
+        methodLabel.alignment = .left
+        statusLabel.alignment = .left
+        methodLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        statusLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        timeLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        urlLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        addArrangedSubview(methodLabel)
+        addArrangedSubview(statusLabel)
+        addArrangedSubview(timeLabel)
+        addArrangedSubview(urlLabel)
+        NSLayoutConstraint.activate([
+            methodLabel.widthAnchor.constraint(equalToConstant: 52),
+            statusLabel.widthAnchor.constraint(equalToConstant: 34),
+            timeLabel.widthAnchor.constraint(equalToConstant: 58)
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) не используется")
+    }
+
+    /// Заполняет строку данными записи журнала
+    func apply(entry: LogEntryMeta) {
+        methodLabel.stringValue = entry.method
+        statusLabel.stringValue = entry.statusCode.map(String.init) ?? "-"
+        statusLabel.textColor = AppTheme.httpStatusColor(entry.statusCode)
+        timeLabel.stringValue = MetaFormat.time(entry.ts)
+        if entry.event == .matched, !entry.file.isEmpty {
+            urlLabel.stringValue = "\(entry.url)  →  \(MetaFormat.stripHome(entry.file))"
+            urlLabel.textColor = .labelColor
+        } else {
+            urlLabel.stringValue = entry.url
+            urlLabel.textColor = .labelColor
+        }
+        toolTip = entry.url
+    }
+}
+
+/// Строка списка с фоном по типу события журнала
+@MainActor
+final class LogRowView: NSTableRowView {
+    var fillColor: NSColor?
+
+    override func drawBackground(in dirtyRect: NSRect) {
+        guard let fillColor else {
+            super.drawBackground(in: dirtyRect)
+            return
+        }
+        fillColor.setFill()
+        dirtyRect.fill()
+    }
+}
+
