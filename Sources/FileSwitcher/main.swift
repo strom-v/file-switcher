@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // Точка входа: самопроверка, прокси без UI (спайк этапа 1) или сообщение о сборке без UI.
@@ -44,5 +45,9 @@ if let flagIndex = arguments.firstIndex(of: "--proxy-only") {
     }
 }
 
-SelfTest.writeError("FileSwitcher: UI ещё не портирован, доступны --selftest и --proxy-only <порт>")
-exit(2)
+// Без флагов запускается приложение с интерфейсом; делегат держим в глобальной переменной -
+// NSApplication.delegate слабая ссылка
+let application = NSApplication.shared
+let applicationDelegate = AppDelegate()
+application.delegate = applicationDelegate
+application.run()

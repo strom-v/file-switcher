@@ -117,6 +117,12 @@ final class ProxyController {
         }
     }
 
+    /// Останавливает прокси и ждёт, пока системный прокси вернётся в исходное состояние
+    func stopAndWait() async {
+        stop()
+        await systemProxyChain.value
+    }
+
     /// Восстанавливает системный прокси после аварийного завершения прошлого запуска
     func recoverStaleSystemProxy() {
         enqueueSystemProxy { [weak self] in
@@ -136,6 +142,11 @@ final class ProxyController {
     /// Последние записи для первичной отрисовки списка
     func recentEntries() -> [LogEntryMeta] {
         store.getRecent()
+    }
+
+    /// Записи, подходящие под фильтр по URL и телу
+    func search(query: String, searchInBody: Bool) -> [LogEntryMeta] {
+        store.search(query: query, searchInBody: searchInBody)
     }
 
     private func setState(_ next: ProxyState) {
