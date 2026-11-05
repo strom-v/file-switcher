@@ -182,18 +182,22 @@ AGENTS.md README.md .gitignore
 
 ### Этап 3. Правила (2 дня)
 
-- [ ] `RuleModel.swift` (Codable, `group`, все модификации), `RuleValidation.swift` (перенос
+- [x] `RuleModel.swift` (Codable, `group`, все модификации), `RuleValidation.swift` (перенос
       `validateRule.ts` + `assertValidRule`), `RuleGroups.swift` (группы, `compareGroupNames`,
-      миграция из пути).
-- [ ] `RegexSafety.swift`: порт `unsafeRegexReason` и `MAX_REGEX_PATTERN_LENGTH` с тестами
+      миграция из пути). (2026-11-05: `Rules/RuleModel.swift`, `Rules/RuleValidation.swift`,
+      `Rules/RuleGroups.swift`; тесты `RuleGroupsValidationTests`.)
+- [x] `RegexSafety.swift`: порт `unsafeRegexReason` и `MAX_REGEX_PATTERN_LENGTH` с тестами
       один-в-один (единственное место, где JS и Swift RegExp расходятся, тесты покрывают все ветки
-      отказа).
-- [ ] `RuleMatcher.swift`: точное совпадение, regex, `$1`, замена из файла (лимит 16 МБ, защита от
+      отказа). (2026-11-05: `Rules/RegexSafety.swift`, тесты `RegexSafetyTests` - 7 кейсов, все ветки отказа)
+- [x] `RuleMatcher.swift`: точное совпадение, regex, `$1`, замена из файла (лимит 16 МБ, защита от
       выхода за каталог), инлайн-тело, contentType, header overrides, `delayMs`,
-      `statusCodeOverride`, кэш по mtime 1 с.
-- [ ] `RulesStore.swift`: чтение/запись с атомарностью, событие "файл повреждён", миграция групп.
+      `statusCodeOverride`, кэш по mtime 1 с. (2026-11-05: `Rules/RuleMatcher.swift`,
+      `Rules/HeaderOverrides.swift`; проверено curl: подмена отдаёт 202, `X-Swapped`, `no-store`)
+- [x] `RulesStore.swift`: чтение/запись с атомарностью, событие "файл повреждён", миграция групп.
+      (2026-11-05: `Rules/RulesStore.swift`, `Support/JsonFile.swift`)
 - [ ] Готово, когда: живые правила из рабочего `rules.json` (saby-подмены) дают на реальном сайте
-      тот же результат, что Electron-версия.
+      тот же результат, что Electron-версия. (проверено на тестовом правиле для example.com;
+      saby-правила требуют VPN и проверяются вручную)
 
 ### Этап 4. Системная интеграция (2 дня)
 

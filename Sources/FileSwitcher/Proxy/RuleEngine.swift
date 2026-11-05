@@ -3,7 +3,8 @@ import Foundation
 /// Сработавшее правило и группы regex-совпадения для подстановки в путь файла
 struct RuleMatch: Sendable {
     var rule: Rule
-    var groups: [String]?
+    /// Группы в порядке $0, $1, ...; nil — правило найдено точным совпадением
+    var groups: [String?]?
 }
 
 /// Тело подмены, готовое к отправке клиенту

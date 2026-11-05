@@ -13,18 +13,18 @@ struct Rule: Codable, Sendable, Equatable, Identifiable {
     var urlPattern: String
     var isRegex: Bool
     /// Группа в списке правил; nil — ещё не мигрировано (определится из пути при загрузке)
-    var group: String?
+    var group: String? = nil
     /// Пусто — запрос идёт на реальный сервер, применяются только остальные модификации
-    var localFilePath: String?
+    var localFilePath: String? = nil
     /// Тело ответа прямо в правиле; приоритетнее localFilePath
-    var responseBody: String?
-    var contentType: String?
-    var requestHeaderOverrides: [HeaderOverride]?
-    var responseHeaderOverrides: [HeaderOverride]?
+    var responseBody: String? = nil
+    var contentType: String? = nil
+    var requestHeaderOverrides: [HeaderOverride]? = nil
+    var responseHeaderOverrides: [HeaderOverride]? = nil
     /// Задержка перед ответом в миллисекундах
-    var delayMs: Int?
+    var delayMs: Int? = nil
     /// Подменяет HTTP-статус ответа
-    var statusCodeOverride: Int?
+    var statusCodeOverride: Int? = nil
 }
 
 /// Файл правил целиком — тот же формат, что у Electron-версии

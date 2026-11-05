@@ -10,11 +10,15 @@ if arguments.contains("--selftest") {
 if let flagIndex = arguments.firstIndex(of: "--proxy") {
     let portIndex = flagIndex + 1
     guard portIndex < arguments.count, let port = Int(arguments[portIndex]) else {
-        SelfTest.writeError("использование: FileSwitcher --proxy <порт>")
+        SelfTest.writeError("использование: FileSwitcher --proxy <порт> [--rules <файл>]")
         exit(2)
     }
+    var rulesFile: URL?
+    if let rulesIndex = arguments.firstIndex(of: "--rules"), rulesIndex + 1 < arguments.count {
+        rulesFile = URL(fileURLWithPath: arguments[rulesIndex + 1])
+    }
     do {
-        try await DebugProxy.run(port: port)
+        try await DebugProxy.run(port: port, rulesFile: rulesFile)
     } catch {
         SelfTest.writeError("прокси не запустился: \(error.localizedDescription)")
         exit(1)

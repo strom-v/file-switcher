@@ -2,17 +2,22 @@ import Foundation
 import NIOCore
 import NIOPosix
 
-/// Прокси без интерфейса: ручной прогон движка на порту (`--proxy <порт>`)
+/// Прокси без интерфейса: ручной прогон движка на порту (`--proxy <порт> [--rules <файл>]`)
 enum DebugProxy {
-    /// Поднимает прокси без правил и пишет события в файл сессии
-    static func run(port: Int) async throws {
+    /// Поднимает прокси и пишет события в файл сессии
+    static func run(port: Int, rulesFile: URL? = nil) async throws {
         let authority = try CertificateAuthority()
         let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         let store = LogStore()
+        let engine: (any RuleEngine)? = rulesFile.map { url in
+            RuleMatcher(rulesFilePath: url) { message in
+                SelfTest.writeError(message)
+            }
+        }
         let server = ProxyServer(
             authority: authority,
             group: group,
-            ruleEngine: nil,
+            ruleEngine: engine,
             onLog: { event in
                 _ = store.appendBatch([event])
             },
