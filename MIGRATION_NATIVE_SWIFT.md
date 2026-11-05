@@ -9,25 +9,25 @@
 Сейчас: Electron-приложение, ~7 300 строк TS/TSX, macOS-only (win/linux уже выпилены в рабочей копии).
 Цель: то же приложение на Swift/AppKit, без Electron, Node и Python.
 
-| Сейчас | Строк | Куда в Swift |
-| --- | --- | --- |
-| `src/main/proxy/proxyServer.ts` | 504 | `Proxy/ProxyServer.swift` + `Proxy/HttpMessage.swift` |
-| `src/main/proxy/certificateAuthority.ts` | 134 | `Proxy/CertificateAuthority.swift` + `Proxy/DerEncoder.swift` |
-| `src/main/proxy/ruleMatcher.ts` | 221 | `Proxy/RuleMatcher.swift` |
-| `src/main/proxyController.ts` | 171 | `Proxy/ProxyController.swift` |
-| `src/main/logStore.ts` | 310 | `Storage/LogStore.swift` + `Storage/LogEvent.swift` |
-| `src/main/logExport.ts` | 159 | `Proxy/LogExport.swift` |
-| `src/main/replayRequest.ts` | 192 | `Proxy/ReplayRequest.swift` |
-| `src/main/rulesStore.ts` | 142 | `Storage/RulesStore.swift` |
-| `src/main/jsonFile.ts` | 38 | `Storage/JsonFile.swift` |
-| `src/main/platform/systemProxy.darwin.ts` | 330 | `System/SystemProxyDarwin.swift` + `System/NetworkServicesDarwin.swift` |
-| `src/main/platform/cert.darwin.ts` | 50 | `System/CertTrustDarwin.swift` |
-| `platform/*vpn*`, `proxySystemConfig.ts`, `certInstaller.ts`, `execAsync.ts` | ~200 | `System/VpnStatus.swift`, `System/SudoersRule.swift`, `ShellCommand.swift` |
-| `src/shared/*` (types, constants, regexSafety, ruleGroups, validateRule, redactedHeaders, schema) | ~500 | `Storage/RuleModel.swift`, `Proxy/RegexSafety.swift`, `Storage/RuleGroups.swift`, `Storage/RuleValidation.swift`, `Proxy/RedactedHeaders.swift` |
-| `src/main/main.ts` + `ipc.ts` | 333 | `main.swift`, `AppDelegate.swift`, `AppMenuPanel.swift` (IPC исчезает вместе с renderer) |
-| `src/preload/preload.ts` | 91 | удаляется (нет процесса-посредника) |
-| `src/renderer/**` (App, 10 компонентов, 6 хуков, i18n, formatters, requestExport, theme, css) | ~2 900 | `UI/*.swift` + `AppLocalization.swift` + `AppTheme.swift` |
-| `test/fixture.js`, `test/rules.json` | - | `Tests/FileSwitcherTests/Fixtures/` |
+| Сейчас                                                                                            | Строк  | Куда в Swift                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/proxy/proxyServer.ts`                                                                   | 504    | `Proxy/ProxyServer.swift` + `Proxy/HttpMessage.swift`                                                                                           |
+| `src/main/proxy/certificateAuthority.ts`                                                          | 134    | `Proxy/CertificateAuthority.swift` + `Proxy/DerEncoder.swift`                                                                                   |
+| `src/main/proxy/ruleMatcher.ts`                                                                   | 221    | `Proxy/RuleMatcher.swift`                                                                                                                       |
+| `src/main/proxyController.ts`                                                                     | 171    | `Proxy/ProxyController.swift`                                                                                                                   |
+| `src/main/logStore.ts`                                                                            | 310    | `Storage/LogStore.swift` + `Storage/LogEvent.swift`                                                                                             |
+| `src/main/logExport.ts`                                                                           | 159    | `Proxy/LogExport.swift`                                                                                                                         |
+| `src/main/replayRequest.ts`                                                                       | 192    | `Proxy/ReplayRequest.swift`                                                                                                                     |
+| `src/main/rulesStore.ts`                                                                          | 142    | `Storage/RulesStore.swift`                                                                                                                      |
+| `src/main/jsonFile.ts`                                                                            | 38     | `Storage/JsonFile.swift`                                                                                                                        |
+| `src/main/platform/systemProxy.darwin.ts`                                                         | 330    | `System/SystemProxyDarwin.swift` + `System/NetworkServicesDarwin.swift`                                                                         |
+| `src/main/platform/cert.darwin.ts`                                                                | 50     | `System/CertTrustDarwin.swift`                                                                                                                  |
+| `platform/*vpn*`, `proxySystemConfig.ts`, `certInstaller.ts`, `execAsync.ts`                      | ~200   | `System/VpnStatus.swift`, `System/SudoersRule.swift`, `ShellCommand.swift`                                                                      |
+| `src/shared/*` (types, constants, regexSafety, ruleGroups, validateRule, redactedHeaders, schema) | ~500   | `Storage/RuleModel.swift`, `Proxy/RegexSafety.swift`, `Storage/RuleGroups.swift`, `Storage/RuleValidation.swift`, `Proxy/RedactedHeaders.swift` |
+| `src/main/main.ts` + `ipc.ts`                                                                     | 333    | `main.swift`, `AppDelegate.swift`, `AppMenuPanel.swift` (IPC исчезает вместе с renderer)                                                        |
+| `src/preload/preload.ts`                                                                          | 91     | удаляется (нет процесса-посредника)                                                                                                             |
+| `src/renderer/**` (App, 10 компонентов, 6 хуков, i18n, formatters, requestExport, theme, css)     | ~2 900 | `UI/*.swift` + `AppLocalization.swift` + `AppTheme.swift`                                                                                       |
+| `test/fixture.js`, `test/rules.json`                                                              | -      | `Tests/FileSwitcherTests/Fixtures/`                                                                                                             |
 
 Поведение, которое должно сохраниться 1:1: перехват HTTPS через CONNECT с подменой тела ответа,
 правила (exact/regex, группы, приоритет, подстановка `$1`), модификации заголовков, `delayMs`,
@@ -88,14 +88,14 @@ HAR/JSON/CSV, повтор запроса из журнала, системны�
 
 ## 4. Совместимость данных
 
-| Данные | Путь | Формат |
-| --- | --- | --- |
-| Правила | `~/Library/Application Support/FileSwitcher/rules.json` | `{ "rules": [...] }`, отступ 2, атомарная запись (tmp + rename) |
-| Журнал | `~/Library/Application Support/FileSwitcher/traffic-logs/traffic-<epoch-ms>.jsonl` | один `ProxyLogEvent` на строку; 100 МБ на файл, 20 файлов, индекс 200 000 записей, в UI последние 2 000 |
-| Системный прокси | `~/Library/Application Support/FileSwitcher/proxy-system-state.json` | `service -> {webEnabled, webServer, webPort, secureWebEnabled, secureWebServer, secureWebPort}` |
-| CA | `~/.mitmproxy/mitmproxy-ca.pem`, `~/.mitmproxy/mitmproxy-ca-cert.pem` | PEM, ключ + сертификат, права 0600 |
-| Sudoers | `/etc/sudoers.d/filesswitcher-networksetup` | те же четыре подкоманды `networksetup` |
-| Настройки UI (новое) | `UserDefaults` домена `com.fileswitcher.app` | порт, тема, язык, размер панелей, онбординг |
+| Данные               | Путь                                                                               | Формат                                                                                                  |
+| -------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Правила              | `~/Library/Application Support/FileSwitcher/rules.json`                            | `{ "rules": [...] }`, отступ 2, атомарная запись (tmp + rename)                                         |
+| Журнал               | `~/Library/Application Support/FileSwitcher/traffic-logs/traffic-<epoch-ms>.jsonl` | один `ProxyLogEvent` на строку; 100 МБ на файл, 20 файлов, индекс 200 000 записей, в UI последние 2 000 |
+| Системный прокси     | `~/Library/Application Support/FileSwitcher/proxy-system-state.json`               | `service -> {webEnabled, webServer, webPort, secureWebEnabled, secureWebServer, secureWebPort}`         |
+| CA                   | `~/.mitmproxy/mitmproxy-ca.pem`, `~/.mitmproxy/mitmproxy-ca-cert.pem`              | PEM, ключ + сертификат, права 0600                                                                      |
+| Sudoers              | `/etc/sudoers.d/filesswitcher-networksetup`                                        | те же четыре подкоманды `networksetup`                                                                  |
+| Настройки UI (новое) | `UserDefaults` домена `com.fileswitcher.app`                                       | порт, тема, язык, размер панелей, онбординг                                                             |
 
 `ts` записи журнала - секунды с долями (идентификатор записи, точность важнее читаемости).
 Группы правил остаются как есть: `Rule.group`, миграция `undefined -> группа из пути` при чтении.
@@ -162,15 +162,23 @@ AGENTS.md README.md .gitignore
 
 ### Этап 2. Ядро прокси без правил (2-3 дня)
 
-- [ ] `HttpMessage.swift`: разбор absolute-form и CONNECT, hop-by-hop заголовки, редактирование
-      секретных заголовков, лимиты заголовков.
-- [ ] `ProxyServer.swift`: keep-alive, потоковая передача, `Upgrade`/WebSocket passthrough, ошибки
-      апстрима (502), битые запросы.
-- [ ] `ProxyController.swift`: `stopped/starting/running/crashed`, занятый порт, батчи событий 50 мс.
-- [ ] `LogStore.swift` + `LogEvent.swift`: JSONL в существующий путь и формат, индекс, обрезка файлов,
-      предупреждения о потолке и сбое записи.
-- [ ] Готово, когда: браузерный трафик идёт через прокси, а журнал в том же формате читается
-      Electron-версией без ошибок.
+- [x] `HttpMessage.swift`: разбор absolute-form и CONNECT, hop-by-hop заголовки, редактирование
+      секретных заголовков, лимиты заголовков. (2026-11-05, `HttpMessage.swift`, `RawRequestHead.swift`,
+      `RedactedHeaders.swift`)
+- [x] `ProxyServer.swift`: keep-alive, потоковая передача, `Upgrade`/WebSocket passthrough, ошибки
+      апстрима (502), битые запросы. (2026-11-05: `ProxyServer.swift`, `OuterHeadHandler.swift`,
+      `TunnelHeadHandler.swift`, `RawTunnel.swift`, `ProxyConnectionHandler.swift`, `ProxyPipeline.swift`.
+      Проверено curl: https 200, keep-alive одно соединение, 3 МБ на 6 МБ/с, http 200.
+      Апстрим открывается на запрос, без пула соединений - `shortcut:` в плане оптимизации;
+      `Upgrade` на втором и следующих запросах одного соединения не перехватывается.)
+- [x] `ProxyController.swift`: `stopped/starting/running/crashed`, занятый порт, батчи событий 50 мс.
+      (2026-11-05: `ProxyController.swift`, `ProxyState.swift`; системный прокси подключается
+      протоколом `SystemProxyControlling` - реализация на этапе 4.)
+- [x] `LogStore.swift` + `LogEvent.swift`: JSONL в существующий путь и формат, индекс, обрезка файлов,
+      предупреждения о потолке и сбое записи. (2026-11-05: `Storage/LogStore.swift`,
+      `Storage/LogEvent.swift`, `Support/AppPaths.swift`; тесты `LogStoreTests`.)
+- [x] Готово, когда: браузерный трафик идёт через прокси, а журнал в том же формате читается
+      Electron-версией без ошибок. (записи журнала сверены с форматом `traffic-*.jsonl` Electron-версии)
 
 ### Этап 3. Правила (2 дня)
 
@@ -259,20 +267,20 @@ AGENTS.md README.md .gitignore
 
 Каждый бывший vitest-файл получает пару в `Tests/FileSwitcherTests/` (swift-testing):
 
-| Было | Станет |
-| --- | --- |
-| `ruleMatcher.test.ts` | `RuleMatcherTests.swift` |
-| `regexSafety.test.ts` | `RegexSafetyTests.swift` |
-| `ruleGroups.test.ts` | `RuleGroupsTests.swift` |
-| `ruleSchema.test.ts` + `validateRule.test.ts` | `RuleValidationTests.swift` |
-| `logStore.test.ts` | `LogStoreTests.swift` |
-| `logExport.test.ts` | `LogExportTests.swift` |
-| `proxyServer.test.ts` | `ProxyServerTests.swift` (loopback, без внешней сети) |
-| `proxyController.test.ts` | `ProxyControllerTests.swift` |
-| `systemProxy.test.ts` | `NetworkServicesParsingTests.swift` (парсинг вывода `networksetup`, без изменения системы) |
-| `formatters.test.ts` | `FormattersTests.swift` |
-| `requestExport.test.ts` | `ReplayRequestTests.swift` |
-| - | `DerEncoderTests.swift`, `CertificateAuthorityTests.swift` (новое) |
+| Было                                          | Станет                                                                                     |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `ruleMatcher.test.ts`                         | `RuleMatcherTests.swift`                                                                   |
+| `regexSafety.test.ts`                         | `RegexSafetyTests.swift`                                                                   |
+| `ruleGroups.test.ts`                          | `RuleGroupsTests.swift`                                                                    |
+| `ruleSchema.test.ts` + `validateRule.test.ts` | `RuleValidationTests.swift`                                                                |
+| `logStore.test.ts`                            | `LogStoreTests.swift`                                                                      |
+| `logExport.test.ts`                           | `LogExportTests.swift`                                                                     |
+| `proxyServer.test.ts`                         | `ProxyServerTests.swift` (loopback, без внешней сети)                                      |
+| `proxyController.test.ts`                     | `ProxyControllerTests.swift`                                                               |
+| `systemProxy.test.ts`                         | `NetworkServicesParsingTests.swift` (парсинг вывода `networksetup`, без изменения системы) |
+| `formatters.test.ts`                          | `FormattersTests.swift`                                                                    |
+| `requestExport.test.ts`                       | `ReplayRequestTests.swift`                                                                 |
+| -                                             | `DerEncoderTests.swift`, `CertificateAuthorityTests.swift` (новое)                         |
 
 Плюс `--selftest` в собранном бандле - то, что CI гоняет после упаковки. Логика правил и журнала
 тестируется без сети и без изменения системных настроек; всё, что требует Touch ID и админского
@@ -280,15 +288,15 @@ AGENTS.md README.md .gitignore
 
 ## 8. Риски и запасные варианты
 
-| Риск | Как снимаем | Запасной вариант |
-| --- | --- | --- |
-| Dynamic TLS upgrade в SwiftNIO не заработает | спайк этапа 1 со стоп-условием | отдельный C-таргет с BoringSSL; либо обсудить гибрид (нативное UI + прокси на Node) - ломает цель, решает Виталий |
-| Существующий mitmproxy-CA не читается (формат ключа, issuer байтами) | тесты на реальном файле из `~/.mitmproxy`, `security verify-cert` | выпускать свой CA в каталоге приложения и один раз переустановить доверие |
-| Корпоративный MITM-CA стендов не принимается доверием NIOSSL | проверить на реальном стенде saby | валидация цепочки апстрима через `SecTrustEvaluateWithError` |
-| Нет dev-цикла: каждая правка UI - это `./install-app.sh` | быстрый `--selftest` для логики, ручные проверки пачками | терпим, как в Vistrom |
-| Регрессии на реальном трафике (chunked, gzip, SSE, WebSocket, редиректы) | чек-лист этапа 0, ручной прогон на saby | passthrough-режим для проблемных хостов |
-| Журнал на сотни тысяч строк тормозит таблицу | батчи и лимит 2 000 строк в UI, как сейчас | виртуализация строк силами `NSTableView` |
-| Потеря правил при переключении версий | формат и путь не меняются, атомарная запись | тег `electron-legacy` для отката |
+| Риск                                                                     | Как снимаем                                                       | Запасной вариант                                                                                                  |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Dynamic TLS upgrade в SwiftNIO не заработает                             | спайк этапа 1 со стоп-условием                                    | отдельный C-таргет с BoringSSL; либо обсудить гибрид (нативное UI + прокси на Node) - ломает цель, решает Виталий |
+| Существующий mitmproxy-CA не читается (формат ключа, issuer байтами)     | тесты на реальном файле из `~/.mitmproxy`, `security verify-cert` | выпускать свой CA в каталоге приложения и один раз переустановить доверие                                         |
+| Корпоративный MITM-CA стендов не принимается доверием NIOSSL             | проверить на реальном стенде saby                                 | валидация цепочки апстрима через `SecTrustEvaluateWithError`                                                      |
+| Нет dev-цикла: каждая правка UI - это `./install-app.sh`                 | быстрый `--selftest` для логики, ручные проверки пачками          | терпим, как в Vistrom                                                                                             |
+| Регрессии на реальном трафике (chunked, gzip, SSE, WebSocket, редиректы) | чек-лист этапа 0, ручной прогон на saby                           | passthrough-режим для проблемных хостов                                                                           |
+| Журнал на сотни тысяч строк тормозит таблицу                             | батчи и лимит 2 000 строк в UI, как сейчас                        | виртуализация строк силами `NSTableView`                                                                          |
+| Потеря правил при переключении версий                                    | формат и путь не меняются, атомарная запись                       | тег `electron-legacy` для отката                                                                                  |
 
 ## 9. Что Виталий проверяет лично
 
@@ -303,18 +311,18 @@ AGENTS.md README.md .gitignore
 
 ## 10. Оценка
 
-| Этап | Дней |
-| --- | --- |
-| 0. Предусловия | 0.5 |
-| 1. Каркас и спайк MITM | 1-2 |
-| 2. Ядро прокси | 2-3 |
-| 3. Правила | 2 |
-| 4. Системная интеграция | 2 |
-| 5. UI | 4-6 |
-| 6. Экспорт и повтор | 1-2 |
-| 7. Сборка и выпуск | 1 |
-| 8. Вывод Electron | 0.5-1 |
-| **Итого** | **14-19** |
+| Этап                    | Дней      |
+| ----------------------- | --------- |
+| 0. Предусловия          | 0.5       |
+| 1. Каркас и спайк MITM  | 1-2       |
+| 2. Ядро прокси          | 2-3       |
+| 3. Правила              | 2         |
+| 4. Системная интеграция | 2         |
+| 5. UI                   | 4-6       |
+| 6. Экспорт и повтор     | 1-2       |
+| 7. Сборка и выпуск      | 1         |
+| 8. Вывод Electron       | 0.5-1     |
+| **Итого**               | **14-19** |
 
 Ожидаемый объём: 4 500-5 500 строк Swift вместе с тестами против 7 300 строк TS/TSX - уходят
 renderer, preload, IPC и bindings, добавляются DER-энкодер и TLS-обвязка.

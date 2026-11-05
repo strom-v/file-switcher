@@ -26,7 +26,11 @@ let package = Package(
         ),
         .testTarget(
             name: "FileSwitcherTests",
-            dependencies: ["FileSwitcher"]
+            dependencies: [
+                "FileSwitcher",
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio")
+            ]
         )
     ],
     swiftLanguageModes: [.v6]

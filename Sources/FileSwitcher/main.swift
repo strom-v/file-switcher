@@ -7,6 +7,20 @@ if arguments.contains("--selftest") {
     SelfTest.runAndExit()
 }
 
+if let flagIndex = arguments.firstIndex(of: "--proxy") {
+    let portIndex = flagIndex + 1
+    guard portIndex < arguments.count, let port = Int(arguments[portIndex]) else {
+        SelfTest.writeError("использование: FileSwitcher --proxy <порт>")
+        exit(2)
+    }
+    do {
+        try await DebugProxy.run(port: port)
+    } catch {
+        SelfTest.writeError("прокси не запустился: \(error.localizedDescription)")
+        exit(1)
+    }
+}
+
 if let flagIndex = arguments.firstIndex(of: "--proxy-only") {
     let portIndex = flagIndex + 1
     guard portIndex < arguments.count, let port = Int(arguments[portIndex]) else {
