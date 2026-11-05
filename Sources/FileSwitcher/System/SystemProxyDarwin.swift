@@ -161,7 +161,7 @@ final class SystemProxyDarwin: SystemProxyControlling, @unchecked Sendable {
         let escaped = script
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        try await ProcessRunner.run(
+        _ = try await ProcessRunner.run(
             "/usr/bin/osascript",
             ["-e", "do shell script \"\(escaped)\" with administrator privileges"]
         )

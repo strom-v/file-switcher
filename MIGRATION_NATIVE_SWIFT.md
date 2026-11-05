@@ -252,26 +252,36 @@ AGENTS.md README.md .gitignore
 ### Этап 6. Экспорт и повтор запроса (1-2 дня)
 
 - [ ] `LogExport.swift`: HAR 1.2 / JSON / CSV, потоково, те же поля и предупреждение о секретах.
-- [ ] `ReplayRequest.swift`: повтор из записи напрямую на сервер (не через прокси), таймаут 15 с,
+- [x] `ExportPanel`/`LogExport.swift`: HAR, JSON, CSV (этап 6, коммит 8214082).
+- [x] `ReplayRequest.swift`: повтор из записи напрямую на сервер (не через прокси), таймаут 15 с,
       до 5 редиректов, потолок тела 8 МБ, отбрасывание forbidden-заголовков, защита от приватных
-      адресов (SSRF), запись `event: replay` в тот же журнал.
-- [ ] Готово, когда: HAR открывается в Chrome DevTools, CSV - в Numbers, повтор даёт тот же ответ,
-      что исходный запрос.
+      адресов (SSRF), запись `event: replay` в тот же журнал. Кнопки «Экспорт журнала» и
+      «Повтор запроса» - в строке поиска вкладки «Трафик».
+- [x] Готово, когда: HAR открывается в Chrome DevTools, CSV - в Numbers, повтор даёт тот же ответ,
+      что исходный запрос. Проверено юнит-тестами (`LogExportTests`, `ReplayRequestTests`);
+      открытие HAR в DevTools и повтор живого запроса - ручная проверка Виталия.
 
 ### Этап 7. Сборка и выпуск как у Vistrom (1 день)
 
-- [ ] `Info.plist`, `FileSwitcher.entitlements`, `FileSwitcher.icns`, `--selftest` (matcher, regex,
-      журнал, экспорт, выпуск сертификата, loopback-запрос через прокси).
-- [ ] `package-app.sh`: `swift build -c release --arch arm64 --arch x86_64`, сборка бандла,
+- [x] `Info.plist`, `--selftest` (matcher, regex, журнал, экспорт, выпуск сертификата,
+      loopback-запрос через прокси - набор был с этапа 4, `--selftest` проходит из бандла).
+      `FileSwitcher.entitlements` и `FileSwitcher.icns` не заведены: приложение вне sandbox,
+      иконки пока нет.
+- [x] `package-app.sh`: `swift build -c release --arch arm64 --arch x86_64`, сборка бандла,
       `codesign --force --options runtime`, `plutil -lint`, `ditto` в `dist/FileSwitcher.zip`.
       Подпись: ad-hoc (`-`) по умолчанию, переопределяется `CODE_SIGN_IDENTITY`.
-- [ ] `install-app.sh`: сборка -> `--selftest` -> остановка запущенной копии -> `/Applications` ->
+- [x] `install-app.sh`: сборка -> `--selftest` -> остановка запущенной копии -> `/Applications` ->
       `open` (правило "одна копия по одному пути" из Vistrom).
-- [ ] `release.sh`: версия в `Info.plist`, коммит, пуш, архив, `gh release`, предыдущие релизы в
-      prerelease.
-- [ ] CI на `macos-26`: `swift test`, `swift build -c release -Xswiftc -warnings-as-errors`,
-      `package-app.sh` + `--selftest` с `CODE_SIGN_IDENTITY: "-"`.
+- [x] `release.sh`: версия в `Info.plist`, коммит, тег, пуш, архив, `gh release`, предыдущие
+      релизы в prerelease.
+- [x] CI-джоба `swift` на `macos-26`: `swift build`, `swift test`, `package-app.sh` с
+      `CODE_SIGN_IDENTITY: "-"`, `--selftest` из бандла. Без `-warnings-as-errors`: swift-nio-ssl
+      объявляет `@available(*, unavailable) extension NIOSSLHandler: Sendable`, поэтому 3
+      предупреждения про Sendable неустранимы на нашей стороне (RawTunnel, ProxySpike,
+      ProxyConnectionHandler). Остальные предупреждения вычищены, deprecated `NIOAny`-записи
+      переведены на типизированный `write`.
 - [ ] Готово, когда: чистый клон собирается `./install-app.sh` без Node и Python, CI зелёный.
+      Не проверял в чистом клоне.
 
 ### Этап 8. Вывод Electron (0.5-1 день)
 

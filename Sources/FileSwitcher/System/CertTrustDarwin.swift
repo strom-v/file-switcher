@@ -26,7 +26,7 @@ enum CertTrustDarwin {
     /// Устанавливает доверие к CA: macOS сам запрашивает пароль или Touch ID в user keychain
     static func install() async throws {
         try CertificateAuthority.ensureCAExists()
-        try await ProcessRunner.run("/usr/bin/security", ["add-trusted-cert", "-r", "trustRoot", certificatePath])
+        _ = try await ProcessRunner.run("/usr/bin/security", ["add-trusted-cert", "-r", "trustRoot", certificatePath])
     }
 
     /// Убирает доверие к CA (файл сертификата не удаляет)
@@ -34,7 +34,7 @@ enum CertTrustDarwin {
         guard FileManager.default.fileExists(atPath: certificatePath) else {
             throw CertTrustError.certificateMissing
         }
-        try await ProcessRunner.run("/usr/bin/security", ["remove-trusted-cert", certificatePath])
+        _ = try await ProcessRunner.run("/usr/bin/security", ["remove-trusted-cert", certificatePath])
     }
 }
 

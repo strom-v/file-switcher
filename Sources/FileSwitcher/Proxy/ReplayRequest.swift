@@ -54,7 +54,7 @@ enum ReplayRequest {
             requestHeaders[name] = value
         }
 
-        var session = URLSessionConfiguration.ephemeral
+        let session = URLSessionConfiguration.ephemeral
         session.timeoutIntervalForRequest = timeout
         session.timeoutIntervalForResource = timeout
         session.httpCookieStorage = nil
@@ -208,7 +208,8 @@ extension ReplayRequest {
                     if let address = current.pointee.ai_addr {
                         var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
                         if getnameinfo(address, current.pointee.ai_addrlen, &buffer, socklen_t(buffer.count), nil, 0, NI_NUMERICHOST) == 0 {
-                            addresses.append(String(cString: buffer))
+                            let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+                            addresses.append(String(decoding: bytes, as: UTF8.self))
                         }
                     }
                     pointer = current.pointee.ai_next

@@ -71,7 +71,7 @@ final class OuterHeadHandler: ChannelInboundHandler, @unchecked Sendable {
     private func startPlainHTTP(context: ChannelHandlerContext, head: RawRequestHead) {
         let absolute = parseAbsoluteForm(head.uri)
         phase = .handedOff
-        var payload = buffer
+        let payload = buffer
         buffer = ByteBuffer()
         if head.isUpgrade {
             guard let absolute else {
@@ -79,7 +79,7 @@ final class OuterHeadHandler: ChannelInboundHandler, @unchecked Sendable {
                 return
             }
             let headBytes = serializeRawRequestHead(head, path: absolute.path)
-            RawTunnel.start(context: context, setup: setup, target: absolute.target, headBytes: headBytes, leftover: payload)
+            _ = RawTunnel.start(context: context, setup: setup, target: absolute.target, headBytes: headBytes, leftover: payload)
             return
         }
         let forwarded = payload

@@ -38,3 +38,18 @@ jobs:
       - run: pip install -r requirements-dev.txt
 
       - run: python -m pytest resources/ -q
+
+  swift:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: swift build
+
+      - run: swift test
+
+      - run: ./package-app.sh
+        env:
+          CODE_SIGN_IDENTITY: '-'
+
+      - run: ./build/FileSwitcher.app/Contents/MacOS/FileSwitcher --selftest

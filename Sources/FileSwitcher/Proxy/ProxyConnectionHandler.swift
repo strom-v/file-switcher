@@ -173,7 +173,11 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
                 handlers.append(HTTPRequestEncoder())
                 handlers.append(ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes)))
                 handlers.append(UpstreamResponseHandler(client: clientChannel, owner: self))
-                return channel.pipeline.addHandlers(handlers)
+                let pipeline = channel.pipeline
+                for handler in handlers {
+                    _ = pipeline.addHandler(handler)
+                }
+                return pipeline.eventLoop.makeSucceededVoidFuture()
             }
         bootstrap.connect(host: target.host, port: target.port).whenComplete { [self] result in
             clientChannel.eventLoop.execute { [self] in
@@ -238,11 +242,11 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             status: HTTPResponseStatus(statusCode: statusCode),
             headers: HTTPHeaders(pairs)
         )
-        clientChannel.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
+        _ = clientChannel.write(HTTPServerResponsePart.head(responseHead))
         var buffer = clientChannel.allocator.buffer(capacity: swapped.body.count)
         buffer.writeBytes(swapped.body)
-        clientChannel.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
-        clientChannel.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+        _ = clientChannel.write(HTTPServerResponsePart.body(.byteBuffer(buffer)))
+        clientChannel.writeAndFlush(HTTPServerResponsePart.end(nil)).whenFailure { _ in }
 
         responseBody = BodyCapture()
         responseBody.add(bytes: swapped.body)
@@ -260,11 +264,11 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
         headers.add(name: "Content-Type", value: "text/plain; charset=utf-8")
         headers.add(name: "Content-Length", value: String(body.count))
         headers.add(name: "Connection", value: "close")
-        clientChannel.write(NIOAny(HTTPServerResponsePart.head(HTTPResponseHead(version: .http1_1, status: status, headers: headers))), promise: nil)
+        _ = clientChannel.write(HTTPServerResponsePart.head(HTTPResponseHead(version: .http1_1, status: status, headers: headers)))
         var buffer = clientChannel.allocator.buffer(capacity: body.count)
         buffer.writeBytes(body)
-        clientChannel.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
-        let written = clientChannel.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)))
+        _ = clientChannel.write(HTTPServerResponsePart.body(.byteBuffer(buffer)))
+        let written = clientChannel.writeAndFlush(HTTPServerResponsePart.end(nil))
         written.whenComplete { _ in
             clientChannel.close(promise: nil)
         }
@@ -281,9 +285,9 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             onUpstreamHead(head: responseHead)
         case let .body(buffer):
             responseBody.add(buffer)
-            clientChannel.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+            _ = clientChannel.write(HTTPServerResponsePart.body(.byteBuffer(buffer)))
         case .end:
-            clientChannel.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil)), promise: nil)
+            clientChannel.writeAndFlush(HTTPServerResponsePart.end(nil)).whenFailure { _ in }
             log(
                 event: match != nil ? .matched : .passed,
                 file: "",
@@ -308,7 +312,7 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             status: HTTPResponseStatus(statusCode: statusCode),
             headers: HTTPHeaders(pairs)
         )
-        clientChannel?.write(NIOAny(HTTPServerResponsePart.head(clientHead)), promise: nil)
+        _ = clientChannel?.write(HTTPServerResponsePart.head(clientHead))
     }
 
     /// Запрос завершён: соединение либо ждёт следующий, либо закрывается
