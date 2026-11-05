@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 
 /// Вкладка трафика: состояние прокси, запуск и остановка, журнал запросов
 @MainActor
@@ -63,7 +64,9 @@ final class TrafficViewController: NSViewController {
         infoRow.orientation = .horizontal
         infoRow.spacing = 16
 
-        let searchRow = NSStackView(views: [searchField, searchInBodyBox, clearButton])
+        let exportButton = NSButton(title: "Экспорт журнала", target: self, action: #selector(exportLog))
+        let replayButton = NSButton(title: "Повтор запроса", target: self, action: #selector(replaySelected))
+        let searchRow = NSStackView(views: [searchField, searchInBodyBox, clearButton, exportButton, replayButton])
         searchRow.orientation = .horizontal
         searchRow.spacing = 8
 
@@ -212,6 +215,56 @@ final class TrafficViewController: NSViewController {
             filtered = found
             tableView.reloadData()
         }
+    }
+
+    /// Просит файл и экспортирует журнал в HAR, JSON или CSV по расширению
+    @objc private func exportLog() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "file-switcher-log"
+        panel.allowedContentTypes = LogExportFormat.allCases.compactMap { format in
+            UTType(filenameExtension: format.rawValue)
+        }
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return
+        }
+        let format = LogExportFormat(rawValue: url.pathExtension.lowercased()) ?? .json
+        do {
+            try LogExport.stream(sourcePath: runtime.store.filePath, destinationPath: url.path, format: format)
+        } catch {
+            showAlert("Не удалось экспортировать журнал", error.localizedDescription)
+        }
+    }
+
+    /// Повторяет выбранный запрос мимо прокси и добавляет запись в список
+    @objc private func replaySelected() {
+        let row = tableView.selectedRow
+        guard row >= 0, row < filtered.count else {
+            showAlert("Повтор запроса", "Выберите запись в списке")
+            return
+        }
+        let meta = filtered[row]
+        guard let event = runtime.store.getEvent(ts: meta.ts) else {
+            showAlert("Повтор запроса", "Запись уже недоступна в файле журнала")
+            return
+        }
+        Task { @MainActor in
+            do {
+                let replayEvent = try await ReplayRequest.replay(event)
+                let metas = runtime.store.appendBatch([replayEvent])
+                append(metas)
+            } catch {
+                showAlert("Не удалось повторить запрос", error.localizedDescription)
+            }
+        }
+    }
+
+    /// Показывает модальное сообщение об ошибке
+    private func showAlert(_ title: String, _ text: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = text
+        alert.alertStyle = .warning
+        alert.runModal()
     }
 
     /// Добавляет пачку записей и прокручивает к последней
