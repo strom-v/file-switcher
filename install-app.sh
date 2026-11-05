@@ -16,6 +16,6 @@ BIN_DIR="$(swift build -c release --show-bin-path)"
 osascript -e "tell application \"${APP_NAME}\" to quit" >/dev/null 2>&1 || true
 sleep 1
 rm -rf "$TARGET"
-cp -R "build/${APP_NAME}.app" "$TARGET"
+cp -R "dist/${APP_NAME}.app" "$TARGET"
 open "$TARGET"
 echo "установлено: ${TARGET}"

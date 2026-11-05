@@ -1,9 +1,0 @@
-.venv/
-__pycache__/
-node_modules/
-dist/
-out/
-build/
-resources/bin/
-*.tsbuildinfo
-package-lock.json

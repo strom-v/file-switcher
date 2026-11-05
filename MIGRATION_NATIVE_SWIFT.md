@@ -251,7 +251,7 @@ AGENTS.md README.md .gitignore
 
 ### Этап 6. Экспорт и повтор запроса (1-2 дня)
 
-- [ ] `LogExport.swift`: HAR 1.2 / JSON / CSV, потоково, те же поля и предупреждение о секретах.
+- [x] `LogExport.swift`: HAR 1.2 / JSON / CSV, потоково, те же поля и предупреждение о секретах.
 - [x] `ExportPanel`/`LogExport.swift`: HAR, JSON, CSV (этап 6, коммит 8214082).
 - [x] `ReplayRequest.swift`: повтор из записи напрямую на сервер (не через прокси), таймаут 15 с,
       до 5 редиректов, потолок тела 8 МБ, отбрасывание forbidden-заголовков, защита от приватных
@@ -265,8 +265,8 @@ AGENTS.md README.md .gitignore
 
 - [x] `Info.plist`, `--selftest` (matcher, regex, журнал, экспорт, выпуск сертификата,
       loopback-запрос через прокси - набор был с этапа 4, `--selftest` проходит из бандла).
-      `FileSwitcher.entitlements` и `FileSwitcher.icns` не заведены: приложение вне sandbox,
-      иконки пока нет.
+      `FileSwitcher.entitlements` не заведён: приложение вне sandbox. Иконка - `resources/FileSwitcher.icns`
+      (перенесена из Electron-сборки), подключается через `CFBundleIconFile` в `Info.plist`.
 - [x] `package-app.sh`: `swift build -c release --arch arm64 --arch x86_64`, сборка бандла,
       `codesign --force --options runtime`, `plutil -lint`, `ditto` в `dist/FileSwitcher.zip`.
       Подпись: ad-hoc (`-`) по умолчанию, переопределяется `CODE_SIGN_IDENTITY`.
@@ -285,14 +285,20 @@ AGENTS.md README.md .gitignore
 
 ### Этап 8. Вывод Electron (0.5-1 день)
 
-- [ ] Удалить `src/`, `test/`, `package.json`, `package-lock.json`, `node_modules`, `out`, `dist`,
+- [x] Удалить `src/`, `test/`, `package.json`, `package-lock.json`, `node_modules`, `out`, `dist`,
       `electron-builder.yml`, `electron.vite.config.ts`, `tsconfig*.json`, `vitest.config.ts`,
       `.venv`, `.pytest_cache`, `.husky`, `.prettier*`, `scripts/`, `resources/__pycache__`,
-      `build/mitmdump`.
-- [ ] Переписать `README.md` (структура, `./install-app.sh`, `swift test`, приватность журнала),
+      `build/mitmdump`. Иконка `build/icon.icns` перенесена в `resources/FileSwitcher.icns`,
+      бандл теперь собирается в `dist/FileSwitcher.app`. CI оставлен одной джобой `swift`.
+- [x] Переписать `README.md` (структура, `./install-app.sh`, `swift test`, приватность журнала),
       добавить `AGENTS.md` по образцу Vistrom.
-- [ ] Убедиться, что нативное приложение читает правила и журнал, оставшиеся от Electron-версии.
-- [ ] Мерж `native-swift` в `main`, релиз через `release.sh`.
+- [x] Убедиться, что нативное приложение читает правила и журнал, оставшиеся от Electron-версии:
+      Electron писал в `app.getPath('userData')`, то есть `~/Library/Application Support/FileSwitcher`
+      (`productName: FileSwitcher`), нативное приложение использует тот же каталог через
+      `AppPaths.supportDirectory` - `rules.json`, `traffic-logs/*.jsonl`, `proxy-system-state.json`
+      подхватываются на месте.
+- [ ] Мерж `native-swift` в `main`, релиз через `release.sh` - за Виталием.
+
 
 ## 7. Тесты
 

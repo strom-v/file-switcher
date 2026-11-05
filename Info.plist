@@ -6,6 +6,8 @@
 	<string>ru</string>
 	<key>CFBundleExecutable</key>
 	<string>FileSwitcher</string>
+	<key>CFBundleIconFile</key>
+	<string>FileSwitcher</string>
 	<key>CFBundleIdentifier</key>
 	<string>ru.strom.fileswitcher</string>
 	<key>CFBundleInfoDictionaryVersion</key>
