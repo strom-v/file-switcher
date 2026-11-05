@@ -201,15 +201,22 @@ AGENTS.md README.md .gitignore
 
 ### Этап 4. Системная интеграция (2 дня)
 
-- [ ] `NetworkServicesDarwin.swift`: список активных сервисов, чтение/запись web/secureweb,
-      сохранение исходного состояния в `proxy-system-state.json`.
-- [ ] `SystemProxyDarwin.swift`: `enable`/`disable`/`recoverStale`, `sudo -n networksetup` при
+- [x] `NetworkServicesDarwin.swift`: список активных сервисов, чтение/запись web/secureweb,
+      сохранение исходного состояния в `proxy-system-state.json`. (2026-11-05:
+      `System/NetworkServices.swift`, тесты `SystemIntegrationTests`)
+- [x] `SystemProxyDarwin.swift`: `enable`/`disable`/`recoverStale`, `sudo -n networksetup` при
       наличии sudoers-правила, иначе один диалог `osascript ... with administrator privileges`.
-- [ ] `SudoersRule.swift`: то же правило и тот же файл, установка/снятие/проверка.
-- [ ] `CertTrustDarwin.swift`: `security verify-cert` / `add-trusted-cert` / `remove-trusted-cert`.
-- [ ] `VpnStatus.swift`: активность VPN и признак full-tunnel (дефолтный маршрут в туннель).
+      (2026-11-05: `System/SystemProxyDarwin.swift`, `System/ProcessRunner.swift`; живая проверка
+      `--system-check`: сертификат trusted, 2 активных сервиса, VPN full-tunnel через utun7)
+- [x] `SudoersRule.swift`: то же правило и тот же файл, установка/снятие/проверка.
+      (2026-11-05: методы `isPasswordlessSetup`/`setUpPasswordless`/`revokePasswordless`
+      в `SystemProxyDarwin.swift`; установку в системе не запускал - нужен диалог пользователя)
+- [x] `CertTrustDarwin.swift`: `security verify-cert` / `add-trusted-cert` / `remove-trusted-cert`.
+      (2026-11-05: `System/CertTrustDarwin.swift`; `--system-check` показывает `trusted`)
+- [x] `VpnStatus.swift`: активность VPN и признак full-tunnel (дефолтный маршрут в туннель).
+      (2026-11-05: `VpnDetector` в `System/SystemProxyDarwin.swift`)
 - [ ] Жизненный цикл: откат системного прокси при выходе и при старте после краша, single instance,
-      `LSUIElement`, меню в status bar.
+      `LSUIElement`, меню в status bar. (перенесено в этап 5: без UI-процесса жизненный цикл не собрать)
 - [ ] Готово, когда: включение/выключение прокси не оставляет систему без сети ни в одном сценарии
       (обычный выход, Cmd+Q, kill -9), а `proxy-system-state.json` после отката отсутствует.
 

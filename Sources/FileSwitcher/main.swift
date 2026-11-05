@@ -3,6 +3,11 @@ import Foundation
 // Точка входа: самопроверка, прокси без UI (спайк этапа 1) или сообщение о сборке без UI.
 let arguments = CommandLine.arguments
 
+if arguments.contains("--system-check") {
+    await SystemCheck.run()
+    exit(0)
+}
+
 if arguments.contains("--selftest") {
     SelfTest.runAndExit()
 }
