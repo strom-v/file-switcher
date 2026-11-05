@@ -52,9 +52,4 @@ final class AppRuntime {
             controller = nil
         }
     }
-
-    /// Останавливает прокси и возвращает системные настройки при выходе
-    func shutdown() {
-        controller?.stop()
-    }
 }

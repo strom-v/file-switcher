@@ -12,7 +12,10 @@ final class RulesViewController: NSViewController {
     private let runtime: AppRuntime
     private var rules: [Rule] = []
     private var rows: [Row] = []
+    /// Поисковая строка по правилам в нижнем регистре
+    private var query = ""
     private let tableView = NSTableView()
+    private let searchField = NSSearchField()
     private let selectAllBox: NSButton = {
         let box = NSButton(checkboxWithTitle: "", target: nil, action: nil)
         box.allowsMixedState = true
@@ -48,7 +51,13 @@ final class RulesViewController: NSViewController {
             target: self,
             action: #selector(createRule)
         )
-        let headerRow = makeRow([selectAllBox, makeSpacer(), addButton], spacing: 8)
+        searchField.placeholderString = "Поиск по правилам"
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.target = self
+        searchField.action = #selector(applyRuleSearch)
+        searchField.sendsWholeSearchString = false
+
+        let headerRow = makeRow([selectAllBox, searchField, makeSpacer(), addButton], spacing: 8)
         headerRow.distribution = .fill
 
         tableView.headerView = nil
@@ -117,8 +126,9 @@ final class RulesViewController: NSViewController {
 
     /// Строит строки списка: именованные группы по алфавиту, «остальные» в конце
     private func rebuildRows() {
+        let source = filteredRules
         var namedGroups: [String] = []
-        for rule in rules {
+        for rule in source {
             let key = groupKey(of: rule)
             if key != otherGroupKey, !namedGroups.contains(key) {
                 namedGroups.append(key)
@@ -129,9 +139,9 @@ final class RulesViewController: NSViewController {
         var result: [Row] = []
         for key in namedGroups {
             result.append(.group(key))
-            result.append(contentsOf: rules.filter { groupKey(of: $0) == key }.map { Row.rule($0) })
+            result.append(contentsOf: source.filter { groupKey(of: $0) == key }.map { Row.rule($0) })
         }
-        let others = rules.filter { groupKey(of: $0) == otherGroupKey }
+        let others = source.filter { groupKey(of: $0) == otherGroupKey }
         if !others.isEmpty {
             result.append(.group(otherGroupKey))
             result.append(contentsOf: others.map { Row.rule($0) })
@@ -139,6 +149,24 @@ final class RulesViewController: NSViewController {
         rows = result
         tableView.reloadData()
         updateHeader()
+    }
+
+    /// Правила, прошедшие поиск по шаблону, файлу подмены и группе
+    private var filteredRules: [Rule] {
+        guard !query.isEmpty else {
+            return rules
+        }
+        return rules.filter { rule in
+            rule.urlPattern.lowercased().contains(query)
+                || (rule.localFilePath?.lowercased().contains(query) ?? false)
+                || groupKey(of: rule).lowercased().contains(query)
+        }
+    }
+
+    /// Применяет поиск по правилам
+    @objc private func applyRuleSearch() {
+        query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        rebuildRows()
     }
 
     /// Обновляет чекбокс всех правил
@@ -151,7 +179,15 @@ final class RulesViewController: NSViewController {
         } else {
             selectAllBox.state = .mixed
         }
-        emptyLabel.isHidden = !rules.isEmpty
+        if rules.isEmpty {
+            emptyLabel.stringValue = "Правил пока нет"
+            emptyLabel.isHidden = false
+        } else if filteredRules.isEmpty {
+            emptyLabel.stringValue = "Ничего не найдено"
+            emptyLabel.isHidden = false
+        } else {
+            emptyLabel.isHidden = true
+        }
     }
 
     /// Сохраняет правила в файл и обновляет список
@@ -370,8 +406,22 @@ extension RulesViewController: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         let row = tableView.clickedRow
         let isRuleRow = rule(at: row) != nil
-        for item in menu.items where item.action != nil {
-            item.isEnabled = isRuleRow
+        var isGroupRow = false
+        if row >= 0, row < rows.count, case .group = rows[row] {
+            isGroupRow = true
+        }
+        for item in menu.items {
+            guard let action = item.action else {
+                continue
+            }
+            switch action {
+            case #selector(enableGroup), #selector(disableGroup):
+                item.isEnabled = isGroupRow
+            case #selector(importFromClipboard(_:)):
+                item.isEnabled = true
+            default:
+                item.isEnabled = isRuleRow
+            }
         }
     }
 }
@@ -397,8 +447,67 @@ extension RulesViewController {
         menu.addItem(withTitle: "Переместить в группу…", action: #selector(moveRowToGroup), keyEquivalent: "")
             .target = self
         menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "Включить группу", action: #selector(enableGroup), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Выключить группу", action: #selector(disableGroup), keyEquivalent: "").target = self
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "Импортировать из буфера", action: #selector(importFromClipboard(_:)), keyEquivalent: "")
+            .target = self
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Удалить", action: #selector(deleteRow), keyEquivalent: "").target = self
         return menu
+    }
+
+    /// Включает все правила группы, по которой кликнули
+    @objc private func enableGroup() {
+        setGroupEnabled(true)
+    }
+
+    /// Выключает все правила группы, по которой кликнули
+    @objc private func disableGroup() {
+        setGroupEnabled(false)
+    }
+
+    /// Переключает все правила группы из строки меню
+    private func setGroupEnabled(_ enabled: Bool) {
+        let row = tableView.clickedRow
+        guard row >= 0, row < rows.count, case let .group(key) = rows[row] else {
+            return
+        }
+        var next = rules
+        for index in next.indices where groupKey(of: next[index]) == key {
+            next[index].enabled = enabled
+        }
+        saveRules(next)
+    }
+
+    /// Добавляет правила из JSON в буфере обмена
+    @objc func importFromClipboard(_ sender: Any?) {
+        let text = NSPasteboard.general.string(forType: .string) ?? ""
+        let data = Data(text.utf8)
+        let decoder = JSONDecoder()
+        var imported: [Rule] = []
+        if let file = try? decoder.decode(RulesFile.self, from: data) {
+            imported = file.rules
+        } else if let list = try? decoder.decode([Rule].self, from: data) {
+            imported = list
+        } else if let single = try? decoder.decode(Rule.self, from: data) {
+            imported = [single]
+        }
+        guard !imported.isEmpty else {
+            showAlert("В буфере нет правила", "Скопируйте JSON правила или массив правил")
+            return
+        }
+        let known = Set(rules.map(\.id))
+        var added: [Rule] = []
+        for rule in imported {
+            var copy = rule
+            if known.contains(copy.id) {
+                copy.id = UUID().uuidString
+            }
+            added.append(copy)
+        }
+        saveRules(rules + added)
+        showAlert("Правила добавлены", "Из буфера добавлено: \(added.count)")
     }
 
     /// Открывает форму правила из контекстного меню

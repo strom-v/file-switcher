@@ -57,6 +57,19 @@ struct HttpMessageTests {
         #expect(!names.contains("x-custom"))
     }
 
+    @Test("accept-encoding не пересылается апстриму: тело ответа остаётся читаемым")
+    func forwardableRequestHeadersDropAcceptEncoding() {
+        var headers = HTTPHeaders()
+        headers.add(name: "Host", value: "example.com")
+        headers.add(name: "Accept-Encoding", value: "gzip, br")
+        headers.add(name: "X-Kept", value: "1")
+
+        let names = forwardableRequestHeaders(headers).map { $0.0.lowercased() }
+        #expect(names.contains("host"))
+        #expect(names.contains("x-kept"))
+        #expect(!names.contains("accept-encoding"))
+    }
+
     @Test("журнал склеивает повторы и прячет секреты")
     func headersForLogMergesAndRedacts() {
         let pairs = [

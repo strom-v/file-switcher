@@ -145,8 +145,8 @@ final class ProxyController {
     }
 
     /// Записи, подходящие под фильтр по URL и телу
-    func search(query: String, searchInBody: Bool) -> [LogEntryMeta] {
-        store.search(query: query, searchInBody: searchInBody)
+    func search(query: String, searchInBody: Bool, includeHistory: Bool = false) -> [LogEntryMeta] {
+        store.search(query: query, searchInBody: searchInBody, includeHistory: includeHistory)
     }
 
     private func setState(_ next: ProxyState) {

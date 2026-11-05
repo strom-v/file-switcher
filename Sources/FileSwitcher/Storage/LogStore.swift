@@ -13,6 +13,8 @@ final class LogStore: @unchecked Sendable {
     private let keepSessionFiles = 20
     // потолок индекса в памяти (~200 байт на запись)
     private let maxIndexEntries = 200_000
+    // сколько строк прошлых сессий просматривает поиск по истории
+    private let historyLineLimit = 50_000
 
     /// Запись индекса: лёгкие поля для списка и положение полной строки в файле
     private struct IndexEntry {
@@ -165,7 +167,10 @@ final class LogStore: @unchecked Sendable {
         let entry = index.first { $0.meta.ts == ts }
         lock.unlock()
 
-        guard let entry, entry.byteLength > 0 else {
+        guard let entry else {
+            return eventFromHistory(ts: ts)
+        }
+        guard entry.byteLength > 0 else {
             return nil
         }
         guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
@@ -195,8 +200,9 @@ final class LogStore: @unchecked Sendable {
     }
 
     /// Метаданные записей, чьи url/method/тело содержат query (по телу — только с поиском в теле).
-    /// Синхронный: чтение тысяч строк вызывающий выполняет в фоне.
-    func search(query: String, searchInBody: Bool) -> [LogEntryMeta] {
+    /// С includeHistory читаются и строки прошлых сессий. Синхронный: чтение тысяч строк
+    /// вызывающий выполняет в фоне.
+    func search(query: String, searchInBody: Bool, includeHistory: Bool = false) -> [LogEntryMeta] {
         lock.lock()
         searchGeneration += 1
         let generation = searchGeneration
@@ -222,7 +228,132 @@ final class LogStore: @unchecked Sendable {
                 return []
             }
         }
-        return searchable.filter { matchedTs.contains($0.meta.ts) }.map(\.meta)
+        var result = searchable.filter { matchedTs.contains($0.meta.ts) }.map(\.meta)
+        guard includeHistory else {
+            return result
+        }
+        var known = Set(result.map(\.ts))
+        for meta in searchHistoryFiles(needle: needle, searchInBody: searchInBody, generation: generation) {
+            guard !known.contains(meta.ts) else {
+                continue
+            }
+            known.insert(meta.ts)
+            result.append(meta)
+        }
+        return result
+    }
+
+    /// Файлы прошлых сессий на диске, от новых к старым
+    private func historyFiles() -> [URL] {
+        let directory = fileURL.deletingLastPathComponent()
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path) else {
+            return []
+        }
+        let current = fileURL.lastPathComponent
+        return names
+            .filter { $0.hasPrefix("traffic-") && $0.hasSuffix(".jsonl") && $0 != current }
+            .sorted(by: >)
+            .map { directory.appendingPathComponent($0) }
+    }
+
+    /// Поиск по строкам прошлых сессий: сначала отсев по тексту строки, потом точная сверка полей
+    private func searchHistoryFiles(needle: String, searchInBody: Bool, generation: Int) -> [LogEntryMeta] {
+        var found: [LogEntryMeta] = []
+        var budget = historyLineLimit
+        for url in historyFiles() {
+            guard budget > 0, !isSearchStale(generation) else {
+                break
+            }
+            var read = 0
+            LogStore.forEachLine(in: url, limit: budget) { line in
+                read += 1
+                if isSearchStale(generation) {
+                    return false
+                }
+                guard line.lowercased().contains(needle),
+                      let event = LogStore.decodeEvent(line),
+                      LogStore.eventMatches(event, needle: needle, searchInBody: searchInBody) else {
+                    return true
+                }
+                found.append(event.meta())
+                return true
+            }
+            budget -= read
+        }
+        return found
+    }
+
+    /// Полная запись по времени из файлов прошлых сессий
+    private func eventFromHistory(ts: Double) -> ProxyLogEvent? {
+        var found: ProxyLogEvent?
+        for url in historyFiles() {
+            LogStore.forEachLine(in: url, limit: historyLineLimit) { line in
+                guard let event = LogStore.decodeEvent(line) else {
+                    return true
+                }
+                guard abs(event.ts - ts) < 0.0005 else {
+                    return true
+                }
+                found = event
+                return false
+            }
+            if found != nil {
+                break
+            }
+        }
+        return found
+    }
+
+    /// Читает файл построчно, пока обработчик не вернёт false
+    private static func forEachLine(in url: URL, limit: Int, _ body: (String) -> Bool) {
+        guard let handle = try? FileHandle(forReadingFrom: url) else {
+            return
+        }
+        defer {
+            try? handle.close()
+        }
+        var remainder = Data()
+        var read = 0
+        while read < limit {
+            guard let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty else {
+                break
+            }
+            remainder.append(chunk)
+            while let newline = remainder.firstIndex(of: 0x0A) {
+                let lineData = remainder[remainder.startIndex..<newline]
+                remainder = Data(remainder[remainder.index(after: newline)...])
+                read += 1
+                guard let line = String(data: lineData, encoding: .utf8) else {
+                    continue
+                }
+                guard body(line) else {
+                    return
+                }
+            }
+        }
+    }
+
+    /// Разбирает строку журнала
+    private static func decodeEvent(_ line: String) -> ProxyLogEvent? {
+        guard let data = line.data(using: .utf8) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(ProxyLogEvent.self, from: data)
+    }
+
+    /// Совпадает ли запись с поисковой строкой по url, файлу подмены и телам
+    private static func eventMatches(_ event: ProxyLogEvent, needle: String, searchInBody: Bool) -> Bool {
+        if event.url.lowercased().contains(needle) {
+            return true
+        }
+        if event.event == .matched, event.file.lowercased().contains(needle) {
+            return true
+        }
+        guard searchInBody else {
+            return false
+        }
+        return event.requestBody.lowercased().contains(needle)
+            || event.responseBody.lowercased().contains(needle)
     }
 
     /// Строка файла сессии: JSON без переводов строки

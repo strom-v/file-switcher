@@ -90,6 +90,14 @@ extension SettingsSheet {
         let openFolderButton = ClosureButton(title: "Открыть папку данных") { [weak self] in
             self?.openSupportFolder()
         }
+        let revealLogButton = ClosureButton(title: "Показать журнал") { [weak self] in
+            self?.revealLogFile()
+        }
+        let resetLogsButton = ClosureButton(title: "Удалить журналы…") { [weak self] in
+            self?.resetLogs()
+        }
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
+        let versionLabel = makeLabel("FileSwitcher \(version)", font: AppTheme.compactFont, color: .tertiaryLabelColor)
         let folderLabel = makeLabel(
             MetaFormat.stripHome(AppPaths.supportDirectory.path),
             font: AppTheme.monoFont,
@@ -107,7 +115,12 @@ extension SettingsSheet {
             ]),
             makeSection("Правила", views: [rulesRow]),
             makeSection("Журнал", views: [logRow]),
-            makeSection("Данные", views: [folderLabel, openFolderButton])
+            makeSection("Данные", views: [
+                folderLabel,
+                openFolderButton,
+                makeRow([revealLogButton, resetLogsButton], spacing: 8)
+            ]),
+            makeSection("О программе", views: [versionLabel])
         ]
 
         let column = makeColumn(sections, spacing: 12)
@@ -343,6 +356,40 @@ extension SettingsSheet {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         }
         NSWorkspace.shared.open(directory)
+    }
+
+    /// Показывает файл текущей сессии журнала в Finder
+    private func revealLogFile() {
+        let path = runtime.store.filePath
+        guard FileManager.default.fileExists(atPath: path) else {
+            showAlert("Журнала пока нет", "В этой сессии ещё не записано ни одного запроса")
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// Удаляет с диска файлы журнала всех сессий
+    private func resetLogs() {
+        let alert = NSAlert()
+        alert.messageText = "Удалить журналы?"
+        alert.informativeText = "Будут удалены файлы трафика всех сессий. Правила и настройки останутся."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Удалить")
+        alert.addButton(withTitle: "Отмена")
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+        let directory = AppPaths.trafficLogDirectory
+        let manager = FileManager.default
+        let names = (try? manager.contentsOfDirectory(atPath: directory.path)) ?? []
+        var removed = 0
+        for name in names where name.hasPrefix("traffic-") && name.hasSuffix(".jsonl") {
+            let url = directory.appendingPathComponent(name)
+            if (try? manager.removeItem(at: url)) != nil {
+                removed += 1
+            }
+        }
+        showAlert("Журналы удалены", "Удалено файлов: \(removed). Перезапустите приложение, чтобы начать новый журнал.")
     }
 
     /// Показывает короткое модальное сообщение

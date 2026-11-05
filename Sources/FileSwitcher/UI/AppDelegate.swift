@@ -5,17 +5,29 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let runtime = AppRuntime.shared
     private var mainWindowController: MainWindowController?
+    private var statusBar: StatusBarController?
     private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
+        NSApp.setActivationPolicy(.accessory)
         AppearanceSettings.applyStored()
         AppMenu.install(appDelegate: self)
         runtime.controller?.recoverStaleSystemProxy()
+        statusBar = StatusBarController(runtime: runtime)
+        statusBar?.onShowWindow = { [weak self] in
+            self?.showMainWindow()
+        }
         let controller = MainWindowController(runtime: runtime)
         mainWindowController = controller
         controller.showWindow(nil)
         controller.startProxyIfNeeded()
+        controller.presentOnboardingIfNeeded()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Показывает главное окно из строки меню
+    func showMainWindow() {
+        mainWindowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -33,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
+        false
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

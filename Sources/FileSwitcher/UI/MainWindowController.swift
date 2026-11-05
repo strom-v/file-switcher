@@ -56,6 +56,7 @@ final class MainWindowController: NSWindowController {
         window.titleVisibility = .hidden
         window.minSize = NSSize(width: 820, height: 520)
         window.tabbingMode = .disallowed
+        window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
 
@@ -78,6 +79,14 @@ final class MainWindowController: NSWindowController {
             return
         }
         controller.start(port: ProxyPortSettings.current)
+    }
+
+    /// Показывает подсказку по первому запуску
+    func presentOnboardingIfNeeded() {
+        guard OnboardingSheet.shouldShow else {
+            return
+        }
+        rootController.presentAsSheet(OnboardingSheet(runtime: runtime))
     }
 
 }

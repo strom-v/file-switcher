@@ -103,7 +103,7 @@ enum AppMenu {
         return item
     }
 
-    /// Меню правил: создание нового правила
+    /// Меню правил: создание нового правила и импорт из буфера
     private static func rulesItem() -> NSMenuItem {
         let item = NSMenuItem()
         let menu = NSMenu(title: "Правила")
@@ -111,6 +111,11 @@ enum AppMenu {
             withTitle: "Новое правило",
             action: #selector(RulesViewController.createNewRule(_:)),
             keyEquivalent: "n"
+        )
+        menu.addItem(
+            withTitle: "Импортировать из буфера",
+            action: #selector(RulesViewController.importFromClipboard(_:)),
+            keyEquivalent: ""
         )
         item.submenu = menu
         return item

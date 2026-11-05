@@ -41,6 +41,8 @@ final class LogDetailSheet: NSViewController {
             isBinary: event.responseBodyIsBinary,
             size: event.responseSize
         )))
+        addJSONTab(to: tabs, title: "JSON запроса", body: event.requestBody, isBinary: event.requestBodyIsBinary)
+        addJSONTab(to: tabs, title: "JSON ответа", body: event.responseBody, isBinary: event.responseBodyIsBinary)
 
         let createButton = ClosureButton(title: "Создать правило") { [weak self] in
             guard let self else {
@@ -124,6 +126,17 @@ final class LogDetailSheet: NSViewController {
     /// Подпись поля в сводке
     private func makeFieldLabel(_ text: String) -> NSTextField {
         makeLabel(text, font: AppTheme.compactFont, color: .secondaryLabelColor)
+    }
+
+    /// Добавляет вкладку с деревом, если тело - валидный JSON
+    private func addJSONTab(to tabs: NSTabView, title: String, body: String, isBinary: Bool) {
+        guard !isBinary, JSONTreeNode.isJSON(body) else {
+            return
+        }
+        let item = NSTabViewItem(identifier: title)
+        item.label = title
+        item.view = JSONTreeView(json: body)
+        tabs.addTabViewItem(item)
     }
 
     /// Вкладка с прокручиваемым текстом только для чтения

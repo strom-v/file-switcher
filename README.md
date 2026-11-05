@@ -15,7 +15,8 @@
 - `Sources/FileSwitcher/Storage/` - журнал (`traffic-logs/*.jsonl`), экспорт в HAR/JSON/CSV.
 - `Sources/FileSwitcher/System/` - системный прокси macOS (вкл./выкл. с откатом при краше),
   доверие к CA, список сетевых сервисов.
-- `Sources/FileSwitcher/UI/` - AppKit: окно, вкладки "Трафик" и "Правила".
+- `Sources/FileSwitcher/UI/` - AppKit: одно окно с журналом и правилами, иконка в строке меню,
+  онбординг первого запуска.
 
 Ограничения движка: HTTP/2 не перехватывается (браузер договаривается на HTTP/1.1).
 

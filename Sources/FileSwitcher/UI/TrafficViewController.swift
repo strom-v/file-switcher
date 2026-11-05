@@ -340,7 +340,7 @@ final class TrafficViewController: NSViewController {
     @objc private func applySearch() {
         bodySearchTask?.cancel()
         let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard bodySearchButton.state == .on, !query.isEmpty, let controller = runtime.controller else {
+        guard !query.isEmpty, let controller = runtime.controller else {
             bodyMatches = nil
             rebuildVisible()
             return
@@ -350,13 +350,28 @@ final class TrafficViewController: NSViewController {
             guard let self, !Task.isCancelled else {
                 return
             }
-            let found = controller.search(query: query, searchInBody: true)
+            let inBody = bodySearchButton.state == .on
+            // вместе с текущей сессией просматриваются и файлы прошлых сессий
+            let found = controller.search(query: query, searchInBody: inBody, includeHistory: true)
             guard !Task.isCancelled else {
                 return
             }
+            mergeFoundFromHistory(found)
             bodyMatches = Set(found.map { $0.ts })
             rebuildVisible()
         }
+    }
+
+    /// Добавляет в список записи, найденные в файлах прошлых сессий
+    private func mergeFoundFromHistory(_ found: [LogEntryMeta]) {
+        let known = Set(entries.map { $0.ts })
+        let extra = found.filter { !known.contains($0.ts) }.suffix(Self.maxEntries)
+        guard !extra.isEmpty else {
+            return
+        }
+        entries.append(contentsOf: extra)
+        entries.sort { $0.ts < $1.ts }
+        matchedTotal += extra.filter { $0.event == .matched }.count
     }
 
     /// Очищает журнал в интерфейсе (файл журнала остаётся на диске)

@@ -69,4 +69,26 @@ struct LogStoreTests {
         let all = store.search(query: "  ", searchInBody: false)
         #expect(all.count == 2)
     }
+
+    @Test("поиск по истории находит записи прошлой сессии")
+    func searchIncludesHistory() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let previous = LogStore(directory: directory)
+        _ = previous.appendBatch([makeEvent(url: "https://example.com/old", ts: 100, responseBody: "old")])
+        try await Task.sleep(for: .milliseconds(5))
+        let current = LogStore(directory: directory)
+        _ = current.appendBatch([makeEvent(url: "https://example.com/new", ts: 200, responseBody: "new")])
+
+        #expect(current.search(query: "old", searchInBody: false).isEmpty)
+
+        let found = current.search(query: "old", searchInBody: false, includeHistory: true)
+        #expect(found.contains { $0.ts == 100 })
+
+        let event = try #require(current.getEvent(ts: 100))
+        #expect(event.url == "https://example.com/old")
+    }
 }
