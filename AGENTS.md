@@ -16,8 +16,8 @@ FileSwitcher - нативное macOS-приложение для перехва
 | `Sources/FileSwitcher/Rules/` | модель и группы правил, matcher, безопасный regex, валидация, `RulesStore` |
 | `Sources/FileSwitcher/Storage/` | `LogStore` (jsonl-журнал), `LogEvent`, экспорт HAR/JSON/CSV |
 | `Sources/FileSwitcher/System/` | системный прокси macOS, доверие к CA, перечисление сетевых сервисов, запуск `sudo`-команд |
-| `Sources/FileSwitcher/Support/` | пути данных, JSON-файлы, `--system-check`, отладочный прокси |
-| `Sources/FileSwitcher/UI/` | AppKit: `AppDelegate`, единое окно с журналом и правилами (`MainWindowController`), панели, формы правила, деталей и настроек, палитра `AppTheme` |
+| `Sources/FileSwitcher/Support/` | пути данных, JSON-файлы, `--system-check`, локализация интерфейса (`L10n`) |
+| `Sources/FileSwitcher/UI/` | AppKit: `AppDelegate`, меню приложения и темы (`AppMenu`, `AppearanceSettings`), единое окно с журналом и правилами (`MainWindowController`), панели, формы правила, деталей и настроек, онбординг, иконка в строке меню, дерево JSON, палитра `AppTheme` |
 | `Tests/FileSwitcherTests/` | Swift Testing, по файлу на модуль |
 
 ## Команды
@@ -39,8 +39,8 @@ swift run FileSwitcher --system-check
   неочевидна (например, `shortcut:` у осознанных упрощений).
 - Публичные типы и функции - с кратким док-комментарием; приватные помощники - без него.
 - Никаких `try!`/`as!` в новом коде; ошибки возвращать или логировать, не глотать.
-- UI только на AppKit, без сторонних UI-библиотек. Строки интерфейса - по-русски, как в существующих
-  контроллерах.
+- UI только на AppKit, без сторонних UI-библиотек. Строки интерфейса - по-русски как ключи словаря
+  и оборачиваются в `L10n.t(...)`; английские переводы - в `Support/AppLocalizationEnglish.swift`.
 
 ## Данные и совместимость
 
