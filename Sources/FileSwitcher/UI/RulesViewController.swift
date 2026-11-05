@@ -19,11 +19,11 @@ final class RulesViewController: NSViewController {
     private let selectAllBox: NSButton = {
         let box = NSButton(checkboxWithTitle: "", target: nil, action: nil)
         box.allowsMixedState = true
-        box.toolTip = "Включить или выключить все правила"
+        box.toolTip = L10n.t("Включить или выключить все правила")
         box.translatesAutoresizingMaskIntoConstraints = false
         return box
     }()
-    private let emptyLabel = makeLabel("Правил пока нет", font: AppTheme.baseFont, color: .secondaryLabelColor)
+    private let emptyLabel = makeLabel(L10n.t("Правил пока нет"), font: AppTheme.baseFont, color: .secondaryLabelColor)
 
     init(runtime: AppRuntime) {
         self.runtime = runtime
@@ -47,11 +47,11 @@ final class RulesViewController: NSViewController {
         selectAllBox.action = #selector(toggleAll)
         let addButton = makeIconButton(
             symbol: "plus",
-            tooltip: "Добавить правило",
+            tooltip: L10n.t("Добавить правило"),
             target: self,
             action: #selector(createRule)
         )
-        searchField.placeholderString = "Поиск по правилам"
+        searchField.placeholderString = L10n.t("Поиск по правилам")
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.target = self
         searchField.action = #selector(applyRuleSearch)
@@ -180,10 +180,10 @@ final class RulesViewController: NSViewController {
             selectAllBox.state = .mixed
         }
         if rules.isEmpty {
-            emptyLabel.stringValue = "Правил пока нет"
+            emptyLabel.stringValue = L10n.t("Правил пока нет")
             emptyLabel.isHidden = false
         } else if filteredRules.isEmpty {
-            emptyLabel.stringValue = "Ничего не найдено"
+            emptyLabel.stringValue = L10n.t("Ничего не найдено")
             emptyLabel.isHidden = false
         } else {
             emptyLabel.isHidden = true
@@ -196,7 +196,7 @@ final class RulesViewController: NSViewController {
             rules = try runtime.rulesStore.saveAll(next)
             rebuildRows()
         } catch {
-            showAlert("Правило не сохранено", error.localizedDescription)
+            showAlert(L10n.t("Правило не сохранено"), error.localizedDescription)
         }
     }
 
@@ -442,18 +442,18 @@ extension RulesViewController {
     func makeContextMenu() -> NSMenu {
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(withTitle: "Изменить", action: #selector(editRow), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Дублировать", action: #selector(duplicateRow), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Переместить в группу…", action: #selector(moveRowToGroup), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.t("Изменить"), action: #selector(editRow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L10n.t("Дублировать"), action: #selector(duplicateRow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L10n.t("Переместить в группу…"), action: #selector(moveRowToGroup), keyEquivalent: "")
             .target = self
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Включить группу", action: #selector(enableGroup), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "Выключить группу", action: #selector(disableGroup), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L10n.t("Включить группу"), action: #selector(enableGroup), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L10n.t("Выключить группу"), action: #selector(disableGroup), keyEquivalent: "").target = self
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Импортировать из буфера", action: #selector(importFromClipboard(_:)), keyEquivalent: "")
+        menu.addItem(withTitle: L10n.t("Импортировать из буфера"), action: #selector(importFromClipboard(_:)), keyEquivalent: "")
             .target = self
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Удалить", action: #selector(deleteRow), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L10n.t("Удалить"), action: #selector(deleteRow), keyEquivalent: "").target = self
         return menu
     }
 
@@ -494,7 +494,7 @@ extension RulesViewController {
             imported = [single]
         }
         guard !imported.isEmpty else {
-            showAlert("В буфере нет правила", "Скопируйте JSON правила или массив правил")
+            showAlert(L10n.t("В буфере нет правила"), L10n.t("Скопируйте JSON правила или массив правил"))
             return
         }
         let known = Set(rules.map(\.id))
@@ -507,7 +507,7 @@ extension RulesViewController {
             added.append(copy)
         }
         saveRules(rules + added)
-        showAlert("Правила добавлены", "Из буфера добавлено: \(added.count)")
+        showAlert(L10n.t("Правила добавлены"), String(format: L10n.t("Из буфера добавлено: %d"), added.count))
     }
 
     /// Открывает форму правила из контекстного меню
@@ -532,10 +532,10 @@ extension RulesViewController {
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Удалить правило?"
+        alert.messageText = L10n.t("Удалить правило?")
         alert.informativeText = rule.urlPattern
-        alert.addButton(withTitle: "Удалить")
-        alert.addButton(withTitle: "Отмена")
+        alert.addButton(withTitle: L10n.t("Удалить"))
+        alert.addButton(withTitle: L10n.t("Отмена"))
         guard alert.runModal() == .alertFirstButtonReturn else {
             return
         }
@@ -550,17 +550,17 @@ extension RulesViewController {
         let groups = knownGroups() + [otherGroupKey]
         let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 240, height: 26), pullsDown: false)
         for group in groups {
-            popup.addItem(withTitle: group.isEmpty ? "остальные" : group)
+            popup.addItem(withTitle: group.isEmpty ? L10n.t("остальные") : group)
         }
         if let index = groups.firstIndex(of: groupKey(of: rule)) {
             popup.selectItem(at: index)
         }
         let alert = NSAlert()
-        alert.messageText = "Переместить правило"
-        alert.informativeText = "Выберите группу для правила"
+        alert.messageText = L10n.t("Переместить правило")
+        alert.informativeText = L10n.t("Выберите группу для правила")
         alert.accessoryView = popup
-        alert.addButton(withTitle: "Переместить")
-        alert.addButton(withTitle: "Отмена")
+        alert.addButton(withTitle: L10n.t("Переместить"))
+        alert.addButton(withTitle: L10n.t("Отмена"))
         guard alert.runModal() == .alertFirstButtonReturn, popup.indexOfSelectedItem >= 0 else {
             return
         }
@@ -588,7 +588,7 @@ final class RuleGroupCellView: NSView {
 
     /// Показывает название группы
     func apply(key: String) {
-        let name = key.isEmpty ? "остальные" : key
+        let name = key.isEmpty ? L10n.t("остальные") : key
         label.stringValue = name.uppercased()
     }
 }
@@ -642,13 +642,16 @@ final class RuleCellView: NSView {
 
     /// Вторая строка правила: файл подмены, тело в правиле или пометка об отсутствии подмены
     private func detailText(_ rule: Rule) -> String {
+        var text: String
         if let body = rule.responseBody, !body.isEmpty {
-            return "тело в правиле, \(MetaFormat.size(body.utf8.count))"
+            text = String(format: L10n.t("тело в правиле, %@"), MetaFormat.size(body.utf8.count))
+        } else if let path = rule.localFilePath, !path.isEmpty {
+            text = MetaFormat.stripHome(path)
+        } else {
+            text = L10n.t("без подмены")
         }
-        if let path = rule.localFilePath, !path.isEmpty {
-            return MetaFormat.stripHome(path)
-        }
-        return "без подмены"
+        let hits = RuleHitCounter.shared.count(ruleId: rule.id)
+        return hits > 0 ? "\(text) · \(hits)" : text
     }
 
     @objc private func toggle() {

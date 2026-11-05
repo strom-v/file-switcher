@@ -14,11 +14,11 @@ final class OnboardingSheet: NSViewController {
     private let certLabel = makeLabel("", font: AppTheme.compactFont, color: .secondaryLabelColor)
     private let sudoersLabel = makeLabel("", font: AppTheme.compactFont, color: .secondaryLabelColor)
 
-    private lazy var certButton = ClosureButton(title: "Доверять") { [weak self] in
+    private lazy var certButton = ClosureButton(title: L10n.t("Доверять")) { [weak self] in
         self?.trustCertificate()
     }
 
-    private lazy var sudoersButton = ClosureButton(title: "Установить") { [weak self] in
+    private lazy var sudoersButton = ClosureButton(title: L10n.t("Установить")) { [weak self] in
         self?.setUpPasswordless()
     }
 
@@ -44,10 +44,10 @@ final class OnboardingSheet: NSViewController {
 extension OnboardingSheet {
     /// Собирает шаги настройки и кнопку закрытия
     private func buildLayout() {
-        let title = makeLabel("Первые шаги", font: NSFont.systemFont(ofSize: 15, weight: .semibold))
+        let title = makeLabel(L10n.t("Первые шаги"), font: NSFont.systemFont(ofSize: 15, weight: .semibold))
         let port = ProxyPortSettings.current
         let intro = makeLabel(
-            "Прокси слушает 127.0.0.1:\(port) и прописан системным. Осталось два действия.",
+            String(format: L10n.t("Прокси слушает 127.0.0.1:%d и прописан системным. Осталось два действия."), port),
             font: AppTheme.baseFont,
             color: .secondaryLabelColor
         )
@@ -55,26 +55,26 @@ extension OnboardingSheet {
         intro.maximumNumberOfLines = 2
 
         let certStep = makeStep(
-            title: "Доверие сертификату",
-            text: "Без доверия к сертификату прокси не откроются HTTPS-сайты.",
+            title: L10n.t("Доверие сертификату"),
+            text: L10n.t("Без доверия к сертификату прокси не откроются HTTPS-сайты."),
             status: certLabel,
             button: certButton
         )
         let sudoersStep = makeStep(
-            title: "Пароль администратора",
-            text: "Правило sudoers избавит от запроса пароля при каждом запуске.",
+            title: L10n.t("Пароль администратора"),
+            text: L10n.t("Правило sudoers избавит от запроса пароля при каждом запуске."),
             status: sudoersLabel,
             button: sudoersButton
         )
         let firefoxNote = makeLabel(
-            "Firefox использует своё хранилище сертификатов - сертификат добавляется там вручную.",
+            L10n.t("Firefox использует своё хранилище сертификатов - сертификат добавляется там вручную."),
             font: AppTheme.compactFont,
             color: .tertiaryLabelColor
         )
         firefoxNote.lineBreakMode = .byWordWrapping
         firefoxNote.maximumNumberOfLines = 2
 
-        let doneButton = ClosureButton(title: "Понятно") { [weak self] in
+        let doneButton = ClosureButton(title: L10n.t("Понятно")) { [weak self] in
             UserDefaults.standard.set(true, forKey: OnboardingSheet.doneKey)
             self?.dismiss(nil)
         }
@@ -121,18 +121,18 @@ extension OnboardingSheet {
             }
             switch await CertTrustDarwin.status() {
             case .notGenerated:
-                certLabel.stringValue = "Сертификат ещё не создан"
-                certButton.title = "Создать"
+                certLabel.stringValue = L10n.t("Сертификат ещё не создан")
+                certButton.title = L10n.t("Создать")
             case .notTrusted:
-                certLabel.stringValue = "Сертификат не доверен системе"
-                certButton.title = "Доверять"
+                certLabel.stringValue = L10n.t("Сертификат не доверен системе")
+                certButton.title = L10n.t("Доверять")
             case .trusted:
-                certLabel.stringValue = "Сертификат доверен системе"
-                certButton.title = "Убрать доверие"
+                certLabel.stringValue = L10n.t("Сертификат доверен системе")
+                certButton.title = L10n.t("Убрать доверие")
             }
             let installed = runtime.systemProxy.isPasswordlessSetup()
-            sudoersLabel.stringValue = installed ? "Правило установлено" : "Правило не установлено"
-            sudoersButton.title = installed ? "Отозвать" : "Установить"
+            sudoersLabel.stringValue = installed ? L10n.t("Правило установлено") : L10n.t("Правило не установлено")
+            sudoersButton.title = installed ? L10n.t("Отозвать") : L10n.t("Установить")
         }
     }
 
@@ -151,7 +151,7 @@ extension OnboardingSheet {
                     try await CertTrustDarwin.install()
                 }
             } catch {
-                showAlert("Не удалось изменить доверие", error.localizedDescription)
+                showAlert(L10n.t("Не удалось изменить доверие"), error.localizedDescription)
             }
             certButton.isEnabled = true
             refreshStatuses()
@@ -173,7 +173,7 @@ extension OnboardingSheet {
                     try await runtime.systemProxy.setUpPasswordless()
                 }
             } catch {
-                showAlert("Не удалось настроить sudoers", error.localizedDescription)
+                showAlert(L10n.t("Не удалось настроить sudoers"), error.localizedDescription)
             }
             sudoersButton.isEnabled = true
             refreshStatuses()
@@ -185,7 +185,7 @@ extension OnboardingSheet {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = text
-        alert.addButton(withTitle: "Ок")
+        alert.addButton(withTitle: L10n.t("Ок"))
         alert.runModal()
     }
 }

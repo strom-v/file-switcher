@@ -93,6 +93,11 @@ final class OuterHeadHandler: ChannelInboundHandler, @unchecked Sendable {
         buffer = ByteBuffer()
         let firstByte = payload.getInteger(at: payload.readerIndex, as: UInt8.self) ?? 0
         let target = connectTarget
+        if firstByte == 0x16, let target, !TunnelScope.shouldIntercept(host: target.host) {
+            // хост вне области перехвата: байты клиента идут в апстрим без расшифровки
+            _ = RawTunnel.start(context: context, setup: setup, target: target, headBytes: "", leftover: payload)
+            return
+        }
         if firstByte == 0x16 {
             ProxyPipeline.installTLS(
                 context: context,

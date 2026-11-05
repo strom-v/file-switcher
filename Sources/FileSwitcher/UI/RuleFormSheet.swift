@@ -54,8 +54,8 @@ final class RuleFormSheet: NSViewController {
         groupBox.font = AppTheme.compactFont
 
         pathField.font = AppTheme.monoFont
-        pathField.placeholderString = "путь к файлу на диске"
-        let chooseButton = ClosureButton(title: "Выбрать…") { [weak self] in
+        pathField.placeholderString = L10n.t("путь к файлу на диске")
+        let chooseButton = ClosureButton(title: L10n.t("Выбрать…")) { [weak self] in
             self?.chooseFile()
         }
         let pathRow = makeRow([pathField, chooseButton], spacing: 6)
@@ -75,11 +75,11 @@ final class RuleFormSheet: NSViewController {
         bodyScroll.heightAnchor.constraint(equalToConstant: 170).isActive = true
 
         regexBox.translatesAutoresizingMaskIntoConstraints = false
-        contentTypeField.placeholderString = "content-type ответа"
+        contentTypeField.placeholderString = L10n.t("content-type ответа")
         contentTypeField.font = AppTheme.compactFont
-        delayField.placeholderString = "задержка, мс"
+        delayField.placeholderString = L10n.t("задержка, мс")
         delayField.font = AppTheme.compactFont
-        statusField.placeholderString = "статус"
+        statusField.placeholderString = L10n.t("статус")
         statusField.font = AppTheme.compactFont
         NSLayoutConstraint.activate([
             contentTypeField.widthAnchor.constraint(equalToConstant: 200),
@@ -91,11 +91,11 @@ final class RuleFormSheet: NSViewController {
 
         let form = makeColumn(
             [
-                makeFieldGroup(title: "URL-паттерн", view: urlField),
-                makeFieldGroup(title: "Группа", view: groupBox),
-                makeFieldGroup(title: "Файл подмены", view: pathRow),
-                makeFieldGroup(title: "Тело ответа", view: bodyScroll),
-                makeFieldGroup(title: "Дополнительно", view: extrasRow)
+                makeFieldGroup(title: L10n.t("URL-паттерн"), view: urlField),
+                makeFieldGroup(title: L10n.t("Группа"), view: groupBox),
+                makeFieldGroup(title: L10n.t("Файл подмены"), view: pathRow),
+                makeFieldGroup(title: L10n.t("Тело ответа"), view: bodyScroll),
+                makeFieldGroup(title: L10n.t("Дополнительно"), view: extrasRow)
             ],
             spacing: 10
         )
@@ -104,20 +104,20 @@ final class RuleFormSheet: NSViewController {
             group.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
         }
 
-        let cancelButton = ClosureButton(title: "Отмена") { [weak self] in
+        let cancelButton = ClosureButton(title: L10n.t("Отмена")) { [weak self] in
             self?.dismiss(nil)
         }
         cancelButton.keyEquivalent = "\u{1b}"
-        let saveButton = ClosureButton(title: "Сохранить") { [weak self] in
+        let saveButton = ClosureButton(title: L10n.t("Сохранить")) { [weak self] in
             self?.save()
         }
         saveButton.keyEquivalent = "\r"
         var leadingButtons: [NSView] = []
         if !isNew {
-            let deleteButton = ClosureButton(title: "Удалить") { [weak self] in
+            let deleteButton = ClosureButton(title: L10n.t("Удалить")) { [weak self] in
                 self?.deleteRule()
             }
-            let duplicateButton = ClosureButton(title: "Дублировать") { [weak self] in
+            let duplicateButton = ClosureButton(title: L10n.t("Дублировать")) { [weak self] in
                 self?.duplicateRule()
             }
             leadingButtons = [deleteButton, duplicateButton]
@@ -194,10 +194,10 @@ final class RuleFormSheet: NSViewController {
     /// Удаляет правило после подтверждения
     private func deleteRule() {
         let alert = NSAlert()
-        alert.messageText = "Удалить правило?"
+        alert.messageText = L10n.t("Удалить правило?")
         alert.informativeText = draft.urlPattern
-        alert.addButton(withTitle: "Удалить")
-        alert.addButton(withTitle: "Отмена")
+        alert.addButton(withTitle: L10n.t("Удалить"))
+        alert.addButton(withTitle: L10n.t("Отмена"))
         guard alert.runModal() == .alertFirstButtonReturn else {
             return
         }
@@ -214,7 +214,7 @@ final class RuleFormSheet: NSViewController {
     /// Показывает ошибку валидации, не закрывая форму
     private func showValidation(_ message: String) {
         let alert = NSAlert()
-        alert.messageText = "Правило не сохранено"
+        alert.messageText = L10n.t("Правило не сохранено")
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.runModal()

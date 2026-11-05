@@ -12,9 +12,9 @@ enum AppearanceSettings {
         /// Подпись пункта меню
         var title: String {
             switch self {
-            case .system: return "Системная"
-            case .light: return "Светлая"
-            case .dark: return "Тёмная"
+            case .system: return L10n.t("Системная")
+            case .light: return L10n.t("Светлая")
+            case .dark: return L10n.t("Тёмная")
             }
         }
 

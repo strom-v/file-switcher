@@ -13,15 +13,18 @@ final class SettingsSheet: NSViewController {
 
     private let runtime: AppRuntime
     private let portField = NSTextField(string: "\(ProxyPortSettings.current)")
-    private let certLabel = makeLabel("проверка сертификата", font: AppTheme.compactFont, color: .secondaryLabelColor)
-    private let sudoersLabel = makeLabel("проверка настройки", font: AppTheme.compactFont, color: .secondaryLabelColor)
+    private let certLabel = makeLabel(L10n.t("проверка сертификата"), font: AppTheme.compactFont, color: .secondaryLabelColor)
+    private let sudoersLabel = makeLabel(L10n.t("проверка настройки"), font: AppTheme.compactFont, color: .secondaryLabelColor)
     private let logFormatPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let scopePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let scopeField = NSTextField(string: "")
+    private let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
 
-    private lazy var certButton = ClosureButton(title: "Установить доверие") { [weak self] in
+    private lazy var certButton = ClosureButton(title: L10n.t("Установить доверие")) { [weak self] in
         self?.toggleCert()
     }
 
-    private lazy var sudoersButton = ClosureButton(title: "Установить") { [weak self] in
+    private lazy var sudoersButton = ClosureButton(title: L10n.t("Установить")) { [weak self] in
         self?.toggleSudoers()
     }
 
@@ -48,8 +51,8 @@ final class SettingsSheet: NSViewController {
 extension SettingsSheet {
     /// Собирает колонку секций внутри прокручиваемой области
     private func buildLayout() {
-        let title = makeLabel("Настройки", font: NSFont.systemFont(ofSize: 15, weight: .semibold))
-        let doneButton = ClosureButton(title: "Готово") { [weak self] in
+        let title = makeLabel(L10n.t("Настройки"), font: NSFont.systemFont(ofSize: 15, weight: .semibold))
+        let doneButton = ClosureButton(title: L10n.t("Готово")) { [weak self] in
             self?.dismiss(nil)
         }
         doneButton.keyEquivalent = "\r"
@@ -60,20 +63,34 @@ extension SettingsSheet {
         portField.alignment = .right
         portField.widthAnchor.constraint(equalToConstant: 90).isActive = true
 
-        let applyPortButton = ClosureButton(title: "Применить") { [weak self] in
+        let applyPortButton = ClosureButton(title: L10n.t("Применить")) { [weak self] in
             self?.applyPort()
         }
-        let portRow = makeRow([makeLabel("Порт прокси", font: AppTheme.baseFont), portField, applyPortButton], spacing: 8)
+        let portRow = makeRow([makeLabel(L10n.t("Порт прокси"), font: AppTheme.baseFont), portField, applyPortButton], spacing: 8)
 
-        certButton.toolTip = "Firefox использует своё хранилище сертификатов: CA придётся добавить вручную"
+        scopePopup.translatesAutoresizingMaskIntoConstraints = false
+        for title in [L10n.t("Расшифровывать все хосты"), L10n.t("Только хосты из списка"), L10n.t("Все, кроме хостов из списка")] {
+            scopePopup.addItem(withTitle: title)
+        }
+        scopePopup.selectItem(at: TunnelScope.mode.rawValue)
+        scopeField.stringValue = TunnelScope.hosts.joined(separator: ", ")
+        scopeField.placeholderString = "example.com, *.internal.lan"
+        scopeField.translatesAutoresizingMaskIntoConstraints = false
+        scopeField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let scopeButton = ClosureButton(title: L10n.t("Применить")) { [weak self] in
+            self?.applyScope()
+        }
+        let scopeRow = makeRow([scopePopup, scopeField, scopeButton], spacing: 8)
 
-        let exportRulesButton = ClosureButton(title: "Экспорт") { [weak self] in
+        certButton.toolTip = L10n.t("Firefox использует своё хранилище сертификатов: CA придётся добавить вручную")
+
+        let exportRulesButton = ClosureButton(title: L10n.t("Экспорт")) { [weak self] in
             self?.exportRules()
         }
-        let importRulesButton = ClosureButton(title: "Импорт") { [weak self] in
+        let importRulesButton = ClosureButton(title: L10n.t("Импорт")) { [weak self] in
             self?.importRules()
         }
-        let refreshRulesButton = ClosureButton(title: "Перезагрузить") { [weak self] in
+        let refreshRulesButton = ClosureButton(title: L10n.t("Перезагрузить")) { [weak self] in
             self?.reloadRules()
         }
         let rulesRow = makeRow([exportRulesButton, importRulesButton, refreshRulesButton], spacing: 8)
@@ -82,22 +99,35 @@ extension SettingsSheet {
         for format in LogExportFormat.allCases {
             logFormatPopup.addItem(withTitle: format.rawValue.uppercased())
         }
-        let exportLogButton = ClosureButton(title: "Экспорт") { [weak self] in
+        let exportLogButton = ClosureButton(title: L10n.t("Экспорт")) { [weak self] in
             self?.exportLog()
         }
         let logRow = makeRow([logFormatPopup, exportLogButton], spacing: 8)
 
-        let openFolderButton = ClosureButton(title: "Открыть папку данных") { [weak self] in
+        let openFolderButton = ClosureButton(title: L10n.t("Открыть папку данных")) { [weak self] in
             self?.openSupportFolder()
         }
-        let revealLogButton = ClosureButton(title: "Показать журнал") { [weak self] in
+        let revealLogButton = ClosureButton(title: L10n.t("Показать журнал")) { [weak self] in
             self?.revealLogFile()
         }
-        let resetLogsButton = ClosureButton(title: "Удалить журналы…") { [weak self] in
+        let resetLogsButton = ClosureButton(title: L10n.t("Удалить журналы…")) { [weak self] in
             self?.resetLogs()
         }
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         let versionLabel = makeLabel("FileSwitcher \(version)", font: AppTheme.compactFont, color: .tertiaryLabelColor)
+        languagePopup.translatesAutoresizingMaskIntoConstraints = false
+        for language in L10n.Language.allCases {
+            languagePopup.addItem(withTitle: language.title)
+        }
+        if let index = L10n.Language.allCases.firstIndex(of: L10n.language) {
+            languagePopup.selectItem(at: index)
+        }
+        languagePopup.target = self
+        languagePopup.action = #selector(changeLanguage)
+        let languageRow = makeRow(
+            [makeLabel(L10n.t("Язык интерфейса"), font: AppTheme.baseFont), languagePopup],
+            spacing: 8
+        )
         let folderLabel = makeLabel(
             MetaFormat.stripHome(AppPaths.supportDirectory.path),
             font: AppTheme.monoFont,
@@ -106,21 +136,23 @@ extension SettingsSheet {
 
         let sections: [NSView] = [
             header,
-            makeSection("Сеть и сертификат", views: [
+            makeSection(L10n.t("Сеть и сертификат"), views: [
                 portRow,
+                makeSeparator(),
+                scopeRow,
                 makeSeparator(),
                 certLabel, certButton,
                 makeSeparator(),
                 sudoersLabel, sudoersButton
             ]),
-            makeSection("Правила", views: [rulesRow]),
-            makeSection("Журнал", views: [logRow]),
-            makeSection("Данные", views: [
+            makeSection(L10n.t("Правила"), views: [rulesRow]),
+            makeSection(L10n.t("Журнал"), views: [logRow]),
+            makeSection(L10n.t("Данные"), views: [
                 folderLabel,
                 openFolderButton,
                 makeRow([revealLogButton, resetLogsButton], spacing: 8)
             ]),
-            makeSection("О программе", views: [versionLabel])
+            makeSection(L10n.t("О программе"), views: [versionLabel, languageRow])
         ]
 
         let column = makeColumn(sections, spacing: 12)
@@ -167,7 +199,7 @@ extension SettingsSheet {
     /// Сохраняет порт и предлагает перезапустить прокси
     private func applyPort() {
         guard let port = Int(portField.stringValue.trimmingCharacters(in: .whitespaces)), (1...65535).contains(port) else {
-            showAlert("Неверный порт", "Порт должен быть числом от 1 до 65535")
+            showAlert(L10n.t("Неверный порт"), L10n.t("Порт должен быть числом от 1 до 65535"))
             portField.stringValue = "\(ProxyPortSettings.current)"
             return
         }
@@ -175,22 +207,45 @@ extension SettingsSheet {
         onPortChange?(port)
         let isRunning = runtime.controller?.state.status == .running
         guard isRunning else {
-            showAlert("Порт сохранён", "Прокси запустится на порту \(port)")
+            showAlert(L10n.t("Порт сохранён"), String(format: L10n.t("Прокси запустится на порту %d"), port))
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Порт сохранён"
-        alert.informativeText = "Перезапустить прокси на порту \(port) сейчас?"
-        alert.addButton(withTitle: "Перезапустить")
-        alert.addButton(withTitle: "Позже")
+        alert.messageText = L10n.t("Порт сохранён")
+        alert.informativeText = String(format: L10n.t("Перезапустить прокси на порту %d сейчас?"), port)
+        alert.addButton(withTitle: L10n.t("Перезапустить"))
+        alert.addButton(withTitle: L10n.t("Позже"))
         if alert.runModal() == .alertFirstButtonReturn {
             onRestart?()
         }
     }
 
+    /// Переключает язык интерфейса
+    @objc private func changeLanguage() {
+        let languages = L10n.Language.allCases
+        let index = languagePopup.indexOfSelectedItem
+        guard index >= 0, index < languages.count else {
+            return
+        }
+        L10n.save(languages[index])
+        showAlert(L10n.t("Язык изменён"), L10n.t("Язык изменится после перезапуска приложения"))
+    }
+
+    /// Сохраняет область перехвата трафика
+    private func applyScope() {
+        let mode = TunnelScope.Mode(rawValue: scopePopup.indexOfSelectedItem) ?? .all
+        let hosts = scopeField.stringValue
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty }
+        TunnelScope.save(mode: mode, hosts: hosts)
+        scopeField.stringValue = hosts.joined(separator: ", ")
+        showAlert(L10n.t("Область перехвата сохранена"), mode == .all ? L10n.t("Прокси расшифровывает все хосты") : String(format: L10n.t("Список хостов: %d"), hosts.count))
+    }
+
     /// Показывает состояние доверия к CA-сертификату
     private func refreshCertStatus() {
-        certLabel.stringValue = "проверка сертификата"
+        certLabel.stringValue = L10n.t("проверка сертификата")
         Task { [weak self] in
             let status = await CertTrustDarwin.status()
             guard let self else {
@@ -198,14 +253,14 @@ extension SettingsSheet {
             }
             switch status {
             case .notGenerated:
-                certLabel.stringValue = "Сертификат прокси ещё не создан"
-                certButton.title = "Создать и доверять"
+                certLabel.stringValue = L10n.t("Сертификат прокси ещё не создан")
+                certButton.title = L10n.t("Создать и доверять")
             case .notTrusted:
-                certLabel.stringValue = "Сертификат не доверен системе"
-                certButton.title = "Установить доверие"
+                certLabel.stringValue = L10n.t("Сертификат не доверен системе")
+                certButton.title = L10n.t("Установить доверие")
             case .trusted:
-                certLabel.stringValue = "Сертификат доверен системе"
-                certButton.title = "Убрать доверие"
+                certLabel.stringValue = L10n.t("Сертификат доверен системе")
+                certButton.title = L10n.t("Убрать доверие")
             }
             certButton.isHidden = false
         }
@@ -226,7 +281,7 @@ extension SettingsSheet {
                     try await CertTrustDarwin.install()
                 }
             } catch {
-                showAlert("Не удалось изменить доверие", error.localizedDescription)
+                showAlert(L10n.t("Не удалось изменить доверие"), error.localizedDescription)
             }
             refreshCertStatus()
             certButton.isEnabled = true
@@ -237,9 +292,9 @@ extension SettingsSheet {
     private func refreshSudoersStatus() {
         let installed = runtime.systemProxy.isPasswordlessSetup()
         sudoersLabel.stringValue = installed
-            ? "Беспарольное переключение системного прокси настроено"
-            : "Системный прокси переключается с запросом пароля"
-        sudoersButton.title = installed ? "Отозвать" : "Установить"
+            ? L10n.t("Беспарольное переключение системного прокси настроено")
+            : L10n.t("Системный прокси переключается с запросом пароля")
+        sudoersButton.title = installed ? L10n.t("Отозвать") : L10n.t("Установить")
     }
 
     /// Ставит или снимает правило sudoers
@@ -257,7 +312,7 @@ extension SettingsSheet {
                     try await runtime.systemProxy.setUpPasswordless()
                 }
             } catch {
-                showAlert("Не удалось настроить sudoers", error.localizedDescription)
+                showAlert(L10n.t("Не удалось настроить sudoers"), error.localizedDescription)
             }
             refreshSudoersStatus()
             sudoersButton.isEnabled = true
@@ -270,7 +325,7 @@ extension SettingsSheet {
     private func exportRules() {
         let rules = runtime.rulesStore.all()
         guard !rules.isEmpty else {
-            showAlert("Нет правил", "В списке нет правил для экспорта")
+            showAlert(L10n.t("Нет правил"), L10n.t("В списке нет правил для экспорта"))
             return
         }
         let panel = NSSavePanel()
@@ -281,9 +336,9 @@ extension SettingsSheet {
         }
         do {
             try JsonFile.write(RulesFile(rules: rules), to: url)
-            showAlert("Правила экспортированы", url.path)
+            showAlert(L10n.t("Правила экспортированы"), url.path)
         } catch {
-            showAlert("Не удалось сохранить файл", error.localizedDescription)
+            showAlert(L10n.t("Не удалось сохранить файл"), error.localizedDescription)
         }
     }
 
@@ -306,30 +361,30 @@ extension SettingsSheet {
                 imported = try decoder.decode([Rule].self, from: data)
             }
         } catch {
-            showAlert("Неверный формат файла", "Ожидался JSON с массивом правил")
+            showAlert(L10n.t("Неверный формат файла"), L10n.t("Ожидался JSON с массивом правил"))
             return
         }
         let alert = NSAlert()
-        alert.messageText = "Заменить правила?"
-        alert.informativeText = "Текущий список будет заменён правилами из файла (\(imported.count) шт.)"
-        alert.addButton(withTitle: "Заменить")
-        alert.addButton(withTitle: "Отмена")
+        alert.messageText = L10n.t("Заменить правила?")
+        alert.informativeText = String(format: L10n.t("Текущий список будет заменён правилами из файла (%d шт.)"), imported.count)
+        alert.addButton(withTitle: L10n.t("Заменить"))
+        alert.addButton(withTitle: L10n.t("Отмена"))
         guard alert.runModal() == .alertFirstButtonReturn else {
             return
         }
         do {
             _ = try runtime.rulesStore.saveAll(imported)
             onRulesChanged?()
-            showAlert("Правила импортированы", "Загружено правил: \(imported.count)")
+            showAlert(L10n.t("Правила импортированы"), String(format: L10n.t("Загружено правил: %d"), imported.count))
         } catch {
-            showAlert("Не удалось импортировать правила", error.localizedDescription)
+            showAlert(L10n.t("Не удалось импортировать правила"), error.localizedDescription)
         }
     }
 
     /// Перечитывает правила с диска
     private func reloadRules() {
         onRulesChanged?()
-        showAlert("Правила перечитаны", "Загружено правил: \(runtime.rulesStore.all().count)")
+        showAlert(L10n.t("Правила перечитаны"), String(format: L10n.t("Загружено правил: %d"), runtime.rulesStore.all().count))
     }
 
     /// Экспортирует журнал в выбранном формате
@@ -343,9 +398,9 @@ extension SettingsSheet {
         }
         do {
             try LogExport.stream(sourcePath: runtime.store.filePath, destinationPath: url.path, format: format)
-            showAlert("Журнал экспортирован", url.path)
+            showAlert(L10n.t("Журнал экспортирован"), url.path)
         } catch {
-            showAlert("Не удалось экспортировать журнал", error.localizedDescription)
+            showAlert(L10n.t("Не удалось экспортировать журнал"), error.localizedDescription)
         }
     }
 
@@ -362,7 +417,7 @@ extension SettingsSheet {
     private func revealLogFile() {
         let path = runtime.store.filePath
         guard FileManager.default.fileExists(atPath: path) else {
-            showAlert("Журнала пока нет", "В этой сессии ещё не записано ни одного запроса")
+            showAlert(L10n.t("Журнала пока нет"), L10n.t("В этой сессии ещё не записано ни одного запроса"))
             return
         }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
@@ -371,11 +426,11 @@ extension SettingsSheet {
     /// Удаляет с диска файлы журнала всех сессий
     private func resetLogs() {
         let alert = NSAlert()
-        alert.messageText = "Удалить журналы?"
-        alert.informativeText = "Будут удалены файлы трафика всех сессий. Правила и настройки останутся."
+        alert.messageText = L10n.t("Удалить журналы?")
+        alert.informativeText = L10n.t("Будут удалены файлы трафика всех сессий. Правила и настройки останутся.")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Удалить")
-        alert.addButton(withTitle: "Отмена")
+        alert.addButton(withTitle: L10n.t("Удалить"))
+        alert.addButton(withTitle: L10n.t("Отмена"))
         guard alert.runModal() == .alertFirstButtonReturn else {
             return
         }
@@ -389,7 +444,7 @@ extension SettingsSheet {
                 removed += 1
             }
         }
-        showAlert("Журналы удалены", "Удалено файлов: \(removed). Перезапустите приложение, чтобы начать новый журнал.")
+        showAlert(L10n.t("Журналы удалены"), String(format: L10n.t("Удалено файлов: %d. Перезапустите приложение, чтобы начать новый журнал."), removed))
     }
 
     /// Показывает короткое модальное сообщение
@@ -397,7 +452,7 @@ extension SettingsSheet {
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = text
-        alert.addButton(withTitle: "Ок")
+        alert.addButton(withTitle: L10n.t("Ок"))
         alert.runModal()
     }
 }

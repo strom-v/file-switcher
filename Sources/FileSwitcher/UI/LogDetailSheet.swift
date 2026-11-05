@@ -29,29 +29,29 @@ final class LogDetailSheet: NSViewController {
         let tabs = NSTabView()
         tabs.tabViewType = .topTabsBezelBorder
         tabs.translatesAutoresizingMaskIntoConstraints = false
-        tabs.addTabViewItem(makeTab(title: "Заголовки запроса", text: EventFormatter.headers(event.requestHeaders)))
-        tabs.addTabViewItem(makeTab(title: "Заголовки ответа", text: EventFormatter.headers(event.responseHeaders)))
-        tabs.addTabViewItem(makeTab(title: "Тело запроса", text: bodyText(
+        tabs.addTabViewItem(makeTab(title: L10n.t("Заголовки запроса"), text: EventFormatter.headers(event.requestHeaders)))
+        tabs.addTabViewItem(makeTab(title: L10n.t("Заголовки ответа"), text: EventFormatter.headers(event.responseHeaders)))
+        tabs.addTabViewItem(makeTab(title: L10n.t("Тело запроса"), text: bodyText(
             event.requestBody,
             isBinary: event.requestBodyIsBinary,
             size: event.requestBodySize
         )))
-        tabs.addTabViewItem(makeTab(title: "Тело ответа", text: bodyText(
+        tabs.addTabViewItem(makeTab(title: L10n.t("Тело ответа"), text: bodyText(
             event.responseBody,
             isBinary: event.responseBodyIsBinary,
             size: event.responseSize
         )))
-        addJSONTab(to: tabs, title: "JSON запроса", body: event.requestBody, isBinary: event.requestBodyIsBinary)
-        addJSONTab(to: tabs, title: "JSON ответа", body: event.responseBody, isBinary: event.responseBodyIsBinary)
+        addJSONTab(to: tabs, title: L10n.t("JSON запроса"), body: event.requestBody, isBinary: event.requestBodyIsBinary)
+        addJSONTab(to: tabs, title: L10n.t("JSON ответа"), body: event.responseBody, isBinary: event.responseBodyIsBinary)
 
-        let createButton = ClosureButton(title: "Создать правило") { [weak self] in
+        let createButton = ClosureButton(title: L10n.t("Создать правило")) { [weak self] in
             guard let self else {
                 return
             }
             dismiss(nil)
             onCreateRule?(event)
         }
-        let replayButton = ClosureButton(title: "Повторить") { [weak self] in
+        let replayButton = ClosureButton(title: L10n.t("Повторить")) { [weak self] in
             guard let self else {
                 return
             }
@@ -59,7 +59,7 @@ final class LogDetailSheet: NSViewController {
             onReplay?(event)
         }
         replayButton.isEnabled = !event.requestBodyIsBinary
-        let copyButton = ClosureButton(title: "Копировать всё") { [weak self] in
+        let copyButton = ClosureButton(title: L10n.t("Копировать всё")) { [weak self] in
             guard let self else {
                 return
             }
@@ -75,7 +75,7 @@ final class LogDetailSheet: NSViewController {
             pasteboard.clearContents()
             pasteboard.setString(EventFormatter.curl(event), forType: .string)
         }
-        let closeButton = ClosureButton(title: "Закрыть") { [weak self] in
+        let closeButton = ClosureButton(title: L10n.t("Закрыть")) { [weak self] in
             self?.dismiss(nil)
         }
         closeButton.keyEquivalent = "\r"
@@ -108,10 +108,10 @@ final class LogDetailSheet: NSViewController {
 
         let grid = NSGridView(views: [
             [makeFieldLabel("URL"), urlLabel],
-            [makeFieldLabel("Метод"), makeLabel(event.method, font: AppTheme.compactBoldFont)],
-            [makeFieldLabel("Статус"), statusLabel],
-            [makeFieldLabel("Время"), makeLabel(MetaFormat.time(event.ts, withDate: true), font: AppTheme.compactFont)],
-            [makeFieldLabel("Размер"), makeLabel(MetaFormat.size(event.responseSize), font: AppTheme.compactFont)]
+            [makeFieldLabel(L10n.t("Метод")), makeLabel(event.method, font: AppTheme.compactBoldFont)],
+            [makeFieldLabel(L10n.t("Статус")), statusLabel],
+            [makeFieldLabel(L10n.t("Время")), makeLabel(MetaFormat.time(event.ts, withDate: true), font: AppTheme.compactFont)],
+            [makeFieldLabel(L10n.t("Размер")), makeLabel(MetaFormat.size(event.responseSize), font: AppTheme.compactFont)]
         ])
         grid.translatesAutoresizingMaskIntoConstraints = false
         grid.rowSpacing = 4
@@ -165,8 +165,8 @@ final class LogDetailSheet: NSViewController {
     /// Текст тела запроса или пометка о бинарном содержимом
     private func bodyText(_ body: String, isBinary: Bool, size: Int) -> String {
         if isBinary {
-            return "Бинарное тело размером \(MetaFormat.size(size)) - в журнале не сохраняется"
+            return String(format: L10n.t("Бинарное тело размером %@ - в журнале не сохраняется"), MetaFormat.size(size))
         }
-        return body.isEmpty ? "(тела нет)" : body
+        return body.isEmpty ? L10n.t("(тела нет)") : body
     }
 }

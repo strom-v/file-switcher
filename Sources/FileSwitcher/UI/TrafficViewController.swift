@@ -28,7 +28,7 @@ final class TrafficViewController: NSViewController {
     private let searchField = NSSearchField()
     private let bodySearchButton = NSButton()
     private let filterControl = NSSegmentedControl(
-        labels: ["Все", "Подмены"],
+        labels: [L10n.t("Все"), L10n.t("Подмены")],
         trackingMode: .selectOne,
         target: nil,
         action: nil
@@ -62,7 +62,7 @@ final class TrafficViewController: NSViewController {
 
     /// Собирает тулбар поиска, счётчики и список журнала
     private func buildLayout() {
-        searchField.placeholderString = "Поиск по URL или файлу подмены"
+        searchField.placeholderString = L10n.t("Поиск по URL или файлу подмены")
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.target = self
         searchField.action = #selector(applySearch)
@@ -73,7 +73,7 @@ final class TrafficViewController: NSViewController {
         bodySearchButton.isBordered = false
         bodySearchButton.bezelStyle = .regularSquare
         bodySearchButton.setButtonType(.toggle)
-        bodySearchButton.toolTip = "Искать и в телах запросов"
+        bodySearchButton.toolTip = L10n.t("Искать и в телах запросов")
         bodySearchButton.target = self
         bodySearchButton.action = #selector(applySearch)
         bodySearchButton.translatesAutoresizingMaskIntoConstraints = false
@@ -88,36 +88,36 @@ final class TrafficViewController: NSViewController {
         filterControl.setContentHuggingPriority(.defaultHigh, for: .horizontal)
         filterControl.translatesAutoresizingMaskIntoConstraints = false
 
-        countLabel.toolTip = "всего записей / подмен"
+        countLabel.toolTip = L10n.t("всего записей / подмен")
         countLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
         let replayItem = actionsMenu.addItem(
-            withTitle: "Повторить выбранный запрос",
+            withTitle: L10n.t("Повторить выбранный запрос"),
             action: #selector(replaySelected),
             keyEquivalent: ""
         )
         replayItem.target = self
         let pauseItem = actionsMenu.addItem(
-            withTitle: "Пауза записи",
+            withTitle: L10n.t("Пауза записи"),
             action: #selector(togglePause(_:)),
             keyEquivalent: ""
         )
         pauseItem.target = self
         let errorsItem = actionsMenu.addItem(
-            withTitle: "Только ошибки 4xx-5xx",
+            withTitle: L10n.t("Только ошибки 4xx-5xx"),
             action: #selector(toggleOnlyErrors(_:)),
             keyEquivalent: ""
         )
         errorsItem.target = self
         let exportItem = actionsMenu.addItem(
-            withTitle: "Экспортировать журнал…",
+            withTitle: L10n.t("Экспортировать журнал…"),
             action: #selector(exportLog),
             keyEquivalent: ""
         )
         exportItem.target = self
         actionsMenu.addItem(.separator())
         let clearItem = actionsMenu.addItem(
-            withTitle: "Очистить список…",
+            withTitle: L10n.t("Очистить список…"),
             action: #selector(clearLog),
             keyEquivalent: ""
         )
@@ -125,7 +125,7 @@ final class TrafficViewController: NSViewController {
 
         let actionsButton = makeIconButton(
             symbol: "ellipsis",
-            tooltip: "Действия с журналом",
+            tooltip: L10n.t("Действия с журналом"),
             target: self,
             action: #selector(showActionsMenu(_:))
         )
@@ -191,7 +191,7 @@ final class TrafficViewController: NSViewController {
         matchedTotal = entries.filter { $0.event == .matched }.count
         rebuildVisible()
         guard let controller = runtime.controller else {
-            emptyLabel.stringValue = runtime.startupError ?? "Прокси недоступен"
+            emptyLabel.stringValue = runtime.startupError ?? L10n.t("Прокси недоступен")
             return
         }
         controller.onLogBatch = { [weak self] metas in
@@ -268,7 +268,7 @@ final class TrafficViewController: NSViewController {
     private func updateCounters() {
         countLabel.stringValue = "\(entries.count) / \(matchedTotal)"
         if visible.isEmpty {
-            emptyLabel.stringValue = entries.isEmpty ? "Записей пока нет" : "Ничего не найдено"
+            emptyLabel.stringValue = entries.isEmpty ? L10n.t("Записей пока нет") : L10n.t("Ничего не найдено")
             emptyLabel.isHidden = false
         } else {
             emptyLabel.isHidden = true
@@ -281,7 +281,7 @@ final class TrafficViewController: NSViewController {
             switch item.action {
             case #selector(togglePause(_:)):
                 item.state = isPaused ? .on : .off
-                item.title = isPaused ? "Продолжить запись" : "Пауза записи"
+                item.title = isPaused ? L10n.t("Продолжить запись") : L10n.t("Пауза записи")
             case #selector(toggleOnlyErrors(_:)):
                 item.state = onlyErrors ? .on : .off
             default:
@@ -379,10 +379,10 @@ final class TrafficViewController: NSViewController {
         let filter = EventFilter(rawValue: filterControl.selectedSegment) ?? .all
         let keepsMatched = filter == .matched
         let alert = NSAlert()
-        alert.messageText = keepsMatched ? "Убрать из списка записи о подменах?" : "Очистить журнал?"
-        alert.informativeText = "Файл журнала на диске останется - очищается только список в окне."
-        alert.addButton(withTitle: "Очистить")
-        alert.addButton(withTitle: "Отмена")
+        alert.messageText = keepsMatched ? L10n.t("Убрать из списка записи о подменах?") : L10n.t("Очистить журнал?")
+        alert.informativeText = L10n.t("Файл журнала на диске останется - очищается только список в окне.")
+        alert.addButton(withTitle: L10n.t("Очистить"))
+        alert.addButton(withTitle: L10n.t("Отмена"))
         guard alert.runModal() == .alertFirstButtonReturn else {
             return
         }
@@ -405,7 +405,7 @@ final class TrafficViewController: NSViewController {
         do {
             try LogExport.stream(sourcePath: runtime.store.filePath, destinationPath: url.path, format: format)
         } catch {
-            showAlert("Не удалось экспортировать журнал", error.localizedDescription)
+            showAlert(L10n.t("Не удалось экспортировать журнал"), error.localizedDescription)
         }
     }
 
@@ -424,7 +424,7 @@ final class TrafficViewController: NSViewController {
                 let replayEvent = try await ReplayRequest.replay(event)
                 append(runtime.store.appendBatch([replayEvent]))
             } catch {
-                showAlert("Не удалось повторить запрос", error.localizedDescription)
+                showAlert(L10n.t("Не удалось повторить запрос"), error.localizedDescription)
             }
         }
     }
@@ -442,7 +442,7 @@ final class TrafficViewController: NSViewController {
     /// Показывает модальную панель с заголовками и телами запроса
     func openDetails(for ts: Double) {
         guard let event = runtime.controller?.event(ts: ts) else {
-            showAlert("Запись недоступна", "Этой записи больше нет в файле журнала")
+            showAlert(L10n.t("Запись недоступна"), L10n.t("Этой записи больше нет в файле журнала"))
             return
         }
         let sheet = LogDetailSheet(event: event)
@@ -459,7 +459,7 @@ final class TrafficViewController: NSViewController {
     private func eventForAction() -> ProxyLogEvent? {
         let row = tableView.clickedRow >= 0 ? tableView.clickedRow : tableView.selectedRow
         guard row >= 0, row < visible.count, let event = runtime.controller?.event(ts: visible[row].ts) else {
-            showAlert("Запись недоступна", "Выберите запись в журнале")
+            showAlert(L10n.t("Запись недоступна"), L10n.t("Выберите запись в журнале"))
             return nil
         }
         return event
@@ -478,24 +478,24 @@ final class TrafficViewController: NSViewController {
     private func makeContextMenu() -> NSMenu {
         let menu = NSMenu()
         let createItem = menu.addItem(
-            withTitle: "Создать правило подмены",
+            withTitle: L10n.t("Создать правило подмены"),
             action: #selector(createRuleFromRow),
             keyEquivalent: ""
         )
         createItem.target = self
         let copyMenu = NSMenu()
-        let copyUrlItem = copyMenu.addItem(withTitle: "Копировать URL", action: #selector(copyUrl), keyEquivalent: "")
+        let copyUrlItem = copyMenu.addItem(withTitle: L10n.t("Копировать URL"), action: #selector(copyUrl), keyEquivalent: "")
         copyUrlItem.target = self
         let copyCurlItem = copyMenu.addItem(
-            withTitle: "Копировать как cURL",
+            withTitle: L10n.t("Копировать как cURL"),
             action: #selector(copyAsCurl),
             keyEquivalent: ""
         )
         copyCurlItem.target = self
-        let copyItem = NSMenuItem(title: "Копировать", action: nil, keyEquivalent: "")
+        let copyItem = NSMenuItem(title: L10n.t("Копировать"), action: nil, keyEquivalent: "")
         copyItem.submenu = copyMenu
         menu.addItem(copyItem)
-        let replayItem = menu.addItem(withTitle: "Повторить запрос", action: #selector(replayRow), keyEquivalent: "")
+        let replayItem = menu.addItem(withTitle: L10n.t("Повторить запрос"), action: #selector(replayRow), keyEquivalent: "")
         replayItem.target = self
         return menu
     }

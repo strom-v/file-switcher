@@ -185,6 +185,7 @@ final class RuleMatcher: RuleEngine, @unchecked Sendable {
             lock.unlock()
         }
         if let exact = exactRules[url] {
+            RuleHitCounter.shared.register(ruleId: exact.id)
             return RuleMatch(rule: exact, groups: nil)
         }
         guard url.count <= maxRegexURLLength else {
@@ -195,6 +196,7 @@ final class RuleMatcher: RuleEngine, @unchecked Sendable {
             guard let match = entry.regex.firstMatch(in: url, range: range) else {
                 continue
             }
+            RuleHitCounter.shared.register(ruleId: entry.rule.id)
             return RuleMatch(rule: entry.rule, groups: captureGroups(of: match, in: url))
         }
         return nil

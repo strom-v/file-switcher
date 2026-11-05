@@ -35,7 +35,7 @@ final class MainWindowController: NSWindowController {
 
     private lazy var startStopButton = FilledIconButton(
         symbol: "play.fill",
-        tooltip: "Запустить прокси",
+        tooltip: L10n.t("Запустить прокси"),
         fillColor: AppTheme.success,
         target: self,
         action: #selector(toggleProxy)
@@ -105,7 +105,7 @@ extension MainWindowController {
             self?.showSettings()
         }
         settingsButton.isBordered = false
-        settingsButton.toolTip = "Настройки"
+        settingsButton.toolTip = L10n.t("Настройки")
 
         let header = makeRow(
             [statusDot, statusLabel, portLabel, makeSpacer(), settingsButton, startStopButton],
@@ -166,28 +166,28 @@ extension MainWindowController {
         portLabel.stringValue = "127.0.0.1:\(state.port)"
         switch state.status {
         case .stopped:
-            statusLabel.stringValue = "остановлен"
+            statusLabel.stringValue = L10n.t("остановлен")
             statusLabel.textColor = .secondaryLabelColor
             statusDot.layer?.backgroundColor = NSColor.tertiaryLabelColor.cgColor
             setStartStop(isRunning: false, enabled: true)
         case .starting:
-            statusLabel.stringValue = "запускается"
+            statusLabel.stringValue = L10n.t("запускается")
             statusLabel.textColor = .secondaryLabelColor
             statusDot.layer?.backgroundColor = AppTheme.warning.cgColor
             setStartStop(isRunning: false, enabled: false)
         case .running:
-            statusLabel.stringValue = "работает"
+            statusLabel.stringValue = L10n.t("работает")
             statusLabel.textColor = .secondaryLabelColor
             statusDot.layer?.backgroundColor = AppTheme.success.cgColor
             setStartStop(isRunning: true, enabled: true)
         case .crashed:
-            statusLabel.stringValue = "ошибка запуска"
+            statusLabel.stringValue = L10n.t("ошибка запуска")
             statusLabel.textColor = AppTheme.danger
             statusDot.layer?.backgroundColor = AppTheme.danger.cgColor
             setStartStop(isRunning: false, enabled: true)
         }
         startStopButton.toolTip = state.error
-            ?? (state.status == .running ? "Остановить прокси" : "Запустить прокси")
+            ?? (state.status == .running ? L10n.t("Остановить прокси") : L10n.t("Запустить прокси"))
     }
 
     /// Переключает вид кнопки запуска и остановки
@@ -222,7 +222,7 @@ extension MainWindowController {
             guard vpn.blocksProxy else {
                 return
             }
-            warningLabel.stringValue = "Активный VPN перехватывает трафик - прокси не увидит запросы"
+            warningLabel.stringValue = L10n.t("Активный VPN перехватывает трафик - прокси не увидит запросы")
             warningBanner.layer?.backgroundColor = AppTheme.errorBanner.cgColor
             warningBanner.isHidden = false
             warningHideTask?.cancel()

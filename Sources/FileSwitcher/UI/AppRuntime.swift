@@ -31,7 +31,7 @@ final class AppRuntime {
         do {
             loadedAuthority = try CertificateAuthority()
         } catch {
-            startupMessage = "Нет сертификата прокси: \(error.localizedDescription)"
+            startupMessage = String(format: L10n.t("Нет сертификата прокси: %@"), error.localizedDescription)
         }
         authority = loadedAuthority
         startupError = startupMessage

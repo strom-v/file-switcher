@@ -21,7 +21,7 @@ enum AppMenu {
         let menu = NSMenu(title: "FileSwitcher")
 
         let about = NSMenuItem(
-            title: "О FileSwitcher",
+            title: L10n.t("О FileSwitcher"),
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
@@ -29,16 +29,16 @@ enum AppMenu {
         menu.addItem(about)
         menu.addItem(.separator())
 
-        let settings = NSMenuItem(title: "Настройки…", action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
+        let settings = NSMenuItem(title: L10n.t("Настройки…"), action: #selector(AppDelegate.showSettings(_:)), keyEquivalent: ",")
         settings.target = appDelegate
         menu.addItem(settings)
         menu.addItem(.separator())
 
-        let hide = NSMenuItem(title: "Скрыть FileSwitcher", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hide = NSMenuItem(title: L10n.t("Скрыть FileSwitcher"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hide.target = NSApp
         menu.addItem(hide)
 
-        let quit = NSMenuItem(title: "Завершить FileSwitcher", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let quit = NSMenuItem(title: L10n.t("Завершить FileSwitcher"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.target = NSApp
         menu.addItem(quit)
 
@@ -49,16 +49,16 @@ enum AppMenu {
     /// Меню правки: отмена, буфер обмена и выделение
     private static func editItem() -> NSMenuItem {
         let item = NSMenuItem()
-        let menu = NSMenu(title: "Правка")
-        menu.addItem(withTitle: "Отменить", action: Selector(("undo:")), keyEquivalent: "z")
-        let redo = NSMenuItem(title: "Повторить", action: Selector(("redo:")), keyEquivalent: "z")
+        let menu = NSMenu(title: L10n.t("Правка"))
+        menu.addItem(withTitle: L10n.t("Отменить"), action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = NSMenuItem(title: L10n.t("Повторить"), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(redo)
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Вырезать", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        menu.addItem(withTitle: "Копировать", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        menu.addItem(withTitle: "Вставить", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        menu.addItem(withTitle: "Выделить всё", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        menu.addItem(withTitle: L10n.t("Вырезать"), action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        menu.addItem(withTitle: L10n.t("Копировать"), action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        menu.addItem(withTitle: L10n.t("Вставить"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        menu.addItem(withTitle: L10n.t("Выделить всё"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         item.submenu = menu
         return item
     }
@@ -66,9 +66,9 @@ enum AppMenu {
     /// Меню вида: выбор темы оформления
     private static func viewItem(appDelegate: AppDelegate) -> NSMenuItem {
         let item = NSMenuItem()
-        let menu = NSMenu(title: "Вид")
-        let themeItem = NSMenuItem(title: "Тема", action: nil, keyEquivalent: "")
-        let themeMenu = NSMenu(title: "Тема")
+        let menu = NSMenu(title: L10n.t("Вид"))
+        let themeItem = NSMenuItem(title: L10n.t("Тема"), action: nil, keyEquivalent: "")
+        let themeMenu = NSMenu(title: L10n.t("Тема"))
         for mode in AppearanceSettings.Mode.allCases {
             let entry = NSMenuItem(
                 title: mode.title,
@@ -88,14 +88,14 @@ enum AppMenu {
     /// Меню журнала: фокус в поиск и повтор выбранного запроса
     private static func logItem() -> NSMenuItem {
         let item = NSMenuItem()
-        let menu = NSMenu(title: "Журнал")
+        let menu = NSMenu(title: L10n.t("Журнал"))
         menu.addItem(
-            withTitle: "Найти",
+            withTitle: L10n.t("Найти"),
             action: #selector(TrafficViewController.focusSearchField(_:)),
             keyEquivalent: "f"
         )
         menu.addItem(
-            withTitle: "Повторить запрос",
+            withTitle: L10n.t("Повторить запрос"),
             action: #selector(TrafficViewController.replaySelectedRequest(_:)),
             keyEquivalent: "r"
         )
@@ -106,14 +106,14 @@ enum AppMenu {
     /// Меню правил: создание нового правила и импорт из буфера
     private static func rulesItem() -> NSMenuItem {
         let item = NSMenuItem()
-        let menu = NSMenu(title: "Правила")
+        let menu = NSMenu(title: L10n.t("Правила"))
         menu.addItem(
-            withTitle: "Новое правило",
+            withTitle: L10n.t("Новое правило"),
             action: #selector(RulesViewController.createNewRule(_:)),
             keyEquivalent: "n"
         )
         menu.addItem(
-            withTitle: "Импортировать из буфера",
+            withTitle: L10n.t("Импортировать из буфера"),
             action: #selector(RulesViewController.importFromClipboard(_:)),
             keyEquivalent: ""
         )
@@ -124,9 +124,9 @@ enum AppMenu {
     /// Меню окна: свернуть и закрыть
     private static func windowItem() -> NSMenuItem {
         let item = NSMenuItem()
-        let menu = NSMenu(title: "Окно")
-        menu.addItem(withTitle: "Свернуть", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        menu.addItem(withTitle: "Закрыть окно", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let menu = NSMenu(title: L10n.t("Окно"))
+        menu.addItem(withTitle: L10n.t("Свернуть"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        menu.addItem(withTitle: L10n.t("Закрыть окно"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         item.submenu = menu
         return item
     }

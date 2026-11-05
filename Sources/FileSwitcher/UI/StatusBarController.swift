@@ -16,15 +16,15 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         statusItem.button?.toolTip = "FileSwitcher"
 
         menu.delegate = self
-        let openItem = NSMenuItem(title: "Открыть FileSwitcher", action: #selector(showWindow), keyEquivalent: "")
+        let openItem = NSMenuItem(title: L10n.t("Открыть FileSwitcher"), action: #selector(showWindow), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
         menu.addItem(.separator())
-        let toggleItem = NSMenuItem(title: "Запустить прокси", action: #selector(toggleProxy), keyEquivalent: "")
+        let toggleItem = NSMenuItem(title: L10n.t("Запустить прокси"), action: #selector(toggleProxy), keyEquivalent: "")
         toggleItem.target = self
         menu.addItem(toggleItem)
         menu.addItem(.separator())
-        let quitItem = NSMenuItem(title: "Завершить FileSwitcher", action: #selector(quit), keyEquivalent: "")
+        let quitItem = NSMenuItem(title: L10n.t("Завершить FileSwitcher"), action: #selector(quit), keyEquivalent: "")
         quitItem.target = self
         menu.addItem(quitItem)
         statusItem.menu = menu
@@ -34,7 +34,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         let running = runtime.controller?.state.status == .running
         let item = menu.item(at: 2)
-        item?.title = running ? "Остановить прокси" : "Запустить прокси"
+        item?.title = running ? L10n.t("Остановить прокси") : L10n.t("Запустить прокси")
         item?.image = AppTheme.symbol(running ? "stop.fill" : "play.fill", size: 12)
     }
 

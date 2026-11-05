@@ -116,10 +116,10 @@ enum MetaFormat {
     /// Размер в байтах, килобайтах или мегабайтах
     static func size(_ bytes: Int) -> String {
         if bytes >= 1_048_576 {
-            return String(format: "%.1f МБ", Double(bytes) / 1_048_576)
+            return String(format: L10n.t("%.1f МБ"), Double(bytes) / 1_048_576)
         }
         if bytes >= 1024 {
-            return String(format: "%.1f КБ", Double(bytes) / 1024)
+            return String(format: L10n.t("%.1f КБ"), Double(bytes) / 1024)
         }
         return "\(bytes) Б"
     }
