@@ -340,7 +340,7 @@ final class TrafficViewController: NSViewController {
     @objc private func applySearch() {
         bodySearchTask?.cancel()
         let query = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty, let controller = runtime.controller else {
+        guard !query.isEmpty else {
             bodyMatches = nil
             rebuildVisible()
             return
@@ -351,8 +351,11 @@ final class TrafficViewController: NSViewController {
                 return
             }
             let inBody = bodySearchButton.state == .on
-            // вместе с текущей сессией просматриваются и файлы прошлых сессий
-            let found = controller.search(query: query, searchInBody: inBody, includeHistory: true)
+            let store = runtime.store
+            // поиск читает файлы сессий с диска: уводим его с главного потока
+            let found = await Task.detached(priority: .userInitiated) {
+                store.search(query: query, searchInBody: inBody, includeHistory: true)
+            }.value
             guard !Task.isCancelled else {
                 return
             }

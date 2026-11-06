@@ -21,9 +21,8 @@ enum RawTunnel {
                     return channel.pipeline.addHandler(RawUpstreamHandler(relay: relay))
                 }
                 do {
-                    let configuration = TLSConfiguration.makeClientConfiguration()
                     let tls = try NIOSSLClientHandler(
-                        context: NIOSSLContext(configuration: configuration),
+                        context: setup.authority.clientTLSContext(),
                         serverHostname: target.host
                     )
                     return channel.pipeline.addHandlers([tls, RawUpstreamHandler(relay: relay)])

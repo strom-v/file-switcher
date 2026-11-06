@@ -61,7 +61,7 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             case .awaitingUpstream:
                 queuedParts.append(part)
             case .streaming:
-                upstream?.write(HTTPClientRequestPart.body(.byteBuffer(buffer)), promise: nil)
+                upstream?.writeAndFlush(HTTPClientRequestPart.body(.byteBuffer(buffer)), promise: nil)
             case .idle, .swapping:
                 break
             }
@@ -154,15 +154,15 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             return
         }
         let group = setup.group
+        let authority = setup.authority
         let bootstrap = ClientBootstrap(group: group)
             .channelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .channelInitializer { channel in
                 var handlers: [any ChannelHandler] = []
                 if target.scheme == .https {
                     do {
-                        let configuration = TLSConfiguration.makeClientConfiguration()
                         let tls = try NIOSSLClientHandler(
-                            context: NIOSSLContext(configuration: configuration),
+                            context: authority.clientTLSContext(),
                             serverHostname: target.host
                         )
                         handlers.append(tls)
@@ -222,6 +222,8 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             }
         }
         queuedParts = []
+        // накопленные части без завершающего .end тоже должны уйти сразу
+        upstream.flush()
     }
 
     /// Ответ подменой: тело правила, свой content-type и запрет кэширования
@@ -285,7 +287,8 @@ final class ProxyConnectionHandler: ChannelInboundHandler, @unchecked Sendable {
             onUpstreamHead(head: responseHead)
         case let .body(buffer):
             responseBody.add(buffer)
-            _ = clientChannel.write(HTTPServerResponsePart.body(.byteBuffer(buffer)))
+            // тело ответа уходит клиенту сразу: иначе потоковые ответы ждут конца запроса
+            _ = clientChannel.writeAndFlush(HTTPServerResponsePart.body(.byteBuffer(buffer)))
         case .end:
             clientChannel.writeAndFlush(HTTPServerResponsePart.end(nil)).whenFailure { _ in }
             log(

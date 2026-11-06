@@ -50,6 +50,8 @@ final class CertificateAuthority: @unchecked Sendable {
     private let leafPublicKeyDER: [UInt8]
     private let leafKeyPKCS8: [UInt8]
     private var contexts: [String: NIOSSLContext] = [:]
+    /// Клиентский контекст общий: создавать его на каждое соединение слишком дорого
+    private var clientContext: NIOSSLContext?
     private let lock = NSLock()
 
     init() throws {
@@ -147,6 +149,21 @@ extension CertificateAuthority {
             contexts.removeAll()
         }
         contexts[host] = context
+        lock.unlock()
+        return context
+    }
+
+    /// Клиентский TLS-контекст для соединений с настоящими серверами: создаётся один раз на запуск
+    func clientTLSContext() throws -> NIOSSLContext {
+        lock.lock()
+        let cached = clientContext
+        lock.unlock()
+        if let cached {
+            return cached
+        }
+        let context = try NIOSSLContext(configuration: TLSConfiguration.makeClientConfiguration())
+        lock.lock()
+        clientContext = context
         lock.unlock()
         return context
     }

@@ -32,6 +32,8 @@ final class LogStore: @unchecked Sendable {
     private var diskLoggingError: String?
     private var diskLoggingWarning: String?
     private var index: [IndexEntry] = []
+    /// Запись по её ts: детали открываются по времени, линейный поиск по индексу не нужен
+    private var indexByTs: [Double: IndexEntry] = [:]
     private var searchGeneration = 0
 
     init(directory: URL = AppPaths.trafficLogDirectory) {
@@ -103,10 +105,7 @@ final class LogStore: @unchecked Sendable {
         guard !events.isEmpty else {
             return []
         }
-        let lines = events.map { event -> (String, Int) in
-            let line = LogStore.encodeLine(event)
-            return (line, line.utf8.count)
-        }
+        let lines = LogStore.encodeLines(events)
 
         lock.lock()
         defer {
@@ -116,11 +115,11 @@ final class LogStore: @unchecked Sendable {
         let writeStartOffset = bytesWritten
         var writtenInBatch = 0
         if diskLoggingError == nil {
-            var payload = ""
-            for (line, byteLength) in lines {
-                if writeStartOffset + writtenInBatch + byteLength <= maxSessionFileBytes {
-                    payload += line
-                    writtenInBatch += byteLength
+            var payload = Data()
+            for line in lines {
+                if writeStartOffset + writtenInBatch + line.count <= maxSessionFileBytes {
+                    payload.append(line)
+                    writtenInBatch += line.count
                 } else {
                     // потолок размера: остаток пачки уходит в список, но на диск уже не пишется
                     sizeLimitReached = true
@@ -141,7 +140,7 @@ final class LogStore: @unchecked Sendable {
         var metas: [LogEntryMeta] = []
         var offsetCursor = writeStartOffset
         for (offset, event) in events.enumerated() {
-            let byteLength = lines[offset].1
+            let byteLength = lines[offset].count
             // byteLength 0 означает "строки нет в файле": доступ к телам вернёт nil
             let isOnDisk = offsetCursor + byteLength <= writeStartOffset + writtenInBatch
             let entry = IndexEntry(
@@ -153,18 +152,29 @@ final class LogStore: @unchecked Sendable {
                 offsetCursor += byteLength
             }
             index.append(entry)
+            indexByTs[entry.meta.ts] = entry
             metas.append(entry.meta)
         }
-        if index.count > maxIndexEntries {
-            index.removeFirst(index.count - maxIndexEntries)
-        }
+        trimIndex()
         return metas
+    }
+
+    /// Держит индекс в пределах потолка, забывая самые старые записи
+    private func trimIndex() {
+        let extra = index.count - maxIndexEntries
+        guard extra > 0 else {
+            return
+        }
+        for entry in index.prefix(extra) {
+            indexByTs.removeValue(forKey: entry.meta.ts)
+        }
+        index.removeFirst(extra)
     }
 
     /// Полное событие с этим ts — читает одну строку из файла по смещению из индекса
     func getEvent(ts: Double) -> ProxyLogEvent? {
         lock.lock()
-        let entry = index.first { $0.meta.ts == ts }
+        let entry = indexByTs[ts]
         lock.unlock()
 
         guard let entry else {
@@ -179,15 +189,12 @@ final class LogStore: @unchecked Sendable {
         defer {
             try? handle.close()
         }
-        do {
-            try handle.seek(toOffset: UInt64(entry.byteOffset))
-            guard let data = try handle.read(upToCount: entry.byteLength), data.count == entry.byteLength else {
-                return nil
-            }
-            return try JSONDecoder().decode(ProxyLogEvent.self, from: data)
-        } catch {
-            return nil
-        }
+        return LogStore.readEvent(
+            handle: handle,
+            offset: entry.byteOffset,
+            length: entry.byteLength,
+            decoder: JSONDecoder()
+        )
     }
 
     /// Последние записи для первичной отрисовки списка
@@ -260,18 +267,20 @@ final class LogStore: @unchecked Sendable {
     private func searchHistoryFiles(needle: String, searchInBody: Bool, generation: Int) -> [LogEntryMeta] {
         var found: [LogEntryMeta] = []
         var budget = historyLineLimit
+        let decoder = JSONDecoder()
+        let needleBytes = Array(needle.utf8)
         for url in historyFiles() {
             guard budget > 0, !isSearchStale(generation) else {
                 break
             }
             var read = 0
-            LogStore.forEachLine(in: url, limit: budget) { line in
+            LogStore.forEachLine(in: url, limit: budget) { lineData in
                 read += 1
                 if isSearchStale(generation) {
                     return false
                 }
-                guard line.lowercased().contains(needle),
-                      let event = LogStore.decodeEvent(line),
+                guard LogStore.lineContains(lineData, needleBytes: needleBytes, needle: needle),
+                      let event = LogStore.decodeEvent(lineData, decoder: decoder),
                       LogStore.eventMatches(event, needle: needle, searchInBody: searchInBody) else {
                     return true
                 }
@@ -286,9 +295,10 @@ final class LogStore: @unchecked Sendable {
     /// Полная запись по времени из файлов прошлых сессий
     private func eventFromHistory(ts: Double) -> ProxyLogEvent? {
         var found: ProxyLogEvent?
+        let decoder = JSONDecoder()
         for url in historyFiles() {
-            LogStore.forEachLine(in: url, limit: historyLineLimit) { line in
-                guard let event = LogStore.decodeEvent(line) else {
+            LogStore.forEachLine(in: url, limit: historyLineLimit) { lineData in
+                guard let event = LogStore.decodeEvent(lineData, decoder: decoder) else {
                     return true
                 }
                 guard abs(event.ts - ts) < 0.0005 else {
@@ -305,69 +315,115 @@ final class LogStore: @unchecked Sendable {
     }
 
     /// Читает файл построчно, пока обработчик не вернёт false
-    private static func forEachLine(in url: URL, limit: Int, _ body: (String) -> Bool) {
-        guard let handle = try? FileHandle(forReadingFrom: url) else {
+    private static func forEachLine(in url: URL, limit: Int, _ body: (Data) -> Bool) {
+        // файл сессии отдаётся отображением в память: построчные срезы не копируют остаток файла
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
             return
         }
-        defer {
-            try? handle.close()
-        }
-        var remainder = Data()
+        let end = data.endIndex
+        var start = data.startIndex
         var read = 0
-        while read < limit {
-            guard let chunk = try? handle.read(upToCount: 1 << 20), !chunk.isEmpty else {
-                break
-            }
-            remainder.append(chunk)
-            while let newline = remainder.firstIndex(of: 0x0A) {
-                let lineData = remainder[remainder.startIndex..<newline]
-                remainder = Data(remainder[remainder.index(after: newline)...])
-                read += 1
-                guard let line = String(data: lineData, encoding: .utf8) else {
-                    continue
-                }
-                guard body(line) else {
+        while start < end, read < limit {
+            read += 1
+            guard let newline = data[start..<end].firstIndex(of: 0x0A) else {
+                guard body(Data(data[start..<end])) else {
                     return
                 }
+                return
             }
+            guard body(Data(data[start..<newline])) else {
+                return
+            }
+            start = data.index(after: newline)
         }
     }
 
     /// Разбирает строку журнала
-    private static func decodeEvent(_ line: String) -> ProxyLogEvent? {
-        guard let data = line.data(using: .utf8) else {
+    private static func decodeEvent(_ lineData: Data, decoder: JSONDecoder) -> ProxyLogEvent? {
+        try? decoder.decode(ProxyLogEvent.self, from: lineData)
+    }
+
+    /// Совпадение строки файла с поисковой строкой: ASCII проверяется по байтам без сборки String
+    private static func lineContains(_ lineData: Data, needleBytes: [UInt8], needle: String) -> Bool {
+        if let asciiResult = asciiContains(lineData, needleBytes: needleBytes) {
+            return asciiResult
+        }
+        guard let line = String(data: lineData, encoding: .utf8) else {
+            return false
+        }
+        return line.lowercased().contains(needle)
+    }
+
+    /// Регистронезависимое вхождение по байтам; nil, когда байты не ASCII и нужна сверка строк
+    private static func asciiContains(_ lineData: Data, needleBytes: [UInt8]) -> Bool? {
+        guard !needleBytes.isEmpty, needleBytes.allSatisfy({ $0 < 0x80 }) else {
             return nil
         }
-        return try? JSONDecoder().decode(ProxyLogEvent.self, from: data)
+        let haystack = [UInt8](lineData)
+        guard haystack.count >= needleBytes.count else {
+            return false
+        }
+        let first = asciiLower(needleBytes[0])
+        let lastStart = haystack.count - needleBytes.count
+        var hasNonASCII = false
+        var start = 0
+        while start < haystack.count {
+            let byte = haystack[start]
+            if byte >= 0x80 {
+                hasNonASCII = true
+            }
+            if start <= lastStart, asciiLower(byte) == first {
+                var offset = 1
+                while offset < needleBytes.count, asciiLower(haystack[start + offset]) == needleBytes[offset] {
+                    offset += 1
+                }
+                if offset == needleBytes.count {
+                    return true
+                }
+            }
+            start += 1
+        }
+        return hasNonASCII ? nil : false
+    }
+
+    /// Переводит байт ASCII в нижний регистр
+    private static func asciiLower(_ byte: UInt8) -> UInt8 {
+        byte >= 0x41 && byte <= 0x5A ? byte + 0x20 : byte
+    }
+
+    /// Регистронезависимое вхождение подстроки, needle уже в нижнем регистре
+    private static func contains(_ text: String, _ needle: String) -> Bool {
+        text.lowercased().contains(needle)
     }
 
     /// Совпадает ли запись с поисковой строкой по url, файлу подмены и телам
     private static func eventMatches(_ event: ProxyLogEvent, needle: String, searchInBody: Bool) -> Bool {
-        if event.url.lowercased().contains(needle) {
+        if LogStore.contains(event.url, needle) {
             return true
         }
-        if event.event == .matched, event.file.lowercased().contains(needle) {
+        if event.event == .matched, LogStore.contains(event.file, needle) {
             return true
         }
         guard searchInBody else {
             return false
         }
-        return event.requestBody.lowercased().contains(needle)
-            || event.responseBody.lowercased().contains(needle)
+        return LogStore.contains(event.requestBody, needle) || LogStore.contains(event.responseBody, needle)
     }
 
-    /// Строка файла сессии: JSON без переводов строки
-    private static func encodeLine(_ event: ProxyLogEvent) -> String {
+    /// Строки файла сессии: один кодировщик на пачку, JSON с переводом строки на конце
+    private static func encodeLines(_ events: [ProxyLogEvent]) -> [Data] {
         let encoder = JSONEncoder()
-        guard let data = try? encoder.encode(event), let json = String(data: data, encoding: .utf8) else {
-            return "{}"
+        return events.map { event in
+            guard let data = try? encoder.encode(event), let json = String(data: data, encoding: .utf8) else {
+                return Data("{}\n".utf8)
+            }
+            // Foundation экранирует слэши как "\/", в журнале это лишний шум
+            return Data((json.replacingOccurrences(of: "\\/", with: "/") + "\n").utf8)
         }
-        // Foundation экранирует слэши как "\/", в журнале это лишний шум
-        return json.replacingOccurrences(of: "\\/", with: "/") + "\n"
     }
 
     /// Дописывает строку в файл сессии, открывая его при первой записи
-    private func writeLine(_ text: String) throws {
+    private func writeLine(_ line: Data) throws {
         if writeHandle == nil {
             if !FileManager.default.fileExists(atPath: fileURL.path) {
                 FileManager.default.createFile(atPath: fileURL.path, contents: nil)
@@ -375,7 +431,7 @@ final class LogStore: @unchecked Sendable {
             writeHandle = try FileHandle(forWritingTo: fileURL)
             try writeHandle?.seekToEnd()
         }
-        try writeHandle?.write(contentsOf: Data(text.utf8))
+        try writeHandle?.write(contentsOf: line)
     }
 
     /// Отключает запись на диск после первой ошибки файловой системы
@@ -404,11 +460,17 @@ final class LogStore: @unchecked Sendable {
         defer {
             try? handle.close()
         }
+        let decoder = JSONDecoder()
         for entry in pending {
-            guard let event = LogStore.readEvent(handle: handle, entry: entry) else {
+            guard let event = LogStore.readEvent(
+                handle: handle,
+                offset: entry.byteOffset,
+                length: entry.byteLength,
+                decoder: decoder
+            ) else {
                 continue
             }
-            if event.requestBody.lowercased().contains(needle) || event.responseBody.lowercased().contains(needle) {
+            if LogStore.contains(event.requestBody, needle) || LogStore.contains(event.responseBody, needle) {
                 matched.insert(entry.meta.ts)
             }
         }
@@ -416,13 +478,18 @@ final class LogStore: @unchecked Sendable {
     }
 
     /// Читает индексированную строку по смещению и разбирает её
-    private static func readEvent(handle: FileHandle, entry: IndexEntry) -> ProxyLogEvent? {
+    private static func readEvent(
+        handle: FileHandle,
+        offset: Int,
+        length: Int,
+        decoder: JSONDecoder
+    ) -> ProxyLogEvent? {
         do {
-            try handle.seek(toOffset: UInt64(entry.byteOffset))
-            guard let data = try handle.read(upToCount: entry.byteLength), data.count == entry.byteLength else {
+            try handle.seek(toOffset: UInt64(offset))
+            guard let data = try handle.read(upToCount: length), data.count == length else {
                 return nil
             }
-            return try JSONDecoder().decode(ProxyLogEvent.self, from: data)
+            return try decoder.decode(ProxyLogEvent.self, from: data)
         } catch {
             return nil
         }

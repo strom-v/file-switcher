@@ -70,6 +70,26 @@ struct LogStoreTests {
         #expect(all.count == 2)
     }
 
+    @Test("поиск по истории не зависит от регистра, включая кириллицу")
+    func searchHistoryIgnoresCase() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let previous = LogStore(directory: directory)
+        _ = previous.appendBatch([
+            makeEvent(url: "https://example.com/Заказы?id=7", ts: 300, responseBody: "Привет"),
+            makeEvent(url: "https://example.com/ORDERS", ts: 301, responseBody: "hello")
+        ])
+        try await Task.sleep(for: .milliseconds(5))
+        let current = LogStore(directory: directory)
+
+        #expect(current.search(query: "заказы", searchInBody: false, includeHistory: true).map(\.ts) == [300])
+        #expect(current.search(query: "orders", searchInBody: false, includeHistory: true).map(\.ts) == [301])
+        #expect(current.search(query: "привет", searchInBody: true, includeHistory: true).map(\.ts) == [300])
+    }
+
     @Test("поиск по истории находит записи прошлой сессии")
     func searchIncludesHistory() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

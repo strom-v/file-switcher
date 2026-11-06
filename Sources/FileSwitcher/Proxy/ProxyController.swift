@@ -20,6 +20,8 @@ final class ProxyController {
     private var server: ProxyServer?
     private var pendingLogs: [ProxyLogEvent] = []
     private var flushTask: Task<Void, Never>?
+    /// Очередь записи пачек журнала: диск пишется в фоне, но пачки идут строго по порядку
+    private var logWriteChain: Task<Void, Never> = Task {}
     private var shownWarnings: Set<String> = []
     private var systemProxyChain: Task<Void, Never> = Task {}
 
@@ -117,9 +119,10 @@ final class ProxyController {
         }
     }
 
-    /// Останавливает прокси и ждёт, пока системный прокси вернётся в исходное состояние
+    /// Останавливает прокси и ждёт, пока система и журнал вернутся в исходное состояние
     func stopAndWait() async {
         stop()
+        await logWriteChain.value
         await systemProxyChain.value
     }
 
@@ -188,13 +191,24 @@ final class ProxyController {
         }
         let batch = pendingLogs
         pendingLogs = []
-        let metas = store.appendBatch(batch)
-        onLogBatch?(metas)
-        if store.consumeSizeLimitWarning() {
-            emitWarning(ProxyController.logSizeLimitMessage)
-        }
-        if let diskWarning = store.consumeDiskLoggingWarning() {
-            emitWarning(diskWarning)
+        let store = store
+        let previous = logWriteChain
+        // запись на диск идёт в фоне, но пачки не обгоняют друг друга: порядок в журнале сохраняется
+        logWriteChain = Task { [weak self] in
+            await previous.value
+            let metas = await Task.detached(priority: .utility) {
+                store.appendBatch(batch)
+            }.value
+            guard let self else {
+                return
+            }
+            onLogBatch?(metas)
+            if store.consumeSizeLimitWarning() {
+                emitWarning(ProxyController.logSizeLimitMessage)
+            }
+            if let diskWarning = store.consumeDiskLoggingWarning() {
+                emitWarning(diskWarning)
+            }
         }
     }
 
