@@ -6,7 +6,9 @@
     "startProxyButton": "start proxy",
     "stopProxyButton": "stop proxy",
     "relaunchButton": "restart the app",
-    "relaunchConfirm": "restart the app? the proxy will be stopped and started again"
+    "relaunchConfirm": "restart the app? the proxy will be stopped and started again",
+    "tabProxy": "proxy",
+    "tabTests": "tests"
   },
   "rules": {
     "addButton": "add rule",
@@ -89,7 +91,6 @@
   },
   "settings": {
     "error": "error",
-    "groupAppearance": "interface",
     "groupNetwork": "general",
     "groupData": "data",
     "groupDeveloper": "developer",
@@ -118,11 +119,7 @@
     "removeCertSuccess": "certificate trust removed",
     "removeCertError": "failed to remove trust: {{message}}",
     "firefoxWarningTitle": "Firefox is not supported in the MVP",
-    "firefoxWarningDescription": "Firefox uses its own certificate store (NSS), not the system one. import the certificate manually via about:preferences#privacy → Certificates.",
-    "themeLight": "light",
-    "themeDark": "dark",
-    "langRu": "russian",
-    "langEn": "english"
+    "firefoxWarningDescription": "Firefox uses its own certificate store (NSS), not the system one. import the certificate manually via about:preferences#privacy → Certificates."
   },
   "onboarding": {
     "title": "welcome to FileSwitcher",
@@ -150,6 +147,18 @@
         "description": "in Settings, click «Install automatically», or trust it manually in the system certificate store"
       }
     }
+  },
+  "tests": {
+    "title": "tests",
+    "runAll": "run all tests",
+    "run": "run test",
+    "refresh": "refresh test list",
+    "empty": "no tests found",
+    "passed": "passed",
+    "failed": "failed",
+    "skipped": "skipped",
+    "allPassed": "all passed",
+    "summary": "{{passed}} of {{total}} passed"
   },
   "proxyErrors": {
     "startFailed": "failed to start the proxy"

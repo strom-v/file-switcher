@@ -7,6 +7,7 @@ import {
   Flex,
   Layout,
   Popconfirm,
+  Segmented,
   Space,
   Splitter,
   theme as antdTheme,
@@ -22,6 +23,7 @@ import RulesTable from './components/RulesTable'
 import RuleFormModal from './components/RuleFormModal'
 import LogPanel from './components/LogPanel'
 import SettingsPanel from './components/SettingsPanel'
+import TestsPanel from './components/TestsPanel'
 import IconButton from './components/IconButton'
 import OnboardingModal, { hasSeenOnboarding, markOnboardingSeen } from './components/OnboardingModal'
 import { useProxyState } from './hooks/useProxyState'
@@ -29,7 +31,6 @@ import { useVpnStatus } from './hooks/useVpnStatus'
 import { useProxySettings } from './hooks/useProxySettings'
 import { useSplitterSize } from './hooks/useSplitterSize'
 import { useThemeMode } from './hooks/useThemeMode'
-import { setLanguage, type SupportedLanguage } from './i18n'
 import { COLOR_DANGER, COLOR_SUCCESS, COLOR_WARNING } from './theme'
 import { compareGroupNames } from '../shared/ruleGroups'
 import type { ProxyLogEvent, Rule } from '../shared/types'
@@ -52,7 +53,7 @@ const START_STOP_COLOR: Record<string, string> = {
 /** Корневой компонент: постоянные панели лога и правил, настройки в Drawer */
 export default function App(): React.ReactElement {
   const { t, i18n } = useTranslation()
-  const { mode, isDark, setMode } = useThemeMode()
+  const { isDark } = useThemeMode()
   const [rules, setRules] = useState<Rule[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   // при дублировании (handleDuplicate) editingRule — копия без id, чтобы форма/handleSubmit
@@ -60,6 +61,7 @@ export default function App(): React.ReactElement {
   const [editingRule, setEditingRule] = useState<Rule | Omit<Rule, 'id'> | null>(null)
   const [onboardingOpen, setOnboardingOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [view, setView] = useState<'proxy' | 'tests'>('proxy')
   const { splitterSize, setSplitterSize } = useSplitterSize()
   const { port, setPort } = useProxySettings()
   const { status, logs, clearLogs, appendLog } = useProxyState((text) => {
@@ -203,7 +205,7 @@ export default function App(): React.ReactElement {
   const allRulesEnabled = rules.length > 0 && enabledRulesCount === rules.length
   const someRulesEnabled = enabledRulesCount > 0 && enabledRulesCount < rules.length
 
-  const currentLanguage = (i18n.language.startsWith('ru') ? 'ru' : 'en') as SupportedLanguage
+  const currentLanguage: 'ru' | 'en' = i18n.language.startsWith('ru') ? 'ru' : 'en'
 
   // мемоизация обязательна: без неё новый объект темы на каждый рендер (например, на каждое событие лога)
   // заставляет ConfigProvider пересчитывать CSS-in-JS всего дерева — заметно тормозит перетаскивание Splitter
@@ -242,6 +244,15 @@ export default function App(): React.ReactElement {
             <Typography.Title level={4} style={{ margin: 0 }}>
               FileSwitcher
             </Typography.Title>
+            <Segmented
+              size="small"
+              value={view}
+              onChange={(value) => setView(value as 'proxy' | 'tests')}
+              options={[
+                { label: t('app.tabProxy'), value: 'proxy' },
+                { label: t('app.tabTests'), value: 'tests' }
+              ]}
+            />
           </Space>
           <Space>
             <IconButton
@@ -279,47 +290,51 @@ export default function App(): React.ReactElement {
 
         {/* full-tunnel VPN точно ломает перехват — заметный алерт, висит пока такой VPN активен
             и сам исчезает при его отключении (закрыть вручную нельзя, иначе потерялось бы) */}
-        {vpn.blocksProxy && (
+        {view === 'proxy' && vpn.blocksProxy && (
           <Alert type="error" showIcon message={t('app.vpnBlocksWarning')} style={{ marginBottom: 8 }} />
         )}
 
-        <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
-          <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">
-            <div style={{ height: '100%', paddingRight: 8 }}>
-              <LogPanel logs={logs} onClear={clearLogs} onAddRule={handleAddRuleFromLog} onReplayLogged={appendLog} />
-            </div>
-          </Splitter.Panel>
-          <Splitter.Panel>
-            <div className="panel-column" style={{ paddingLeft: 8 }}>
-              <Flex justify="space-between" align="center" className="panel-toolbar">
-                <Tooltip title={t(allRulesEnabled ? 'rules.disableAll' : 'rules.enableAll')}>
-                  <Flex align="center" justify="center" style={{ width: 24, height: 24 }}>
-                    <Checkbox
-                      checked={allRulesEnabled}
-                      indeterminate={someRulesEnabled}
-                      disabled={rules.length === 0}
-                      onChange={(e) => handleToggleAll(e.target.checked)}
-                    />
-                  </Flex>
-                </Tooltip>
-                <IconButton
-                  tooltip={t('rules.addButton')}
-                  icon={<PlusOutlined />}
-                  onClick={handleAdd}
-                  style={{ color: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
-                />
-              </Flex>
-              <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
-                <RulesTable
-                  rules={rules}
-                  onToggle={handleToggle}
-                  onEdit={handleEdit}
-                  onMoveToGroup={handleMoveToGroup}
-                />
+        {view === 'proxy' && (
+          <Splitter style={{ flex: 1, minHeight: 0 }} onResize={handleSplitterResizeEnd}>
+            <Splitter.Panel size={`${splitterSize}%`} min="20%" max="80%">
+              <div style={{ height: '100%', paddingRight: 8 }}>
+                <LogPanel logs={logs} onClear={clearLogs} onAddRule={handleAddRuleFromLog} onReplayLogged={appendLog} />
               </div>
-            </div>
-          </Splitter.Panel>
-        </Splitter>
+            </Splitter.Panel>
+            <Splitter.Panel>
+              <div className="panel-column" style={{ paddingLeft: 8 }}>
+                <Flex justify="space-between" align="center" className="panel-toolbar">
+                  <Tooltip title={t(allRulesEnabled ? 'rules.disableAll' : 'rules.enableAll')}>
+                    <Flex align="center" justify="center" style={{ width: 24, height: 24 }}>
+                      <Checkbox
+                        checked={allRulesEnabled}
+                        indeterminate={someRulesEnabled}
+                        disabled={rules.length === 0}
+                        onChange={(e) => handleToggleAll(e.target.checked)}
+                      />
+                    </Flex>
+                  </Tooltip>
+                  <IconButton
+                    tooltip={t('rules.addButton')}
+                    icon={<PlusOutlined />}
+                    onClick={handleAdd}
+                    style={{ color: COLOR_SUCCESS, borderColor: COLOR_SUCCESS }}
+                  />
+                </Flex>
+                <div className="scroll-panel scroll-panel--visible scroll-panel--panel-bg">
+                  <RulesTable
+                    rules={rules}
+                    onToggle={handleToggle}
+                    onEdit={handleEdit}
+                    onMoveToGroup={handleMoveToGroup}
+                  />
+                </div>
+              </div>
+            </Splitter.Panel>
+          </Splitter>
+        )}
+
+        {view === 'tests' && <TestsPanel />}
 
         <RuleFormModal
           open={modalOpen}
@@ -339,10 +354,6 @@ export default function App(): React.ReactElement {
             rules={rules}
             onRulesImport={persist}
             onRulesRefresh={handleRefreshRules}
-            language={currentLanguage}
-            onLanguageChange={setLanguage}
-            themeMode={mode}
-            onThemeModeChange={setMode}
           />
         </Drawer>
       </Layout>

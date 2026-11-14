@@ -74,3 +74,36 @@ export interface VpnStatus {
    * системный прокси не перехватывает трафик (split-tunnel не мешает и сюда не попадает) */
   blocksProxy: boolean
 }
+
+/** Тест, найденный в проекте (для панели «Тесты») */
+export interface TestCase {
+  /** уникальный ключ: путь к файлу + полное имя теста */
+  id: string
+  /** путь к тест-файлу относительно корня проекта, напр. src/shared/ruleGroups.test.ts */
+  file: string
+  /** полное имя теста (цепочка describe + название), напр. "groupKeyOf > возвращает группу" */
+  fullName: string
+  /** только название теста (последний сегмент полного имени) */
+  title: string
+}
+
+export type TestResultStatus = 'passed' | 'failed' | 'skipped'
+
+/** Результат выполнения одного теста */
+export interface TestResult {
+  id: string
+  status: TestResultStatus
+  title: string
+  duration: number
+  /** текст ошибки для упавшего теста */
+  error?: string
+}
+
+/** Сводка по результатам запуска тестов */
+export interface TestRunSummary {
+  total: number
+  passed: number
+  failed: number
+  skipped: number
+  results: TestResult[]
+}

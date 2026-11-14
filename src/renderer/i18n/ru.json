@@ -6,7 +6,9 @@
     "startProxyButton": "запустить прокси",
     "stopProxyButton": "остановить прокси",
     "relaunchButton": "перезапустить программу",
-    "relaunchConfirm": "перезапустить программу? прокси будет остановлен и запущен заново"
+    "relaunchConfirm": "перезапустить программу? прокси будет остановлен и запущен заново",
+    "tabProxy": "прокси",
+    "tabTests": "тесты"
   },
   "rules": {
     "addButton": "добавить правило",
@@ -89,7 +91,6 @@
   },
   "settings": {
     "error": "ошибка",
-    "groupAppearance": "интерфейс",
     "groupNetwork": "общее",
     "groupData": "данные",
     "groupDeveloper": "разработчику",
@@ -118,11 +119,7 @@
     "removeCertSuccess": "доверие к сертификату удалено",
     "removeCertError": "не удалось удалить доверие: {{message}}",
     "firefoxWarningTitle": "Firefox не поддерживается в MVP",
-    "firefoxWarningDescription": "Firefox использует собственное хранилище сертификатов (NSS), а не системное. импортируйте сертификат вручную через about:preferences#privacy → Certificates.",
-    "themeLight": "светлая",
-    "themeDark": "тёмная",
-    "langRu": "русский",
-    "langEn": "английский"
+    "firefoxWarningDescription": "Firefox использует собственное хранилище сертификатов (NSS), а не системное. импортируйте сертификат вручную через about:preferences#privacy → Certificates."
   },
   "onboarding": {
     "title": "добро пожаловать в FileSwitcher",
@@ -150,6 +147,18 @@
         "description": "в «настройках» нажмите «установить автоматически», либо доверьтесь вручную в системном хранилище"
       }
     }
+  },
+  "tests": {
+    "title": "тесты",
+    "runAll": "запустить все тесты",
+    "run": "запустить тест",
+    "refresh": "обновить список тестов",
+    "empty": "тесты не найдены",
+    "passed": "прошёл",
+    "failed": "упал",
+    "skipped": "пропущен",
+    "allPassed": "все прошли",
+    "summary": "прошло {{passed}} из {{total}}"
   },
   "proxyErrors": {
     "startFailed": "не удалось запустить прокси"

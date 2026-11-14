@@ -4,8 +4,6 @@ import { QuestionCircleOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import SectionHeader from './SectionHeader'
 import SettingsGroup from './SettingsGroup'
-import type { ThemeMode } from '../hooks/useThemeMode'
-import type { SupportedLanguage } from '../i18n'
 import { isValidRuleArray } from '../../shared/validateRule'
 import type { CertStatus, ProxyState, Rule } from '../../shared/types'
 
@@ -16,24 +14,16 @@ interface SettingsPanelProps {
   rules: Rule[]
   onRulesImport: (rules: Rule[]) => Promise<boolean>
   onRulesRefresh: () => Promise<void>
-  language: SupportedLanguage
-  onLanguageChange: (language: SupportedLanguage) => void
-  themeMode: ThemeMode
-  onThemeModeChange: (mode: ThemeMode) => void
 }
 
-/** Панель настроек: язык/тема, порт, статус сертификата, экспорт лога и правил, devtools */
+/** Панель настроек: порт, статус сертификата, экспорт лога и правил, devtools */
 export default function SettingsPanel({
   status,
   port,
   onPortChange,
   rules,
   onRulesImport,
-  onRulesRefresh,
-  language,
-  onLanguageChange,
-  themeMode,
-  onThemeModeChange
+  onRulesRefresh
 }: SettingsPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const [certStatus, setCertStatus] = useState<CertStatus>('not-generated')
@@ -180,30 +170,7 @@ export default function SettingsPanel({
     <Space orientation="vertical" size="large" style={{ width: '100%' }}>
       {status.error && <Alert type="error" title={t('settings.error')} description={status.error} />}
 
-      <SettingsGroup title={t('settings.groupAppearance')} first>
-        <Space.Compact block>
-          <Select<SupportedLanguage>
-            style={{ width: '50%' }}
-            value={language}
-            onChange={onLanguageChange}
-            options={[
-              { label: t('settings.langRu'), value: 'ru' },
-              { label: t('settings.langEn'), value: 'en' }
-            ]}
-          />
-          <Select<ThemeMode>
-            style={{ width: '50%' }}
-            value={themeMode}
-            onChange={onThemeModeChange}
-            options={[
-              { label: t('settings.themeLight'), value: 'light' },
-              { label: t('settings.themeDark'), value: 'dark' }
-            ]}
-          />
-        </Space.Compact>
-      </SettingsGroup>
-
-      <SettingsGroup title={t('settings.groupNetwork')}>
+      <SettingsGroup title={t('settings.groupNetwork')} first>
         <Space>
           <InputNumber
             min={1}

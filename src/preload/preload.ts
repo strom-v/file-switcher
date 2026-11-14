@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Rule, ProxyState, ProxyLogEvent, LogEntryMeta, CertStatus, VpnStatus } from '../shared/types'
+import type {
+  Rule,
+  ProxyState,
+  ProxyLogEvent,
+  LogEntryMeta,
+  CertStatus,
+  VpnStatus,
+  TestCase,
+  TestRunSummary
+} from '../shared/types'
 
 const api = {
   // домашняя папка текущего пользователя — renderer сам её получить не может (contextIsolation);
@@ -51,6 +60,11 @@ const api = {
       ipcRenderer.invoke('log:export', format, defaultFileName),
     // есть ли на диске записи сессии — для доступности кнопки экспорта (renderer-список чистится отдельно)
     hasExportableEvents: (): Promise<boolean> => ipcRenderer.invoke('log:hasExportableEvents')
+  },
+  tests: {
+    list: (): Promise<TestCase[]> => ipcRenderer.invoke('tests:list'),
+    run: (filter?: { file?: string; testName?: string }): Promise<TestRunSummary> =>
+      ipcRenderer.invoke('tests:run', filter)
   },
   cert: {
     status: (): Promise<CertStatus> => ipcRenderer.invoke('cert:status'),

@@ -9,6 +9,7 @@ import { platform } from './platform'
 import { replayRequest } from './replayRequest'
 import { logStore } from './logStore'
 import { streamLogExport, type LogExportFormat } from './logExport'
+import { listTests, runTests } from './testRunner'
 
 // защита от IPC, пришедшего не из нашего renderer: у приложения одно окно с локальным контентом,
 // setWindowOpenHandler запрещает новые — но если renderer скомпрометирован (XSS в показанном теле,
@@ -131,6 +132,10 @@ export function registerIpcHandlers(): void {
     await writeFile(result.filePath, content, 'utf-8')
     return result.filePath
   })
+
+  handle('tests:list', () => listTests())
+
+  handle('tests:run', (_event, filter?: { file?: string; testName?: string }) => runTests(filter))
 
   proxyController.on('status', (state) => {
     broadcast('proxy:status', state)
